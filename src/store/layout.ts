@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type RightPanel = 'edit' | 'meta' | 'none'
+export type RightPanel = 'edit' | 'meta' | 'preset' | 'none'
 
 const LAYOUT_KEY = 'raw-viewer:layout'
 
@@ -26,6 +26,7 @@ const persist = (value: Persisted) => {
 type LayoutState = Persisted & {
     toggleEditPanel: () => void
     toggleMetaPanel: () => void
+    selectRightPanel: (panel: Exclude<RightPanel, 'none'>) => void
     toggleFilmstrip: () => void
 }
 
@@ -39,6 +40,7 @@ export const useLayout = create<LayoutState>((set, get) => {
         ...load(),
         toggleEditPanel: () => save({ rightPanel: get().rightPanel === 'edit' ? 'none' : 'edit' }),
         toggleMetaPanel: () => save({ rightPanel: get().rightPanel === 'meta' ? 'none' : 'meta' }),
+        selectRightPanel: (panel) => save({ rightPanel: get().rightPanel === panel ? 'none' : panel }),
         toggleFilmstrip: () => save({ filmstripVisible: !get().filmstripVisible }),
     }
 })
