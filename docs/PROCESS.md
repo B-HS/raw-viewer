@@ -99,10 +99,12 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 통합: cargo test 206 + bun run build + 실기동(패닉 0). 시각 확인은 화면 잠금으로 보류(사용자 재석 시)
 - 3c SPEC-GAP: Dock setState 체크마크 미시도(점 표시 고정), open-with 편집본 TIFF는 3d로, 클립보드 TIFF 무압축(메인스레드 히치 가능), fileAssociations 이미지 그룹 mimeType `image/*` 제거(부적합 와일드카드)
 
-### 3d (계약: docs/phase3d-contract.md) — 진행 중 (feat/phase-3d-lens)
-- [ ] LN: Lensfun XML DB(pin+sync 스크립트, CC-BY-SA 고지)·quick-xml 파싱·매칭/보간·override(005) — 서브에이전트
-- [ ] DX: DNG XMP tag700 주입(dnglab 산출물 IFD 재작성+검증)·프리셋 xmp import/export·open_with_edited — 서브에이전트
-- [ ] FL: gl pass② 렌즈 보정(poly3/poly5/ptlens·TCA·pa 비네팅)·LensSection·프리셋 IO UI·편집본으로 열기 — 서브에이전트 (후속)
+### 3d (계약: docs/phase3d-contract.md) — **완료, dev 반영(fb2bb96·2ec6712)**
+- [x] LN: Lensfun v0.3.95(pin+sync, CC-BY-SA 고지) 파싱 카메라 751·렌즈 952, 매칭(토큰 스코어·mount 호환·crop 게이트 0.96)·초점 선형보간·비네팅 IDW(3.5), override(005) — 테스트 241
+- [x] DX: DNG tag700 주입(EOF append+IFD 재작성 — 기존 오프셋 불변, 재파싱+meta 검증, 원자 rename) 실측 라운드트립(aether:state 100% 복원)·프리셋 .xmp IO·open_with_edited
+- [x] FL: gl 패스② 렌즈 보정(poly3/poly5 Newton·ptlens 사전스케일·TCA·pa 비네팅 선형 곱)·LensSection·프리셋 IO UI·편집 적용본 TIFF 외부 열기
+- [x] 통합: cargo test 241 + bun run build + 실기동(패닉 0). 시각 확인 보류(화면 잠금)
+- 3d SPEC-GAP: 보간은 선형(lensfun 4점 Hermite 대비 3점+ 시 미세 편차), subjectDistance 기본 1000, DNG OpcodeList 우선 규칙(FR-8) 미구현, aperture 미상 시 비네팅 없음
 
 ### Phase 3 이후 잔여
 Export batch 고도화 · 워터마크(FR-14.1 P1) · 필름스트립 높이 드래그 · 히스토리 패널 · §8.2 수용 기준 전수 점검 · 성능 목표 실측(release 빌드, M1 기준은 사용자 하드웨어로 근사)

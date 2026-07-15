@@ -148,6 +148,8 @@ pub fn run() {
             commands::watch_directory,
             export::commands::export_begin,
             export::commands::export_tile,
+            export::commands::export_set_watermark,
+            export::commands::read_watermark_png,
             export::commands::export_finish,
             export::commands::export_cancel,
             export::commands::export_dng,

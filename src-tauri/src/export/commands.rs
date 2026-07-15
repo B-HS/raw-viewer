@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use tauri::ipc::{InvokeBody, Request};
+use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::edit::EditService;
@@ -42,6 +42,34 @@ pub fn export_tile(request: Request<'_>, export: State<'_, ExportService>) -> Ap
         InvokeBody::Json(_) => return Err(AppError::Internal("export_tile requires a raw body".to_owned())),
     };
     export.ingest_tile(&job_id, x, y, width, height, body)
+}
+
+#[tauri::command]
+pub fn export_set_watermark(request: Request<'_>, export: State<'_, ExportService>) -> AppResult<()> {
+    let job_id = header_str(&request, "x-export-job")?;
+    let body = match request.body() {
+        InvokeBody::Raw(bytes) => bytes.as_slice(),
+        InvokeBody::Json(_) => return Err(AppError::Internal("export_set_watermark requires a raw body".to_owned())),
+    };
+    export.set_watermark(&job_id, body)
+}
+
+fn read_watermark_bytes(path: &Path) -> AppResult<Vec<u8>> {
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > 64 * 1024 * 1024 {
+        return Err(AppError::Internal("watermark file exceeds 64MB".to_owned()));
+    }
+    let bytes = std::fs::read(path)?;
+    image::load_from_memory(&bytes).map_err(|error| AppError::Internal(format!("invalid watermark image: {error}")))?;
+    Ok(bytes)
+}
+
+#[tauri::command]
+pub async fn read_watermark_png(path: PathBuf) -> AppResult<Response> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || read_watermark_bytes(&path))
+        .await
+        .map_err(|error| AppError::Internal(format!("watermark read task failed: {error}")))??;
+    Ok(Response::new(bytes))
 }
 
 #[tauri::command]

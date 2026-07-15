@@ -1,16 +1,20 @@
-import { open as openFolder } from '@tauri-apps/plugin-dialog'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect } from 'react'
 import type { FC, PropsWithChildren } from 'react'
 import { useTranslation } from 'react-i18next'
+import { loadWatermarkImage, WATERMARK_POSITIONS } from '../lib/watermark'
 import { usePlaylist } from '../store/playlist'
 import { useExportStore } from '../store/exportStore'
+import type { WatermarkMode, WatermarkSettings } from '../lib/watermark'
 import type { ConflictPolicy } from '../types/ConflictPolicy'
 import type { ExportColorSpace } from '../types/ExportColorSpace'
 import type { ExportMetadata } from '../types/ExportMetadata'
 import type { RasterFormat } from '../types/RasterFormat'
 import type { ResizeMode } from '../types/ResizeMode'
 import type { ExportOutputMode } from '../store/exportStore'
+
+const basename = (path: string) => path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 
 const FORMATS: readonly (readonly [RasterFormat, string])[] = [
     ['jpeg', 'JPEG'],
@@ -173,9 +177,23 @@ export const ExportDialog: FC = () => {
     const startDisabled = running || targets.length === 0 || customMissing || settings.filenameTemplate.trim().length === 0
     const percent = total > 0 ? Math.round((done / total) * 100) : 0
 
+    const updateWatermark = (patch: Partial<WatermarkSettings>) => update({ watermark: { ...settings.watermark, ...patch } })
+
     const pickFolder = async () => {
-        const selected = await openFolder({ directory: true, multiple: false, title: t('export.pickFolderTitle') }).catch(() => null)
+        const selected = await openDialog({ directory: true, multiple: false, title: t('export.pickFolderTitle') }).catch(() => null)
         if (typeof selected === 'string') update({ output: 'custom', customDir: selected })
+    }
+
+    const pickWatermarkImage = async () => {
+        const selected = await openDialog({
+            directory: false,
+            multiple: false,
+            title: t('export.watermarkPickTitle'),
+            filters: [{ name: 'PNG', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+        }).catch(() => null)
+        if (typeof selected !== 'string') return
+        await loadWatermarkImage(selected).catch(() => null)
+        updateWatermark({ mode: 'image', imagePath: selected })
     }
 
     return (
@@ -301,6 +319,112 @@ export const ExportDialog: FC = () => {
                         <Choice value={settings.conflict} options={conflictOptions} onChange={(conflict) => update({ conflict })} />
                     </Field>
 
+                    <Field label={t('export.watermark')}>
+                        <label className='flex cursor-pointer items-center gap-2 text-xs text-neutral-300'>
+                            <input
+                                type='checkbox'
+                                checked={settings.watermark.enabled}
+                                onChange={(event) => updateWatermark({ enabled: event.target.checked })}
+                                className='accent-neutral-300'
+                            />
+                            {t('export.watermarkEnable')}
+                        </label>
+                        {settings.watermark.enabled && (
+                            <div className='mt-1 flex flex-col gap-3 rounded border border-neutral-800 bg-neutral-950/40 p-3'>
+                                <Choice
+                                    value={settings.watermark.mode}
+                                    options={[
+                                        ['text', t('export.watermarkText')],
+                                        ['image', t('export.watermarkImage')],
+                                    ]}
+                                    onChange={(mode: WatermarkMode) => updateWatermark({ mode })}
+                                />
+                                {settings.watermark.mode === 'text' ? (
+                                    <input
+                                        value={settings.watermark.text}
+                                        onChange={(event) => updateWatermark({ text: event.target.value })}
+                                        placeholder={t('export.watermarkContent')}
+                                        spellCheck={false}
+                                        className='w-full rounded bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:ring-1 focus:ring-neutral-500'
+                                    />
+                                ) : (
+                                    <div className='flex items-center gap-2'>
+                                        <span className='min-w-0 flex-1 truncate rounded bg-neutral-800 px-2 py-1 text-[11px] text-neutral-400'>
+                                            {basename(settings.watermark.imagePath) || t('export.watermarkNoImage')}
+                                        </span>
+                                        <button
+                                            type='button'
+                                            onClick={pickWatermarkImage}
+                                            className='shrink-0 rounded border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300 hover:bg-neutral-800'>
+                                            {t('export.watermarkPickImage')}
+                                        </button>
+                                    </div>
+                                )}
+                                <div className='flex gap-4'>
+                                    <div className='flex flex-col gap-1'>
+                                        <span className='text-[10px] uppercase tracking-wide text-neutral-500'>{t('export.watermarkPosition')}</span>
+                                        <div className='grid grid-cols-3 gap-1'>
+                                            {WATERMARK_POSITIONS.map((position) => (
+                                                <button
+                                                    key={position}
+                                                    type='button'
+                                                    aria-label={t(`export.wmPos.${position}`)}
+                                                    onClick={() => updateWatermark({ position })}
+                                                    className={`h-5 w-6 rounded-sm ${
+                                                        settings.watermark.position === position
+                                                            ? 'bg-neutral-200'
+                                                            : 'bg-neutral-800 hover:bg-neutral-700'
+                                                    }`}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className='flex flex-1 flex-col gap-2'>
+                                        <label className='flex flex-col gap-1'>
+                                            <span className='text-[10px] uppercase tracking-wide text-neutral-500'>
+                                                {t('export.watermarkSize', { value: settings.watermark.sizePercent })}
+                                            </span>
+                                            <input
+                                                type='range'
+                                                min={1}
+                                                max={settings.watermark.mode === 'text' ? 20 : 100}
+                                                value={settings.watermark.sizePercent}
+                                                onChange={(event) => updateWatermark({ sizePercent: Number(event.target.value) })}
+                                                className='w-full accent-neutral-300'
+                                            />
+                                        </label>
+                                        <label className='flex flex-col gap-1'>
+                                            <span className='text-[10px] uppercase tracking-wide text-neutral-500'>
+                                                {t('export.watermarkOpacity', { value: settings.watermark.opacity })}
+                                            </span>
+                                            <input
+                                                type='range'
+                                                min={0}
+                                                max={100}
+                                                value={settings.watermark.opacity}
+                                                onChange={(event) => updateWatermark({ opacity: Number(event.target.value) })}
+                                                className='w-full accent-neutral-300'
+                                            />
+                                        </label>
+                                        <label className='flex flex-col gap-1'>
+                                            <span className='text-[10px] uppercase tracking-wide text-neutral-500'>
+                                                {t('export.watermarkMargin', { value: settings.watermark.marginPercent })}
+                                            </span>
+                                            <input
+                                                type='range'
+                                                min={0}
+                                                max={25}
+                                                value={settings.watermark.marginPercent}
+                                                onChange={(event) => updateWatermark({ marginPercent: Number(event.target.value) })}
+                                                className='w-full accent-neutral-300'
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </Field>
+
                     {warning && (
                         <div className='rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-200'>{warning}</div>
                     )}
@@ -322,7 +446,7 @@ export const ExportDialog: FC = () => {
                             {failures.length > 0 && (
                                 <ul className='max-h-24 overflow-y-auto rounded bg-neutral-950/60 px-2 py-1 text-[10px] text-red-300'>
                                     {failures.map((failure) => (
-                                        <li key={failure.name} className='truncate'>
+                                        <li key={failure.imageId} className='truncate'>
                                             {failure.name}: {failure.message}
                                         </li>
                                     ))}
@@ -356,6 +480,14 @@ export const ExportDialog: FC = () => {
                                 className='rounded px-3 py-1.5 text-xs text-neutral-400 hover:bg-neutral-800'>
                                 {t('export.close')}
                             </button>
+                            {finished && failures.length > 0 && (
+                                <button
+                                    type='button'
+                                    onClick={() => useExportStore.getState().retryFailed()}
+                                    className='rounded border border-amber-700/60 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-900/40'>
+                                    {t('export.retryFailed', { count: failures.length })}
+                                </button>
+                            )}
                             <button
                                 type='button'
                                 disabled={startDisabled}

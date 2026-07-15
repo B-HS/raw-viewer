@@ -19,6 +19,11 @@ export const exportTile = (jobId: string, tile: ExportTilePayload) =>
         },
     })
 
+export const exportSetWatermark = (jobId: string, png: Uint8Array) =>
+    invoke<void>('export_set_watermark', png, { headers: { 'x-export-job': jobId } })
+
+export const readWatermarkPng = (path: string) => invoke<ArrayBuffer>('read_watermark_png', { path })
+
 export const exportFinish = (jobId: string) => invoke<string>('export_finish', { jobId })
 
 export const exportCancel = (jobId: string) => invoke<void>('export_cancel', { jobId })

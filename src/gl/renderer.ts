@@ -105,6 +105,7 @@ export class Renderer {
     private rebuildFrom = 0
     private clipMode: ClippingMode = 'none'
     private compareSplit: CompareSplit = null
+    private sideBySide = false
     private cropEditMode = false
 
     private stages = new Map<number, Target>()
@@ -329,6 +330,10 @@ export class Renderer {
 
     setCompare(split: CompareSplit) {
         this.compareSplit = split
+    }
+
+    setSideBySide(on: boolean) {
+        this.sideBySide = on
     }
 
     setCropEditMode(on: boolean) {
@@ -825,14 +830,18 @@ export class Renderer {
                 this.processedFor = image.imageId
                 this.baseFor = null
             }
-            if (this.compareSplit) {
+            if (this.compareSplit || this.sideBySide) {
                 if (this.baseFor !== image.imageId) this.buildBase(image)
                 compareBase = this.base?.tex ?? null
             }
             this.sampleHistogram()
         }
         if (!this.processed) return
-        this.drawOutput(image, this.processed, compareBase, metrics, view)
+        if (this.sideBySide && image.kind !== 'l0' && compareBase) {
+            this.drawSideBySide(image, this.processed, compareBase, metrics, view)
+        } else {
+            this.drawOutput(image, this.processed, compareBase, metrics, view)
+        }
     }
 
     private setProc(w: number, h: number, frac: number) {
@@ -888,6 +897,55 @@ export class Renderer {
         gl.uniform1i(this.pass8.u.uCropMode, cropMode)
         gl.uniform4f(this.pass8.u.uCrop, crop?.left ?? 0, crop?.top ?? 0, crop?.right ?? 1, crop?.bottom ?? 1)
         gl.uniform2f(this.pass8.u.uCanvas, this.canvas.width, this.canvas.height)
+        this.drawFullscreen()
+    }
+
+    private drawSideBySide(
+        image: GpuImage,
+        procTex: WebGLTexture,
+        baseTex: WebGLTexture,
+        metrics: NonNullable<ReturnType<Renderer['getMetrics']>>,
+        view: ViewState,
+    ) {
+        const gl = this.gl
+        const cw = this.canvas.width
+        const ch = this.canvas.height
+        const halfW = Math.floor(cw / 2)
+        const paneMetrics = { ...metrics, cw: halfW, fitScale: computeFitScale(halfW, ch, metrics.dispW, metrics.dispH) }
+        const model = buildModelMatrix(view, paneMetrics, image.width, image.height, image.flip)
+        this.lastModel = model
+        this.lastMetrics = { cw: halfW, ch }
+        const nearest = viewScale(view, paneMetrics) > paneMetrics.dpr + 0.001
+        const filter = nearest ? gl.NEAREST : gl.LINEAR
+        const crop = this.editState.crop
+        const cropMode = crop && crop.enabled ? (this.cropEditMode ? 2 : 1) : 0
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+        gl.useProgram(this.pass8.program)
+        gl.bindVertexArray(this.vao)
+        gl.uniformMatrix3fv(this.pass8.u.uModel, false, model)
+        gl.uniform1i(this.pass8.u.uSourceKind, 0)
+        gl.uniform1i(this.pass8.u.uDisplayP3, this.displaySpace === 'display-p3' ? 1 : 0)
+        gl.uniformMatrix3fv(this.pass8.u.uRec2020ToDisplay, false, this.rec2020ToDisplay)
+        gl.uniformMatrix3fv(this.pass8.u.uSrgbToDisplay, false, this.srgbToDisplay)
+        gl.uniform1i(this.pass8.u.uClipMode, CLIP_MODE[this.clipMode])
+        gl.uniform1i(this.pass8.u.uHasBase, 0)
+        gl.uniform3f(this.pass8.u.uSplit, 0, 0, 0)
+        gl.uniform1i(this.pass8.u.uCropMode, cropMode)
+        gl.uniform4f(this.pass8.u.uCrop, crop?.left ?? 0, crop?.top ?? 0, crop?.right ?? 1, crop?.bottom ?? 1)
+        gl.uniform2f(this.pass8.u.uCanvas, cw, ch)
+        gl.uniform1i(this.pass8.u.uTex, 0)
+        gl.uniform1i(this.pass8.u.uBaseTex, 0)
+        this.drawComparePane(baseTex, filter, 0, halfW, ch)
+        this.drawComparePane(procTex, filter, halfW, cw - halfW, ch)
+    }
+
+    private drawComparePane(tex: WebGLTexture, filter: number, vpX: number, vpW: number, ch: number) {
+        const gl = this.gl
+        gl.viewport(vpX, 0, vpW, ch)
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter)
         this.drawFullscreen()
     }
 

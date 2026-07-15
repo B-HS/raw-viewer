@@ -19,6 +19,7 @@ export const Viewport: FC = () => {
     const errors = usePlaylist((state) => state.errors)
     const cropEditMode = useUiStore((state) => state.cropEditMode)
     const compare = useUiStore((state) => state.compare)
+    const sideBySide = useUiStore((state) => state.sideBySide)
     const eyedropper = useUiStore((state) => state.eyedropper)
 
     const current = entries[currentIndex]
@@ -97,6 +98,18 @@ export const Viewport: FC = () => {
                                 : { top: `${compare.position * 100}%`, left: 0, height: 2, width: '100%', transform: 'translateY(-1px)' }
                         }
                     />
+                </div>
+            )}
+
+            {sideBySide && (
+                <div className='pointer-events-none absolute inset-0'>
+                    <div className='absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/60' />
+                    <span className='absolute left-1/4 top-3 -translate-x-1/2 rounded bg-black/60 px-2 py-0.5 text-[11px] font-medium text-neutral-100'>
+                        {t('viewport.compareBefore')}
+                    </span>
+                    <span className='absolute left-3/4 top-3 -translate-x-1/2 rounded bg-black/60 px-2 py-0.5 text-[11px] font-medium text-neutral-100'>
+                        {t('viewport.compareAfter')}
+                    </span>
                 </div>
             )}
 

@@ -12,6 +12,7 @@ type UiState = {
     activeSection: EditSection
     clipping: ClippingMode
     compare: CompareSplit
+    sideBySide: boolean
     cropEditMode: boolean
     cropOverlay: CropOverlayStyle
     eyedropper: boolean
@@ -20,6 +21,7 @@ type UiState = {
     setActiveSection: (section: EditSection) => void
     toggleClipping: (target: Exclude<ClippingMode, 'none'>) => void
     toggleCompare: (axis: 'x' | 'y') => void
+    toggleSideBySide: () => void
     setComparePosition: (position: number) => void
     resetComparePosition: () => void
     exitCompare: () => void
@@ -34,6 +36,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     activeSection: 'basic',
     clipping: 'none',
     compare: null,
+    sideBySide: false,
     cropEditMode: false,
     cropOverlay: 'thirds',
     eyedropper: false,
@@ -43,6 +46,7 @@ export const useUiStore = create<UiState>((set, get) => ({
         const state = get()
         engine.setClipping(state.clipping)
         engine.setCompare(state.compare)
+        engine.setSideBySide(state.sideBySide)
         engine.setCropEditMode(state.cropEditMode)
     },
     togglePanel: () => set((state) => ({ panelVisible: !state.panelVisible })),
@@ -57,7 +61,15 @@ export const useUiStore = create<UiState>((set, get) => ({
         set((state) => {
             const compare: CompareSplit = state.compare && state.compare.axis === axis ? null : { axis, position: 0.5 }
             state.engine?.setCompare(compare)
-            return { compare }
+            if (compare && state.sideBySide) state.engine?.setSideBySide(false)
+            return { compare, sideBySide: compare ? false : state.sideBySide }
+        }),
+    toggleSideBySide: () =>
+        set((state) => {
+            const sideBySide = !state.sideBySide
+            state.engine?.setSideBySide(sideBySide)
+            if (sideBySide && state.compare) state.engine?.setCompare(null)
+            return { sideBySide, compare: sideBySide ? null : state.compare }
         }),
     setComparePosition: (position) =>
         set((state) => {
