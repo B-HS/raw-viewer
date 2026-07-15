@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { i18n } from '../i18n'
 import { getMetadata } from '../ipc/meta'
 import type { ImageMetadata } from '../types/ImageMetadata'
 
@@ -48,7 +49,7 @@ export const useMeta = create<MetaState>((set, get) => {
                 set({ metadata, loading: false })
             } catch (error) {
                 if (token !== current) return
-                set({ metadata: null, loading: false, error: error instanceof Error ? error.message : '메타데이터를 불러올 수 없습니다' })
+                set({ metadata: null, loading: false, error: error instanceof Error ? error.message : i18n.t('meta.loadFailed') })
             }
         },
         clear: () => {

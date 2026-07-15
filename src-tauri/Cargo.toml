@@ -40,6 +40,27 @@ jpeg-encoder = { version = "0.6", features = ["std"] }
 lcms2 = "6"
 uuid = { version = "1", features = ["v4"] }
 little_exif = "0.6"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-store = "2"
+quick-xml = "0.37"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = [
+    "NSApplication",
+    "NSResponder",
+    "NSMenu",
+    "NSMenuItem",
+    "NSPasteboard",
+    "NSWorkspace",
+    "NSRunningApplication",
+    "NSScreen",
+    "NSDocumentController",
+    "NSGraphics",
+    "block2",
+] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSData", "NSURL", "NSError"] }
 
 [features]
 default = ["libraw"]

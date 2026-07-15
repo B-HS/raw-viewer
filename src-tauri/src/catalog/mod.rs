@@ -11,6 +11,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("001_init", include_str!("migrations/001_init.sql")),
     ("002_organize", include_str!("migrations/002_organize.sql")),
     ("003_presets", include_str!("migrations/003_presets.sql")),
+    ("004_recents", include_str!("migrations/004_recents.sql")),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -39,6 +40,12 @@ pub struct PresetRecord {
     pub source: String,
     pub builtin: bool,
     pub created_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecentRow {
+    pub path: String,
+    pub opened_at: i64,
 }
 
 pub struct Catalog {
@@ -285,6 +292,49 @@ impl Catalog {
         conn.query_row("SELECT COUNT(*) FROM presets WHERE builtin = 1", [], |row| row.get(0))
             .map_err(db_err)
     }
+
+    pub fn upsert_recent(&self, path: &Path, opened_at: i64, keep: usize) -> AppResult<()> {
+        let key = path_key(path);
+        let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
+        conn.execute(
+            "INSERT INTO recents (path, opened_at) VALUES (?1, ?2)
+             ON CONFLICT(path) DO UPDATE SET opened_at = excluded.opened_at",
+            params![key, opened_at],
+        )
+        .map_err(db_err)?;
+        conn.execute(
+            "DELETE FROM recents WHERE path NOT IN (SELECT path FROM recents ORDER BY opened_at DESC LIMIT ?1)",
+            params![keep as i64],
+        )
+        .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn list_recents(&self, limit: usize) -> AppResult<Vec<RecentRow>> {
+        let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut statement = conn
+            .prepare("SELECT path, opened_at FROM recents ORDER BY opened_at DESC LIMIT ?1")
+            .map_err(db_err)?;
+        let rows = statement
+            .query_map(params![limit as i64], |row| {
+                Ok(RecentRow {
+                    path: row.get(0)?,
+                    opened_at: row.get(1)?,
+                })
+            })
+            .map_err(db_err)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(db_err)?);
+        }
+        Ok(out)
+    }
+
+    pub fn clear_recents(&self) -> AppResult<()> {
+        let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
+        conn.execute("DELETE FROM recents", []).map_err(db_err)?;
+        Ok(())
+    }
 }
 
 fn row_to_preset(row: &rusqlite::Row) -> rusqlite::Result<PresetRecord> {
@@ -408,6 +458,26 @@ mod tests {
         let _ = catalog.set_flag(path, None, 13);
         let cleared = catalog.load_organize(path).ok().flatten();
         assert!(matches!(cleared, Some(ref value) if value.rating == 4 && value.flag.is_none() && value.label.as_deref() == Some("Red")));
+    }
+
+    #[test]
+    fn recents_upsert_caps_and_orders_by_recency() {
+        let catalog = catalog();
+        for index in 0..25 {
+            let path = std::path::PathBuf::from(format!("/abs/IMG_{index}.CR2"));
+            let _ = catalog.upsert_recent(&path, index as i64, 20);
+        }
+        let rows = catalog.list_recents(20).unwrap_or_default();
+        assert_eq!(rows.len(), 20);
+        assert_eq!(rows.first().map(|row| row.path.as_str()), Some("/abs/IMG_24.CR2"));
+        assert_eq!(rows.last().map(|row| row.path.as_str()), Some("/abs/IMG_5.CR2"));
+
+        let _ = catalog.upsert_recent(Path::new("/abs/IMG_5.CR2"), 100, 20);
+        let rows = catalog.list_recents(1).unwrap_or_default();
+        assert_eq!(rows.first().map(|row| row.path.as_str()), Some("/abs/IMG_5.CR2"));
+
+        let _ = catalog.clear_recents();
+        assert!(catalog.list_recents(20).unwrap_or_default().is_empty());
     }
 
     #[test]

@@ -1,9 +1,11 @@
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMeta } from '../store/meta'
 import { usePlaylist } from '../store/playlist'
 import { formatAperture, formatBytes, formatShutter } from './panels/MetaPanel/format'
 
 export const StatusBar: FC = () => {
+    const { t } = useTranslation()
     const entries = usePlaylist((state) => state.entries)
     const currentIndex = usePlaylist((state) => state.currentIndex)
     const filteredIndices = usePlaylist((state) => state.filteredIndices)
@@ -37,7 +39,9 @@ export const StatusBar: FC = () => {
             <span className='truncate text-neutral-300'>{current.fileName}</span>
             <span className='text-neutral-600'>·</span>
             <span className='truncate'>{parts.join(' · ')}</span>
-            {selection.length > 1 && <span className='ml-auto shrink-0 text-neutral-500'>{selection.length}개 선택됨</span>}
+            {selection.length > 1 && (
+                <span className='ml-auto shrink-0 text-neutral-500'>{t('status.selectedCount', { count: selection.length })}</span>
+            )}
         </footer>
     )
 }

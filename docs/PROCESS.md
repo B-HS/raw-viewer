@@ -84,7 +84,8 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 통합 검증: cargo test 122건·bun run build·tauri dev 실기동·**스크린샷 시각 확인**(iPhone DNG 세로 렌더 정상, 히스토그램/슬라이더/필름스트립/필터바/상태바 표시, 색 자연스러움 — 다크/라이트 토글 및 조작감은 사용자 확인 필요)
 
 **3a PRD 이탈 기록**: ① macOS `trash` 크레이트는 복원 API 미지원 → 휴지통 ⌘Z 복원 불가(Finder '되돌려 놓기' 안내로 대체, Phase 4에서 objc2 NSFileManager 경로 재검토) ② lens.mount·driveMode·stabilization·hasOpcodeList·iccProfileName은 ExifTool 통합(FR-16.4) 전까지 None ③ iPhone ProRAW(linear DNG)는 sensorType=unknown
-### 3b (계약: docs/phase3b-contract.md) — 구현 완료, 통합 중
+### 3b (계약: docs/phase3b-contract.md) — **완료, dev 반영(31473c8)**
+> 차단 버그 해결: Bayer L1/L2 렌더 깨짐의 근본 원인은 **build.rs의 LIBRAW_NOTHREADS** — LibRaw 비트리더(getbithuff)·AHD LUT가 프로세스 전역 static이 되어 병렬 디코드에서 상호 오염(비결정적, iPhone 정상은 요행). 조치: 정의 제거(인스턴스 TLS), 캐시 키에 CACHE_SCHEMA_VERSION 혼입으로 오염된 L1 디스크 캐시 무효화, 격리-vs-동시 바이트 동일성 회귀 테스트(5D3·X-T5·모노) 추가. cargo test 185. 수정 후 동시 디코드 덤프 PNG 육안 검증 정상. 결정 로그 4의 LIBRAW_NOTHREADS 채택은 폐기.
 - [x] X: Export 엔진 — export_begin/tile(raw body)/finish/cancel, 4포맷 전부 ICC 임베드, linear Lanczos3, little_exif(GPS는 어떤 모드도 미기록), 파일명 템플릿, dnglab v0.7.2 sidecar(macOS arm64 릴리스) — 테스트 184건
 - [x] Q: 프리셋(003 마이그레이션, 8섹션 마스크, 번들 10종 시드) + copy_settings — EditService 영속 경로 탑승
 - [x] W: ExportDialog·PresetPanel·exportRenderer(타일 interior 전송)·⌘⇧C/V/⌘⌥V·⌥1~9

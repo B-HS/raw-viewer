@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useHistogram } from '../store/histogramStore'
 import type { HistogramData, HistogramMode } from '../store/histogramStore'
 import { useUiStore } from '../store/uiStore'
@@ -59,13 +60,13 @@ const render = (canvas: HTMLCanvasElement, data: HistogramData | null, mode: His
     ctx.globalCompositeOperation = 'source-over'
 }
 
-const MODE_LABEL: Record<HistogramMode, string> = { rgb: 'RGB', luma: '휘도', separate: '분리' }
-
 export const Histogram: FC = () => {
+    const { t } = useTranslation()
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const data = useHistogram((state) => state.data)
     const mode = useHistogram((state) => state.mode)
     const clipping = useUiStore((state) => state.clipping)
+    const modeLabel = t(`histogram.${mode}`)
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -95,22 +96,22 @@ export const Histogram: FC = () => {
             <button
                 type='button'
                 onClick={() => useUiStore.getState().toggleClipping('shadow')}
-                aria-label='쉐도우 클리핑 토글'
+                aria-label={t('histogram.shadowClipAria')}
                 className={`absolute left-1 top-1 z-10 h-0 w-0 border-b-8 border-r-8 border-b-transparent ${loActive ? 'border-r-blue-400' : 'border-r-neutral-600'}`}
             />
             <button
                 type='button'
                 onClick={() => useUiStore.getState().toggleClipping('highlight')}
-                aria-label='하이라이트 클리핑 토글'
+                aria-label={t('histogram.highlightClipAria')}
                 className={`absolute right-1 top-1 z-10 h-0 w-0 border-b-8 border-l-8 border-b-transparent ${hiActive ? 'border-l-red-400' : 'border-l-neutral-600'}`}
             />
             <canvas
                 ref={canvasRef}
                 onClick={() => useHistogram.getState().cycleMode()}
                 className='block h-24 w-full cursor-pointer'
-                aria-label={`히스토그램 (${MODE_LABEL[mode]})`}
+                aria-label={t('histogram.aria', { mode: modeLabel })}
             />
-            <span className='pointer-events-none absolute bottom-1 right-2 text-[10px] text-neutral-500'>{MODE_LABEL[mode]}</span>
+            <span className='pointer-events-none absolute bottom-1 right-2 text-[10px] text-neutral-500'>{modeLabel}</span>
         </div>
     )
 }

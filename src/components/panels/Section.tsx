@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FC, PropsWithChildren } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useEditStore } from '../../store/editStore'
 import { useUiStore } from '../../store/uiStore'
 import type { EditSection } from '../../store/editDefaults'
@@ -7,6 +8,7 @@ import type { EditSection } from '../../store/editDefaults'
 type SectionProps = PropsWithChildren<{ id: EditSection; title: string; right?: React.ReactNode }>
 
 export const Section: FC<SectionProps> = ({ id, title, right, children }) => {
+    const { t } = useTranslation()
     const [open, setOpen] = useState(true)
     const active = useUiStore((state) => state.activeSection === id)
 
@@ -27,9 +29,9 @@ export const Section: FC<SectionProps> = ({ id, title, right, children }) => {
                     <button
                         type='button'
                         onClick={() => useEditStore.getState().resetSection(id)}
-                        aria-label={`${title} 초기화`}
+                        aria-label={t('panel.sectionReset', { title })}
                         className='rounded px-1.5 py-0.5 text-[10px] text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'>
-                        초기화
+                        {t('common.reset')}
                     </button>
                 </div>
             </header>

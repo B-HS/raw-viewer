@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { i18n } from '../i18n'
 import { useEditStore } from './editStore'
 import { usePlaylist } from './playlist'
 import { useToast } from './toast'
@@ -8,17 +9,6 @@ import type { PresetInfo } from '../types/PresetInfo'
 export const PRESET_SECTIONS = ['wb', 'lens', 'geometry', 'tone', 'curves', 'color', 'detail', 'effects'] as const
 
 export type PresetSectionKey = (typeof PRESET_SECTIONS)[number]
-
-export const PRESET_SECTION_LABEL: Record<PresetSectionKey, string> = {
-    wb: '화이트밸런스',
-    lens: '렌즈 보정',
-    geometry: '기하 · 크롭',
-    tone: '톤',
-    curves: '커브',
-    color: '컬러 · HSL',
-    detail: '디테일',
-    effects: '효과',
-}
 
 const currentImageId = () => {
     const state = usePlaylist.getState()
@@ -56,10 +46,10 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
         try {
             await useEditStore.getState().flushPending()
             await applyPreset(presetId, [imageId])
-            await useEditStore.getState().applyServerState(`프리셋: ${name}`)
-            useToast.getState().show(`프리셋 적용: ${name}`)
+            await useEditStore.getState().applyServerState(i18n.t('history.applyPreset', { name }))
+            useToast.getState().show(i18n.t('toast.presetApplied', { name }))
         } catch (error) {
-            useToast.getState().show(`프리셋 적용 실패: ${errorMessage(error)}`)
+            useToast.getState().show(i18n.t('toast.presetApplyFailed', { message: errorMessage(error) }))
         }
     },
     save: async (name, folder, mask) => {
@@ -69,10 +59,10 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
             await useEditStore.getState().flushPending()
             await savePreset(name, folder, imageId, mask)
             await get().load()
-            useToast.getState().show('프리셋 저장됨')
+            useToast.getState().show(i18n.t('toast.presetSaved'))
             return true
         } catch (error) {
-            useToast.getState().show(`프리셋 저장 실패: ${errorMessage(error)}`)
+            useToast.getState().show(i18n.t('toast.presetSaveFailed', { message: errorMessage(error) }))
             return false
         }
     },
@@ -80,9 +70,9 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
         try {
             await deletePreset(presetId)
             await get().load()
-            useToast.getState().show('프리셋 삭제됨')
+            useToast.getState().show(i18n.t('toast.presetDeleted'))
         } catch (error) {
-            useToast.getState().show(`프리셋 삭제 실패: ${errorMessage(error)}`)
+            useToast.getState().show(i18n.t('toast.presetDeleteFailed', { message: errorMessage(error) }))
         }
     },
 }))

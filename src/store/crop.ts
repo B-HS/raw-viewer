@@ -1,4 +1,5 @@
 import { dispDims } from '../gl/viewTransform'
+import { i18n } from '../i18n'
 import { useEditStore } from './editStore'
 import { usePlaylist } from './playlist'
 import { useUiStore } from './uiStore'
@@ -86,7 +87,7 @@ export const setCropRect = (rect: Rect, aspect: string) => {
             right: clamp01(rect.right),
             bottom: clamp01(rect.bottom),
         },
-        '크롭 조정',
+        i18n.t('history.cropAdjust'),
         false,
     )
 }
@@ -97,12 +98,12 @@ export const applyCropAspect = (aspect: string) => {
     const crop = state.crop ?? { enabled: true, left: 0, top: 0, right: 1, bottom: 1, aspect }
     const normRatio = cropNormRatio(aspect)
     if (normRatio === null) {
-        writeCrop({ ...crop, enabled: true, aspect }, '크롭 비율', true)
+        writeCrop({ ...crop, enabled: true, aspect }, i18n.t('history.cropRatio'), true)
         return
     }
     const center = { x: (crop.left + crop.right) / 2, y: (crop.top + crop.bottom) / 2 }
     const fitted = fitRectToRatio(center, normRatio)
-    writeCrop({ enabled: true, aspect, ...fitted }, '크롭 비율', true)
+    writeCrop({ enabled: true, aspect, ...fitted }, i18n.t('history.cropRatio'), true)
 }
 
 export const swapCropAspect = () => {
@@ -120,14 +121,14 @@ export const toggleCropMode = () => {
     if (!editStore.state) return
     if (ui.cropEditMode) {
         const crop = editStore.state.crop
-        if (crop && crop.enabled && isFullFrame(crop)) editStore.edit((draft) => void (draft.crop = null), { label: '크롭 해제' })
+        if (crop && crop.enabled && isFullFrame(crop)) editStore.edit((draft) => void (draft.crop = null), { label: i18n.t('history.cropRelease') })
         ui.setCropEditMode(false)
         return
     }
     const crop = editStore.state.crop
     if (!crop || !crop.enabled)
         editStore.edit((draft) => void (draft.crop = { enabled: true, left: 0, top: 0, right: 1, bottom: 1, aspect: crop?.aspect ?? 'original' }), {
-            label: '크롭',
+            label: i18n.t('history.crop'),
         })
     ui.setCropEditMode(true)
 }

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { i18n } from '../i18n'
 import { useEditStore } from './editStore'
 import { usePlaylist } from './playlist'
 import { PRESET_SECTIONS } from './presetStore'
@@ -26,7 +27,7 @@ export const useEditClipboard = create<EditClipboardState>((set, get) => ({
         const imageId = currentImageId()
         if (!imageId) return
         set({ sourceImageId: imageId })
-        useToast.getState().show('편집 설정 복사됨')
+        useToast.getState().show(i18n.t('toast.editCopied'))
     },
     pasteTo: async (targets) => {
         const source = get().sourceImageId
@@ -35,10 +36,10 @@ export const useEditClipboard = create<EditClipboardState>((set, get) => ({
         try {
             await useEditStore.getState().flushPending()
             await copySettings(source, targets, ALL_MASK)
-            if (current && targets.includes(current)) await useEditStore.getState().applyServerState('편집 설정 붙여넣기')
-            useToast.getState().show(targets.length > 1 ? `${targets.length}개에 붙여넣기` : '편집 설정 붙여넣기')
+            if (current && targets.includes(current)) await useEditStore.getState().applyServerState(i18n.t('history.pasteEdit'))
+            useToast.getState().show(targets.length > 1 ? i18n.t('toast.editPastedCount', { count: targets.length }) : i18n.t('toast.editPasted'))
         } catch {
-            useToast.getState().show('붙여넣기 실패')
+            useToast.getState().show(i18n.t('toast.pasteFailed'))
         }
     },
     pastePrevious: async () => {
@@ -49,10 +50,10 @@ export const useEditClipboard = create<EditClipboardState>((set, get) => ({
         try {
             await useEditStore.getState().flushPending()
             await copySettings(previous.imageId, [current.imageId], ALL_MASK)
-            await useEditStore.getState().applyServerState('이전 이미지 설정 붙여넣기')
-            useToast.getState().show('이전 이미지 설정 적용')
+            await useEditStore.getState().applyServerState(i18n.t('history.pastePrevious'))
+            useToast.getState().show(i18n.t('toast.prevApplied'))
         } catch {
-            useToast.getState().show('붙여넣기 실패')
+            useToast.getState().show(i18n.t('toast.pasteFailed'))
         }
     },
     syncSelection: async (targets) => {
@@ -61,9 +62,9 @@ export const useEditClipboard = create<EditClipboardState>((set, get) => ({
         try {
             await useEditStore.getState().flushPending()
             await copySettings(current, targets, ALL_MASK)
-            useToast.getState().show(`${targets.length}개 동기화됨`)
+            useToast.getState().show(i18n.t('toast.syncedCount', { count: targets.length }))
         } catch {
-            useToast.getState().show('동기화 실패')
+            useToast.getState().show(i18n.t('toast.syncFailed'))
         }
     },
 }))

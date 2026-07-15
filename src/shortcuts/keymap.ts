@@ -56,6 +56,8 @@ export const KEYMAP = {
     },
     clipboard: {
         copyEdit: 'KeyC',
+        copyImage: 'KeyC',
+        copyFiles: 'KeyC',
         pasteEdit: 'KeyV',
         pastePrevious: 'KeyV',
     },
@@ -66,6 +68,10 @@ export const KEYMAP = {
     trash: {
         move: 'Backspace',
         remove: 'Delete',
+    },
+    misc: {
+        settings: 'Comma',
+        palette: 'KeyP',
     },
 } as const
 

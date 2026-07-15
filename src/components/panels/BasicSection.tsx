@@ -1,4 +1,5 @@
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { DEFAULT_EDIT_STATE } from '../../store/editDefaults'
 import { useEditStore } from '../../store/editStore'
 import type { ToneState } from '../../types/ToneState'
@@ -9,6 +10,7 @@ const signed = (value: number) => (value > 0 ? `+${value}` : `${value}`)
 const signedEv = (value: number) => (value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2))
 
 export const BasicSection: FC = () => {
+    const { t } = useTranslation()
     const wb = useEditStore((state) => state.state?.wb)
     const tone = useEditStore((state) => state.state?.tone)
     const vibrance = useEditStore((state) => state.state?.color.vibrance)
@@ -34,11 +36,11 @@ export const BasicSection: FC = () => {
     )
 
     return (
-        <Section id='basic' title='기본'>
+        <Section id='basic' title={t('panel.basic.title')}>
             {isRaw ? (
                 <>
                     <Slider
-                        label='색온도'
+                        label={t('panel.basic.temp')}
                         value={wb.temp}
                         min={2000}
                         max={50000}
@@ -46,10 +48,10 @@ export const BasicSection: FC = () => {
                         defaultValue={DEFAULT_EDIT_STATE.wb.temp}
                         coalesceKey='wb.temp'
                         format={(value) => `${Math.round(value)}K`}
-                        onChange={(value) => edit((draft) => void (draft.wb.temp = value), { coalesceKey: 'wb.temp', label: '색온도' })}
+                        onChange={(value) => edit((draft) => void (draft.wb.temp = value), { coalesceKey: 'wb.temp', label: t('panel.basic.temp') })}
                     />
                     <Slider
-                        label='색조'
+                        label={t('panel.basic.tint')}
                         value={wb.tint}
                         min={-150}
                         max={150}
@@ -57,12 +59,12 @@ export const BasicSection: FC = () => {
                         defaultValue={DEFAULT_EDIT_STATE.wb.tint}
                         coalesceKey='wb.tint'
                         format={signed}
-                        onChange={(value) => edit((draft) => void (draft.wb.tint = value), { coalesceKey: 'wb.tint', label: '색조' })}
+                        onChange={(value) => edit((draft) => void (draft.wb.tint = value), { coalesceKey: 'wb.tint', label: t('panel.basic.tint') })}
                     />
                 </>
             ) : (
                 <Slider
-                    label='색온도 보정'
+                    label={t('panel.basic.tempShift')}
                     value={wb.tempShift ?? 0}
                     min={-100}
                     max={100}
@@ -70,19 +72,21 @@ export const BasicSection: FC = () => {
                     defaultValue={0}
                     coalesceKey='wb.tempShift'
                     format={signed}
-                    onChange={(value) => edit((draft) => void (draft.wb.tempShift = value), { coalesceKey: 'wb.tempShift', label: '색온도 보정' })}
+                    onChange={(value) =>
+                        edit((draft) => void (draft.wb.tempShift = value), { coalesceKey: 'wb.tempShift', label: t('panel.basic.tempShift') })
+                    }
                 />
             )}
-            {toneSlider('exposure', '노출', -5, 5, 0.05, signedEv)}
-            {toneSlider('contrast', '대비', -100, 100, 1, signed)}
-            {toneSlider('highlights', '밝은 영역', -100, 100, 1, signed)}
-            {toneSlider('shadows', '어두운 영역', -100, 100, 1, signed)}
-            {toneSlider('whites', '흰색 계열', -100, 100, 1, signed)}
-            {toneSlider('blacks', '검정 계열', -100, 100, 1, signed)}
-            {toneSlider('highlightRecovery', '하이라이트 복원', 0, 100, 1)}
+            {toneSlider('exposure', t('panel.basic.exposure'), -5, 5, 0.05, signedEv)}
+            {toneSlider('contrast', t('panel.basic.contrast'), -100, 100, 1, signed)}
+            {toneSlider('highlights', t('panel.basic.highlights'), -100, 100, 1, signed)}
+            {toneSlider('shadows', t('panel.basic.shadows'), -100, 100, 1, signed)}
+            {toneSlider('whites', t('panel.basic.whites'), -100, 100, 1, signed)}
+            {toneSlider('blacks', t('panel.basic.blacks'), -100, 100, 1, signed)}
+            {toneSlider('highlightRecovery', t('panel.basic.highlightRecovery'), 0, 100, 1)}
             <div className='mt-1 border-t border-neutral-800 pt-2' />
             <Slider
-                label='생동감'
+                label={t('panel.basic.vibrance')}
                 value={vibrance}
                 min={-100}
                 max={100}
@@ -90,10 +94,12 @@ export const BasicSection: FC = () => {
                 defaultValue={0}
                 coalesceKey='color.vibrance'
                 format={signed}
-                onChange={(value) => edit((draft) => void (draft.color.vibrance = value), { coalesceKey: 'color.vibrance', label: '생동감' })}
+                onChange={(value) =>
+                    edit((draft) => void (draft.color.vibrance = value), { coalesceKey: 'color.vibrance', label: t('panel.basic.vibrance') })
+                }
             />
             <Slider
-                label='채도'
+                label={t('panel.basic.saturation')}
                 value={saturation}
                 min={-100}
                 max={100}
@@ -101,7 +107,9 @@ export const BasicSection: FC = () => {
                 defaultValue={0}
                 coalesceKey='color.saturation'
                 format={signed}
-                onChange={(value) => edit((draft) => void (draft.color.saturation = value), { coalesceKey: 'color.saturation', label: '채도' })}
+                onChange={(value) =>
+                    edit((draft) => void (draft.color.saturation = value), { coalesceKey: 'color.saturation', label: t('panel.basic.saturation') })
+                }
             />
         </Section>
     )
