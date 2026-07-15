@@ -5,13 +5,15 @@
 > 재현: 성능 `cd src-tauri && cargo test --release --test perf -- --ignored --nocapture` · 정합성 `cd src-tauri && cargo test`
 > 측정기: **Apple M4 Pro (P8/E4 = 12코어) · 48GB · macOS 15.7.3** · libomp 22.1.8 (Homebrew) · Apple clang 17.
 
+> **[갱신 · feat/xtrans-parallel]** §3의 미결정 사항(X-Trans serial-pin)이 해소됨: 사용자 승인으로 **바이트 동일성 게이트를 X-Trans에 한해 허용오차 비교로 완화하고 스레드 핀을 제거**해 X-Trans 디코드를 병렬화했다. §0·§3의 "serial-pin / 속도 이득 없음" 서술은 아래 **§6**이 대체한다(X-T5 L1 13.4s→2.1s, L2 13.4s→2.1s, 6.3×). §1·§2·§4의 링크/Bayer/번들 결론은 불변.
+
 ---
 
 ## 0. 결론 (headline)
 
 - **Bayer는 OpenMP 이득 전면 수용.** 주 목표였던 **R5 L1 = 410.6 → 166.0ms (2.47×) → PRD 250ms 목표 통과.** GFX100(사실 Bayer) L2 = 4070 → 1156ms → 1200ms 목표 통과. 5D3 L2 = 735 → 433ms.
 - **정합성 게이트 유지.** `cargo test` **249 passed / 0 failed**, `concurrent_decode_stays_byte_identical_to_isolated` 포함 녹색.
-- **단, X-Trans(X-T5)는 병렬 시 바이트 비결정적** → 게이트 위반 → **X-Trans만 단일 OpenMP 스레드로 고정(serial)** 하여 결정성 확보. 그 대가로 **X-Trans는 셋업 상태에서 속도 이득 없음**(13~15s 유지). 병렬 시 **2.16s(6.2×) 가능**하나 바이트 동일성 게이트와 충돌(§3).
+- **단, X-Trans(X-T5)는 병렬 시 바이트 비결정적** → 게이트 위반 → **X-Trans만 단일 OpenMP 스레드로 고정(serial)** 하여 결정성 확보. 그 대가로 **X-Trans는 셋업 상태에서 속도 이득 없음**(13~15s 유지). 병렬 시 **2.16s(6.2×) 가능**하나 바이트 동일성 게이트와 충돌(§3). → **[갱신 §6] 해소: 게이트를 X-Trans 허용오차로 완화하고 핀 제거해 병렬화 활성(13.4s→2.1s, 6.3× 실측).**
 - **번들 자립성 확보.** **정적 링크(libomp.a)** — 최종 바이너리에 `libomp.dylib` 의존성 **0건**(otool -L 검증). .app에 별도 dylib 동봉 불필요.
 
 ---
@@ -86,7 +88,7 @@ M4 Pro/48GB, 캐시 미스, 3회 중앙값, ms. **before = phase3-acceptance.md 
 | fujifilm-x-t5.raf | X-Trans 40MP | L1 | 13447.4 | 15594.3 | 2158.2 | ≤250 | FAIL (serial-pin) |
 | fujifilm-x-t5.raf | X-Trans 40MP | L2 | 13416.8 | 15714.0 | 2164.2 | ≤1200 | FAIL (serial-pin) |
 
-Bayer는 shipped == all-∥(핀 대상 아님). X-T5만 두 컬럼이 갈린다.
+Bayer는 shipped == all-∥(핀 대상 아님). X-T5만 두 컬럼이 갈린다. **[갱신 §6]** X-T5의 shipped(serial-pin) 컬럼은 폐기 — 게이트 완화·핀 제거로 이제 **all-∥ 컬럼이 shipped**다(재실측 L1 2139.1 / L2 2055.6).
 
 기타 16기종 L1 개선(shipped): R7 294→123✓, a7r-iv 313→228✓, a1 255→185✓, d850 306→268, om-1 335→306, q2 439→379, s5 131→95✓, pef 308→276, iphone 414→410, mono 124→98✓, x3f 714→720(≈).
 
@@ -115,6 +117,41 @@ Bayer는 shipped == all-∥(핀 대상 아님). X-T5만 두 컬럼이 갈린다.
 3. **프로덕션 오버서브스크립션(튜닝)**: 파이프라인 워커 = `available_parallelism()`(≈12). 각 동시 디코드가 최대 12 OMP 스레드 → 최대 ~144 스레드/12코어. 격리-디코드 지연 이득이 동시 처리량으론 다 안 옮겨오거나 스래싱 가능. **권장: pipeline init에서 내부 OMP 스레드를 소수(N)로 캡 또는 OpenMP 시 외부 워커 축소** — 별도 측정 튜닝 과제. (X-Trans는 이미 1로 핀되어 무관.)
 4. **크로스파일 수정 고지**: X-Trans 스레드 핀은 `src/decode/libraw_ffi.rs`(build.rs 소유 범위 밖)에 있다. 전역 `OMP_NUM_THREADS` 캡으론 Markesteijn 결정성 복원 불가(§2 실측)라 런타임 per-decode 핀이 불가피. `cfg(openmp)` 가드(libomp 없으면 no-op). 디코드 담당/오케스트레이터에 공유.
 5. **문서 정정**: phase3-acceptance.md §1/§2가 GFX100을 "X-Trans"로 표기하나 **실제 Bayer(중형 102MP)** — 런타임 `filters!=9` + half_size 효과(L1 2200 < L2 4070)로 확정(fixtures README도 "중형"). 따라서 GFX100은 OpenMP 전면 수혜. X-Trans는 X-T5 단독.
+
+---
+
+## 6. X-Trans 병렬화 활성 (게이트 완화) — feat/xtrans-parallel
+
+> 사용자 승인(PROCESS.md 미결결정 2-①: "바이트 동일성 게이트 완화 후 병렬"). §3의 "all-∥ 잠재" 컬럼을 X-Trans의 **shipped**로 전환한다. §5-1 (a) 경로 채택.
+
+### 조치
+- **핀 제거**: `src/decode/libraw_ffi.rs`의 `omp_control` 모듈(`XtransThreadPin`, `#[cfg(openmp)]`/`#[cfg(not(openmp))]` 양쪽)과 `decode()` 내 per-decode `omp_set_num_threads(1)` 핀을 **전부 제거**(순감). Bayer/모노 경로는 원래 핀 대상이 아니라 무변경. 이제 X-Trans Markesteijn도 전 OpenMP 스레드로 병렬 실행.
+- **게이트 완화**: `concurrent_decode_stays_byte_identical_to_isolated`에서 **Bayer(5D3)·모노(leica-m-monochrom)는 바이트 동일성 유지**, **X-Trans(x-t5)만** per-pixel 허용오차 비교로 완화. 3라운드 유지. 실패 메시지에 `max_ulp`·`max_abs`·초과 픽셀 수 포함.
+
+### 허용오차 정의
+- 픽셀 통과 조건(OR): `ULP(half) ≤ 2` **또는** `정규화 절대오차 ≤ 8/1023`. **초과 픽셀 0** 요구(전 픽셀이 허용오차 내여야 PASS).
+- 치수·버퍼 길이 동일은 별도 assert(기존 유지).
+- **왜 8/1023인가 (SPEC-GAP)**: 초기 목표는 2/1023이었으나 실측상 양성(benign) 경계 비결정성이 이를 초과한다. 스레드 스케줄에 따라 16px 오버랩 타일 경계 픽셀의 최종 기록자가 갈리고, **두 값 모두 유효한 Markesteijn 보간값**이라 절대오차가 발생.
+  - **특성 측정**(NORM 상한을 1.0으로 열어 초과 없이 관측, 15라운드): **max_abs ≤ 0.005219 (≈5.3/1023), max_ulp ≤ 186**. 소진폭 픽셀에서 ULP는 절대오차 대비 과대(무의미) → **절대오차가 물리적 상한**. 경계 픽셀 집합은 이미지 고정이라 참 상한은 ~0.005–0.006으로 수렴(라운드 수를 늘려도 커지지 않음, 관측 확률만 증가).
+  - **채택**: `8/1023 ≈ 0.00782` — 실측 피크의 ~1.5×, 8-bit 2레벨 미만(sub-perceptual). ULP 브랜치는 2로 유지(엄격 정합 보조 역할).
+- **오염과의 구분**: 3b가 잡은 공유 static 오염(gross corruption, 큰 편차)과 성격이 다르다 — 여기 편차는 intra-decode·경계 집중·sub-perceptual. 임계 0.0078은 오염 규모(대편차)보다 훨씬 작아 게이트는 여전히 실제 corruption을 잡는다.
+
+### 안정성
+- 완화 게이트(초과=0)를 **5회 반복 × 3라운드 = 15라운드 실행, 전부 PASS**. 해당 15라운드 `max_abs` 피크 0.003906 « 임계 0.007820. flaky 아님.
+
+### 성능 before/after (release, M4 Pro/48GB, median-of-3)
+
+| 픽스처 | 레벨 | before(serial-pin) | **after(병렬)** | 배속 | 목표 | 판정 |
+|---|---|---:|---:|---:|---:|---|
+| fujifilm-x-t5.raf | L1 | 13447.4 | **2139.1** | **6.29×** | ≤250 | OVER(40MP 풀 Markesteijn) |
+| fujifilm-x-t5.raf | L2 | 13416.8 | **2055.6** | **6.53×** | ≤1200 | OVER |
+
+- §3의 "all-∥ 잠재"(2158.2 / 2164.2) 값이 실현되어 shipped로 이동. Bayer/모노/기타 기종은 §3과 동일(핀 무관, 이번 변경으로 불변).
+- **여전히 목표 미달**: X-Trans는 40MP 풀해상도 Markesteijn이라 병렬로도 L1 250·L2 1200 목표엔 미달. 완전 충족은 별도(프록시/half, §5-1 (b))가 필요 — 이번 범위 밖. 단 체감 13.4s→2.1s(**6.3×**)로 대폭 개선.
+
+### 파일 변경
+- `src/decode/libraw_ffi.rs`: `omp_control` 모듈·per-decode 핀 제거.
+- `src/decode/fixtures_test.rs`: X-Trans 허용오차 비교(`xtrans_tolerance_stats`, `XTRANS_TOLERANCE_ULP=2`, `XTRANS_TOLERANCE_NORM=8/1023`) 추가, Bayer/모노 바이트 동일성 유지.
 
 ---
 
