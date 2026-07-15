@@ -1,0 +1,158 @@
+{
+  "baseCurve": "standard",
+  "color": {
+    "bw": false,
+    "hsl": {
+      "aqua": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      },
+      "blue": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      },
+      "green": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      },
+      "magenta": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      },
+      "orange": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      },
+      "purple": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      },
+      "red": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      },
+      "yellow": {
+        "hue": 0.0,
+        "lum": 0.0,
+        "sat": 0.0
+      }
+    },
+    "saturation": 0.0,
+    "vibrance": 0.0
+  },
+  "crop": null,
+  "curves": {
+    "blue": [
+      {
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "x": 1.0,
+        "y": 1.0
+      }
+    ],
+    "green": [
+      {
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "x": 1.0,
+        "y": 1.0
+      }
+    ],
+    "red": [
+      {
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "x": 1.0,
+        "y": 1.0
+      }
+    ],
+    "rgb": [
+      {
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "x": 1.0,
+        "y": 1.0
+      }
+    ]
+  },
+  "detail": {
+    "hotPixelRemoval": true,
+    "nrColor": 25.0,
+    "nrColorDetail": 50.0,
+    "nrLumaContrast": 0.0,
+    "nrLumaDetail": 50.0,
+    "nrLuminance": 0.0,
+    "sharpenAmount": 25.0,
+    "sharpenDetail": 25.0,
+    "sharpenMasking": 0.0,
+    "sharpenRadius": 1.0
+  },
+  "effects": {
+    "clarity": 0.0,
+    "dehaze": 0.0,
+    "grainAmount": 0.0,
+    "grainRoughness": 0.0,
+    "grainSize": 0.0,
+    "vignetteAmount": 0.0,
+    "vignetteFeather": 50.0,
+    "vignetteMidpoint": 50.0,
+    "vignetteRoundness": 0.0
+  },
+  "geometry": {
+    "aspectAdjust": 0.0,
+    "flipH": false,
+    "flipV": false,
+    "offsetX": 0.0,
+    "offsetY": 0.0,
+    "perspectiveH": 0.0,
+    "perspectiveRotate": 0.0,
+    "perspectiveV": 0.0,
+    "rotate90": 0,
+    "scale": 100.0,
+    "straighten": 0.0
+  },
+  "lens": {
+    "autoProfile": true,
+    "distortion": 100.0,
+    "manualDistortion": 0.0,
+    "manualVignette": 0.0,
+    "profileId": null,
+    "tca": 100.0,
+    "vignette": 100.0
+  },
+  "meta": {
+    "appliedPreset": null,
+    "modifiedAt": 0.0
+  },
+  "tone": {
+    "blacks": 0.0,
+    "contrast": 0.0,
+    "exposure": 0.0,
+    "highlightRecovery": 0.0,
+    "highlights": 0.0,
+    "shadows": 0.0,
+    "whites": 0.0
+  },
+  "version": 2,
+  "wb": {
+    "mode": "as-shot",
+    "temp": 6500.0,
+    "tempShift": null,
+    "tint": 0.0
+  }
+}

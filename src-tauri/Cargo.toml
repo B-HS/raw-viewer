@@ -1,0 +1,49 @@
+[package]
+name = "raw-viewer"
+version = "0.1.0"
+description = "Cross-platform RAW image viewer and non-destructive editor"
+authors = ["Hyunseok Byun"]
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "raw_viewer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+cc = { version = "1", features = ["parallel"] }
+bindgen = "0.71"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ts-rs = "10"
+rayon = "1"
+blake3 = "1"
+zstd = "0.13"
+half = "2"
+dirs = "6"
+rusqlite = { version = "0.32", features = ["bundled"] }
+base64 = "0.22"
+kamadak-exif = "0.6"
+trash = "5"
+notify = "8"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+image = "0.25"
+jpeg-encoder = { version = "0.6", features = ["std"] }
+lcms2 = "6"
+uuid = { version = "1", features = ["v4"] }
+little_exif = "0.6"
+
+[features]
+default = ["libraw"]
+libraw = []
+
+[profile.release]
+panic = "unwind"

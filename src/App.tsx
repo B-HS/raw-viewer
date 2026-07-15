@@ -1,0 +1,532 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
+import { useEffect, useRef, useState } from 'react'
+import type { MouseEvent } from 'react'
+import { ContextMenu } from './components/ContextMenu'
+import { Filmstrip } from './components/filmstrip/Filmstrip'
+import { FilterBar } from './components/filmstrip/FilterBar'
+import { PerfOverlay } from './components/PerfOverlay'
+import { EditPanel } from './components/panels/EditPanel'
+import { MetaPanel } from './components/panels/MetaPanel/MetaPanel'
+import { StatusBar } from './components/StatusBar'
+import { Viewport } from './components/viewport/Viewport'
+import { frontendReady, navigate, openPath, scanDirectory } from './ipc/commands'
+import { onFsChanged } from './ipc/events'
+import { watchDirectory } from './ipc/fs'
+import { flushOrganize } from './ipc/organize'
+import { confirmAndTrash } from './lib/trash'
+import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
+import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from './store/crop'
+import { useContextMenu } from './store/contextMenu'
+import { useEditClipboard } from './store/editClipboard'
+import { useEditStore } from './store/editStore'
+import { isFilterActive, matchesFilter, useFilter } from './store/filter'
+import { useHistoryStore } from './store/historyStore'
+import { useLayout } from './store/layout'
+import { useMeta } from './store/meta'
+import { LABELS, useOrganize } from './store/organize'
+import { neighbors, usePlaylist, WINDOW_RADIUS } from './store/playlist'
+import { useToast } from './store/toast'
+import { useUiStore } from './store/uiStore'
+import type { ImageEntry } from './types/ImageEntry'
+
+const OPEN_FILTERS = [
+    {
+        name: '이미지',
+        extensions: [
+            'cr2',
+            'cr3',
+            'arw',
+            'nef',
+            'nrw',
+            'raf',
+            'dng',
+            'orf',
+            'rw2',
+            'pef',
+            'x3f',
+            'jpg',
+            'jpeg',
+            'png',
+            'webp',
+            'tif',
+            'tiff',
+            'heic',
+            'heif',
+            'avif',
+            'bmp',
+            'gif',
+        ],
+    },
+]
+
+type NavDirection = 'prev' | 'next' | 'first' | 'last' | 'pageBack' | 'pageForward'
+
+const activeFilteredList = () => {
+    const state = usePlaylist.getState()
+    if (state.filteredIndices.length > 0 || isFilterActive(useFilter.getState())) return state.filteredIndices
+    return state.entries.map((_, index) => index)
+}
+
+const nextFilteredEntryIndex = (base: number, direction: NavDirection) => {
+    const list = activeFilteredList()
+    if (list.length === 0) return null
+    let position = list.indexOf(base)
+    if (position < 0) {
+        position = list.findIndex((index) => index >= base)
+        if (position < 0) position = list.length - 1
+    }
+    let next = position
+    if (direction === 'prev') next = position - 1
+    else if (direction === 'next') next = position + 1
+    else if (direction === 'first') next = 0
+    else if (direction === 'last') next = list.length - 1
+    else if (direction === 'pageBack') next = position - PAGE_STEP
+    else if (direction === 'pageForward') next = position + PAGE_STEP
+    return list[Math.max(0, Math.min(list.length - 1, next))]
+}
+
+const organizeTargets = () => {
+    const state = usePlaylist.getState()
+    if (state.selection.length > 0) return state.selection
+    const current = state.entries[state.currentIndex]
+    return current ? [current.imageId] : []
+}
+
+const advanceToNextFiltered = () => {
+    const target = nextFilteredEntryIndex(usePlaylist.getState().currentIndex, 'next')
+    if (target != null) usePlaylist.getState().focusIndex(target)
+}
+
+const selectAllFiltered = () => {
+    const state = usePlaylist.getState()
+    const list =
+        state.filteredIndices.length > 0 || isFilterActive(useFilter.getState()) ? state.filteredIndices : state.entries.map((_, index) => index)
+    usePlaylist.getState().selectAll(list.map((index) => state.entries[index].imageId))
+}
+
+export const App = () => {
+    const pendingIndexRef = useRef<number | null>(null)
+    const rafRef = useRef<number | null>(null)
+    const closingRef = useRef(false)
+    const handleOpenRef = useRef<(path: string) => void>(() => {})
+    const [pathInput, setPathInput] = useState('')
+    const [openError, setOpenError] = useState('')
+
+    const entryCount = usePlaylist((state) => state.entries.length)
+    const currentImageId = usePlaylist((state) => state.entries[state.currentIndex]?.imageId ?? null)
+    const scanning = usePlaylist((state) => state.scanning)
+    const total = usePlaylist((state) => state.total)
+    const rightPanel = useLayout((state) => state.rightPanel)
+    const filmstripVisible = useLayout((state) => state.filmstripVisible)
+    const toastMessage = useToast((state) => state.message)
+
+    const handleOpen = async (path: string) => {
+        setOpenError('')
+        try {
+            const result = await openPath(path)
+            usePlaylist.getState().openWith(result.entry, result.dir)
+            useOrganize.getState().loadMany([result.entry.imageId])
+            watchDirectory(result.dir).catch(() => undefined)
+            const summary = await scanDirectory(result.dir, (batch) => {
+                usePlaylist.getState().addEntries(batch.entries, batch.done)
+                useOrganize.getState().loadMany(batch.entries.map((entry) => entry.imageId))
+            })
+            usePlaylist.getState().setScanTotal(summary.total)
+        } catch (error) {
+            setOpenError(error instanceof Error ? error.message : '열기에 실패했습니다')
+        }
+    }
+    handleOpenRef.current = handleOpen
+
+    const pickAndOpen = async () => {
+        const selected = await openDialog({ multiple: false, directory: false, title: '이미지 열기', filters: OPEN_FILTERS }).catch(() => null)
+        if (typeof selected === 'string') handleOpenRef.current(selected)
+    }
+
+    const openContextMenu = (event: MouseEvent) => {
+        event.preventDefault()
+        const state = usePlaylist.getState()
+        const current = state.entries[state.currentIndex]
+        if (!current) return
+        const targets = state.selection.length > 1 ? state.selection : [current.imageId]
+        useContextMenu.getState().openAt(event.clientX, event.clientY, targets)
+    }
+
+    useEffect(() => {
+        let disposed = false
+        let unlistenDrop: (() => void) | null = null
+        frontendReady()
+            .then((pending) => {
+                if (!disposed && pending[0]) handleOpenRef.current(pending[0].path)
+            })
+            .catch(() => undefined)
+        getCurrentWebview()
+            .onDragDropEvent((event) => {
+                if (event.payload.type === 'drop' && event.payload.paths[0]) handleOpenRef.current(event.payload.paths[0])
+            })
+            .then((unlisten) => {
+                if (disposed) unlisten()
+                else unlistenDrop = unlisten
+            })
+            .catch(() => undefined)
+        return () => {
+            disposed = true
+            unlistenDrop?.()
+        }
+    }, [])
+
+    useEffect(() => {
+        let unlisten: (() => void) | null = null
+        getCurrentWindow()
+            .onCloseRequested(async (event) => {
+                if (closingRef.current) return
+                event.preventDefault()
+                closingRef.current = true
+                try {
+                    await useEditStore.getState().flushPending()
+                    await flushOrganize()
+                } catch {}
+                await getCurrentWindow().close()
+            })
+            .then((dispose) => {
+                unlisten = dispose
+            })
+            .catch(() => undefined)
+        return () => unlisten?.()
+    }, [])
+
+    useEffect(() => {
+        let disposed = false
+        let unlisten: (() => void) | null = null
+        const reconcile = async (dir: string) => {
+            const collected: ImageEntry[] = []
+            await scanDirectory(dir, (batch) => collected.push(...batch.entries)).catch(() => undefined)
+            usePlaylist.getState().syncEntries(collected)
+            useOrganize.getState().loadMany(collected.map((entry) => entry.imageId))
+        }
+        onFsChanged((payload) => {
+            const state = usePlaylist.getState()
+            if (!state.dir) return
+            if (payload.kind === 'modified') {
+                const affected = new Set(payload.paths)
+                const touched = state.entries.filter((entry) => affected.has(entry.path))
+                if (touched.length === 0) return
+                usePlaylist.getState().invalidate(touched.map((entry) => entry.imageId))
+                const current = state.entries[state.currentIndex]
+                if (current) {
+                    const range = neighbors(state.entries, state.currentIndex, WINDOW_RADIUS)
+                    navigate(current.imageId, range.prevIds, range.nextIds).catch(() => undefined)
+                    if (touched.some((entry) => entry.imageId === current.imageId)) {
+                        useMeta.getState().clear()
+                        useMeta.getState().loadForImage(current.imageId)
+                    }
+                }
+                return
+            }
+            reconcile(state.dir)
+        })
+            .then((dispose) => {
+                if (disposed) dispose()
+                else unlisten = dispose
+            })
+            .catch(() => undefined)
+        return () => {
+            disposed = true
+            unlisten?.()
+        }
+    }, [])
+
+    useEffect(() => {
+        const unsubscribe = useEditStore.subscribe((state) => {
+            if (state.imageId) useOrganize.getState().markEdited(state.imageId, state.dirtyFromDefault)
+        })
+        return unsubscribe
+    }, [])
+
+    useEffect(() => {
+        const recompute = () => {
+            const { entries } = usePlaylist.getState()
+            const filter = useFilter.getState()
+            const organize = useOrganize.getState()
+            const indices: number[] = []
+            for (let index = 0; index < entries.length; index += 1) {
+                const entry = entries[index]
+                if (matchesFilter(filter, entry, organize.entries[entry.imageId], organize.edited[entry.imageId] ?? false)) indices.push(index)
+            }
+            usePlaylist.getState().setFilteredIndices(indices)
+        }
+        recompute()
+        const unsubPlaylist = usePlaylist.subscribe((state, previous) => {
+            if (state.entries !== previous.entries) recompute()
+        })
+        const unsubFilter = useFilter.subscribe(recompute)
+        const unsubOrganize = useOrganize.subscribe((state, previous) => {
+            if (state.version !== previous.version) recompute()
+        })
+        return () => {
+            unsubPlaylist()
+            unsubFilter()
+            unsubOrganize()
+        }
+    }, [])
+
+    useEffect(() => {
+        const commit = () => {
+            rafRef.current = null
+            if (pendingIndexRef.current == null) return
+            usePlaylist.getState().focusIndex(pendingIndexRef.current)
+            pendingIndexRef.current = null
+        }
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (isEditableTarget(document.activeElement) || event.metaKey) return
+            if (usePlaylist.getState().entries.length === 0) return
+            const base = pendingIndexRef.current ?? usePlaylist.getState().currentIndex
+            let direction: NavDirection | null = null
+            if (event.code === KEYMAP.navigate.previous) direction = 'prev'
+            else if (event.code === KEYMAP.navigate.next) direction = 'next'
+            else if (event.code === KEYMAP.navigate.first) direction = 'first'
+            else if (event.code === KEYMAP.navigate.last) direction = 'last'
+            else if (event.code === KEYMAP.navigate.pageBack) direction = 'pageBack'
+            else if (event.code === KEYMAP.navigate.pageForward) direction = 'pageForward'
+            if (!direction) return
+            event.preventDefault()
+            const target = nextFilteredEntryIndex(base, direction)
+            if (target == null) return
+            pendingIndexRef.current = target
+            if (rafRef.current == null) rafRef.current = requestAnimationFrame(commit)
+        }
+        window.addEventListener('keydown', onKeyDown)
+        return () => {
+            window.removeEventListener('keydown', onKeyDown)
+            if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+            rafRef.current = null
+        }
+    }, [])
+
+    useEffect(() => {
+        const rotate = (delta: number) =>
+            useEditStore
+                .getState()
+                .edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), { label: '회전' })
+        const cycleAspect = () => {
+            const aspect = useEditStore.getState().state?.crop?.aspect ?? 'original'
+            applyCropAspect(CROP_ASPECTS[(CROP_ASPECTS.indexOf(aspect) + 1) % CROP_ASPECTS.length])
+        }
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (isEditableTarget(document.activeElement)) return
+            const ui = useUiStore.getState()
+            if (event.metaKey) {
+                if (event.code === KEYMAP.edit.undo && !event.altKey && !event.shiftKey) {
+                    event.preventDefault()
+                    useHistoryStore.getState().undo()
+                } else if (event.code === KEYMAP.edit.redo && event.shiftKey && !event.altKey) {
+                    event.preventDefault()
+                    useHistoryStore.getState().redo()
+                } else if (event.code === KEYMAP.file.reveal && event.shiftKey) {
+                    event.preventDefault()
+                    const current = usePlaylist.getState().entries[usePlaylist.getState().currentIndex]
+                    if (current) revealItemInDir(current.path).catch(() => undefined)
+                } else if (event.code === KEYMAP.edit.resetAll) {
+                    event.preventDefault()
+                    if (event.altKey) useEditStore.getState().resetSection(ui.activeSection)
+                    else useEditStore.getState().resetAll()
+                } else if (event.code === KEYMAP.tool.rotateLeft) {
+                    event.preventDefault()
+                    rotate(-1)
+                } else if (event.code === KEYMAP.tool.rotateRight) {
+                    event.preventDefault()
+                    rotate(1)
+                } else if (digitValue(event.code) >= 0) {
+                    event.preventDefault()
+                    event.stopImmediatePropagation()
+                    const value = digitValue(event.code)
+                    useOrganize.getState().setLabel(organizeTargets(), value === 0 ? null : LABELS[value - 1].name)
+                    if (event.shiftKey) advanceToNextFiltered()
+                } else if (event.code === KEYMAP.file.open) {
+                    event.preventDefault()
+                    pickAndOpen()
+                } else if (event.code === KEYMAP.clipboard.copyEdit && event.shiftKey && !event.altKey) {
+                    event.preventDefault()
+                    const state = useEditStore.getState().state
+                    if (state) {
+                        useEditClipboard.getState().copy(state)
+                        useToast.getState().show('편집 설정 복사됨')
+                    }
+                } else if (event.code === KEYMAP.clipboard.copyEdit && event.shiftKey && event.altKey) {
+                    event.preventDefault()
+                    const current = usePlaylist.getState().entries[usePlaylist.getState().currentIndex]
+                    if (current)
+                        navigator.clipboard
+                            .writeText(current.path)
+                            .then(() => useToast.getState().show('경로 복사됨'))
+                            .catch(() => undefined)
+                } else if (event.code === KEYMAP.clipboard.pasteEdit && event.shiftKey) {
+                    event.preventDefault()
+                    useEditClipboard.getState().paste()
+                } else if (event.code === 'KeyA') {
+                    event.preventDefault()
+                    selectAllFiltered()
+                }
+                return
+            }
+            const rating = digitValue(event.code)
+            if (rating >= 0) {
+                event.preventDefault()
+                useOrganize.getState().setRating(organizeTargets(), rating)
+                if (event.shiftKey) advanceToNextFiltered()
+            } else if (event.code === KEYMAP.organize.flagPick) {
+                event.preventDefault()
+                useOrganize.getState().setFlag(organizeTargets(), 'pick')
+                if (event.shiftKey) advanceToNextFiltered()
+            } else if (event.code === KEYMAP.organize.flagClear) {
+                event.preventDefault()
+                useOrganize.getState().setFlag(organizeTargets(), null)
+                if (event.shiftKey) advanceToNextFiltered()
+            } else if (event.code === KEYMAP.panel.meta) {
+                event.preventDefault()
+                useLayout.getState().toggleMetaPanel()
+            } else if (event.code === KEYMAP.panel.filmstrip && event.altKey) {
+                event.preventDefault()
+                useLayout.getState().toggleFilmstrip()
+            } else if (event.code === 'Tab') {
+                event.preventDefault()
+                if (event.shiftKey) useLayout.getState().toggleFilmstrip()
+                else useLayout.getState().toggleEditPanel()
+            } else if (event.code === KEYMAP.trash.move || event.code === KEYMAP.trash.remove) {
+                event.preventDefault()
+                confirmAndTrash(organizeTargets())
+            } else if (event.code === KEYMAP.inspect.clip) {
+                event.preventDefault()
+                ui.toggleClipping(event.shiftKey ? 'highlight' : event.altKey ? 'shadow' : 'both')
+            } else if (event.code === KEYMAP.compare.split && (event.shiftKey || event.altKey)) {
+                event.preventDefault()
+                ui.toggleCompare(event.altKey ? 'y' : 'x')
+            } else if (event.code === KEYMAP.inspect.before && !event.repeat) {
+                event.preventDefault()
+                ui.engine?.setEditState(null)
+            } else if (event.code === KEYMAP.tool.crop) {
+                event.preventDefault()
+                toggleCropMode()
+            } else if (event.code === KEYMAP.tool.eyedropper) {
+                event.preventDefault()
+                if (useEditStore.getState().isRaw) useUiStore.getState().setEyedropper(!useUiStore.getState().eyedropper)
+            } else if (useUiStore.getState().cropEditMode) {
+                if (event.code === KEYMAP.tool.aspect && event.shiftKey) {
+                    event.preventDefault()
+                    cycleAspect()
+                } else if (event.code === KEYMAP.tool.swap) {
+                    event.preventDefault()
+                    swapCropAspect()
+                } else if (event.code === KEYMAP.tool.overlay) {
+                    event.preventDefault()
+                    useUiStore.getState().cycleCropOverlay()
+                }
+            } else if (event.code === KEYMAP.organize.flagReject) {
+                event.preventDefault()
+                useOrganize.getState().setFlag(organizeTargets(), 'reject')
+                if (event.shiftKey) advanceToNextFiltered()
+            }
+        }
+        const onKeyUp = (event: KeyboardEvent) => {
+            if (event.code === KEYMAP.inspect.before) useUiStore.getState().engine?.setEditState(useEditStore.getState().state)
+        }
+        window.addEventListener('keydown', onKeyDown, true)
+        window.addEventListener('keyup', onKeyUp)
+        return () => {
+            window.removeEventListener('keydown', onKeyDown, true)
+            window.removeEventListener('keyup', onKeyUp)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!currentImageId) {
+            useMeta.getState().clear()
+            return
+        }
+        const timer = setTimeout(() => useMeta.getState().loadForImage(currentImageId), 150)
+        return () => clearTimeout(timer)
+    }, [currentImageId])
+
+    useEffect(() => {
+        const run = async () => {
+            const state = usePlaylist.getState()
+            const current = state.entries[state.currentIndex]
+            if (!current) return
+            const edit = useEditStore.getState()
+            if (edit.imageId && edit.imageId !== current.imageId) await edit.flushPending()
+            const nav = neighbors(state.entries, state.currentIndex, WINDOW_RADIUS)
+            await navigate(current.imageId, nav.prevIds, nav.nextIds).catch(() => undefined)
+            if (useEditStore.getState().imageId !== current.imageId) await useEditStore.getState().loadForImage(current.imageId, current.isRaw)
+        }
+        run().catch(() => undefined)
+    }, [currentImageId, scanning])
+
+    if (entryCount === 0)
+        return (
+            <main className='flex h-screen w-screen select-none flex-col items-center justify-center gap-6 bg-viewport text-neutral-300'>
+                <div className='text-center'>
+                    <h1 className='text-xl font-semibold'>raw-viewer</h1>
+                    <p className='mt-2 text-sm text-neutral-400'>이미지 파일이나 폴더를 창에 끌어다 놓으세요</p>
+                </div>
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault()
+                        if (pathInput.trim()) handleOpen(pathInput.trim())
+                    }}
+                    className='flex w-full max-w-lg gap-2 px-6'>
+                    <input
+                        value={pathInput}
+                        onChange={(event) => setPathInput(event.target.value)}
+                        placeholder='/절대/경로/이미지.CR2'
+                        className='flex-1 rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-400'
+                    />
+                    <button
+                        type='button'
+                        onClick={pickAndOpen}
+                        className='rounded border border-neutral-600 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800'>
+                        파일 선택 (⌘O)
+                    </button>
+                    <button type='submit' className='rounded bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white'>
+                        열기
+                    </button>
+                </form>
+                {openError && <p className='px-6 text-xs text-red-400'>{openError}</p>}
+            </main>
+        )
+
+    return (
+        <main className='relative flex h-screen w-screen select-none flex-col bg-viewport'>
+            <div className='flex min-h-0 flex-1'>
+                <div className='relative min-w-0 flex-1' onContextMenu={openContextMenu}>
+                    <Viewport />
+                    {scanning && (
+                        <div className='absolute bottom-3 left-3 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-300'>
+                            {total > 0 ? `${entryCount} / ${total} 스캔 중...` : `${entryCount}개 스캔 중...`}
+                        </div>
+                    )}
+                    <PerfOverlay visible={false} />
+                </div>
+                {rightPanel === 'edit' && <EditPanel />}
+                {rightPanel === 'meta' && <MetaPanel />}
+            </div>
+            {filmstripVisible && (
+                <div className='flex shrink-0 flex-col'>
+                    <FilterBar />
+                    <div className='h-24'>
+                        <Filmstrip />
+                    </div>
+                </div>
+            )}
+            <StatusBar />
+            {toastMessage && (
+                <div className='pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 rounded bg-black/80 px-3 py-1.5 text-xs text-neutral-100 shadow-lg'>
+                    {toastMessage}
+                </div>
+            )}
+            <ContextMenu />
+        </main>
+    )
+}

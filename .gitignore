@@ -1,0 +1,11 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/vendor/
+src-tauri/binaries/
+tests/fixtures/tier1/
+tests/fixtures/tier2/
+*.log
+.DS_Store
+.claude/

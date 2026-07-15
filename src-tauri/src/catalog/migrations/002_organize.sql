@@ -1,0 +1,4 @@
+ALTER TABLE images ADD COLUMN rating INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE images ADD COLUMN flag TEXT;
+ALTER TABLE images ADD COLUMN label TEXT;
+CREATE INDEX IF NOT EXISTS idx_images_rating ON images(rating) WHERE rating > 0;
