@@ -36,8 +36,12 @@ fn resolve_targets(registry: &Registry, image_ids: &[String]) -> Vec<(String, Pa
 }
 
 #[tauri::command]
-pub async fn frontend_ready(queue: State<'_, OpenQueue>) -> AppResult<Vec<PendingOpenRequest>> {
-    tracing::info!("frontend ready");
+pub async fn frontend_ready(window: tauri::Window, queue: State<'_, OpenQueue>) -> AppResult<Vec<PendingOpenRequest>> {
+    let label = window.label().to_owned();
+    tracing::info!(%label, "frontend ready");
+    if label != "main" {
+        return Ok(queue.drain_window(&label).into_iter().map(|path| PendingOpenRequest { path }).collect());
+    }
     let mut pending: Vec<PendingOpenRequest> = std::env::var("RAW_VIEWER_OPEN")
         .ok()
         .map(|path| PendingOpenRequest { path: PathBuf::from(path) })
@@ -50,7 +54,23 @@ pub async fn frontend_ready(queue: State<'_, OpenQueue>) -> AppResult<Vec<Pendin
 }
 
 #[tauri::command]
-pub async fn open_path(path: PathBuf, state: State<'_, AppState>, edits: State<'_, EditService>) -> AppResult<OpenResult> {
+pub async fn open_in_new_window(path: PathBuf, app: AppHandle, queue: State<'_, OpenQueue>) -> AppResult<String> {
+    let label = queue.next_window_label();
+    queue.enqueue_for_window(&label, path);
+    tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::default())
+        .title("raw-viewer")
+        .inner_size(1280.0, 800.0)
+        .min_inner_size(900.0, 600.0)
+        .build()
+        .map_err(|error| {
+            queue.drain_window(&label);
+            AppError::Io(format!("create window: {error}"))
+        })?;
+    Ok(label)
+}
+
+#[tauri::command]
+pub async fn open_path(path: PathBuf, window: tauri::Window, state: State<'_, AppState>, edits: State<'_, EditService>) -> AppResult<OpenResult> {
     let span = tracing::info_span!("open_path", path = %path.display());
     let _guard = span.enter();
     let canonical = std::fs::canonicalize(&path)?;
@@ -61,7 +81,7 @@ pub async fn open_path(path: PathBuf, state: State<'_, AppState>, edits: State<'
     state.services.registry.insert(entry.image_id.clone(), canonical.clone());
     let dir = canonical.parent().map(Path::to_path_buf).unwrap_or(canonical);
     edits.on_navigate(&entry.image_id);
-    state.pipeline.navigate(entry.image_id.clone(), Vec::new(), Vec::new());
+    state.pipeline.navigate(window.label(), entry.image_id.clone(), Vec::new(), Vec::new());
     Ok(OpenResult { entry, dir })
 }
 
@@ -84,11 +104,12 @@ pub async fn navigate(
     image_id: String,
     prev_ids: Vec<String>,
     next_ids: Vec<String>,
+    window: tauri::Window,
     state: State<'_, AppState>,
     edits: State<'_, EditService>,
 ) -> AppResult<()> {
     edits.on_navigate(&image_id);
-    state.pipeline.navigate(image_id, prev_ids, next_ids);
+    state.pipeline.navigate(window.label(), image_id, prev_ids, next_ids);
     Ok(())
 }
 

@@ -22,7 +22,7 @@ import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
 import { useSettingsTab } from './components/settings/settingsTab'
-import { frontendReady, navigate, openPath, scanDirectory } from './ipc/commands'
+import { frontendReady, navigate, openInNewWindow, openPath, scanDirectory } from './ipc/commands'
 import { onDecodeCrashLoop, onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
 import { requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
@@ -513,9 +513,13 @@ export const App = () => {
     }, [])
 
     useEffect(() => {
+        if (getCurrentWindow().label !== 'main') return
         let disposed = false
         const unlisteners: Array<() => void> = []
-        const handle = (payload: { path: string }) => handleOpenRef.current(payload.path)
+        const handle = (payload: { path: string }) => {
+            if (useSettings.getState().openInNewWindow) openInNewWindow(payload.path).catch(() => undefined)
+            else handleOpenRef.current(payload.path)
+        }
         onOpenRequest(handle)
             .then((dispose) => (disposed ? dispose() : unlisteners.push(dispose)))
             .catch(() => undefined)

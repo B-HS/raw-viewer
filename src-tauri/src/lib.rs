@@ -125,8 +125,8 @@ pub fn run() {
             app.manage(watch::WatchService::new(emit, invalidate));
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { .. } => {
                 if let Some(edits) = window.try_state::<edit::EditService>() {
                     edits.flush_all();
                 }
@@ -134,10 +134,17 @@ pub fn run() {
                     organize.flush_all();
                 }
             }
+            tauri::WindowEvent::Destroyed => {
+                if let Some(state) = window.try_state::<pipeline::AppState>() {
+                    state.pipeline.forget_window(window.label());
+                }
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::frontend_ready,
             commands::open_path,
+            commands::open_in_new_window,
             commands::scan_directory,
             commands::navigate,
             commands::get_edit_state,
@@ -188,6 +195,8 @@ pub fn run() {
             platform::commands::get_recents,
             platform::commands::clear_recents,
             platform::commands::get_display_color_space,
+            platform::commands::has_display_icc_profile,
+            platform::commands::get_display_lut,
             platform::commands::reveal_in_file_manager,
             platform::commands::open_with_external,
         ])

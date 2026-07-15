@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use tauri::ipc::{InvokeBody, Request};
+use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
@@ -93,6 +93,20 @@ pub fn clear_recents(recents: State<'_, RecentsService>) -> AppResult<()> {
 #[tauri::command]
 pub fn get_display_color_space(platform: State<'_, CurrentPlatform>) -> AppResult<ColorSpaceId> {
     platform.display_color_space()
+}
+
+#[tauri::command]
+pub fn has_display_icc_profile(platform: State<'_, CurrentPlatform>) -> AppResult<bool> {
+    Ok(platform.display_icc_profile().ok().flatten().is_some())
+}
+
+#[tauri::command]
+pub fn get_display_lut(platform: State<'_, CurrentPlatform>) -> AppResult<Response> {
+    let bytes = match platform.display_icc_profile().ok().flatten() {
+        Some(icc) => crate::color::display_lut::display_lut_bytes(&icc).unwrap_or_default(),
+        None => Vec::new(),
+    };
+    Ok(Response::new(bytes))
 }
 
 #[tauri::command]

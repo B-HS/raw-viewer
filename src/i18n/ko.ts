@@ -233,6 +233,7 @@ export const ko = {
         copyFiles: '파일 복사',
         copyPath: '경로 복사',
         reveal: 'Finder에서 보기',
+        openInNewWindow: '새 창에서 열기',
         openWith: '다음에서 열기',
         openWithOriginal: '원본 파일',
         openWithEdited: '편집 적용본 (TIFF)',
@@ -474,6 +475,12 @@ export const ko = {
         themeDark: '다크',
         themeLight: '라이트',
         viewportBackground: '뷰포트 배경',
+        openInNewWindow: '파일을 새 창에서 열기',
+        openInNewWindowNote: '켜면 Finder나 Dock에서 연 파일이 현재 창을 바꾸지 않고 별도의 새 창에서 열립니다. 기본값은 꺼짐입니다.',
+        color: '색상',
+        monitorProfile: '모니터 ICC 프로파일 적용',
+        monitorProfileNote:
+            '편집한 이미지를 표준 P3/sRGB 경로 대신 모니터 ICC 프로파일(상대 색도)로 매핑합니다. RAW 렌더링에만 적용되며 기본값은 꺼짐입니다.',
         map: '지도',
         showAddress: '주소 표시 (Nominatim)',
         showAddressNote:

@@ -9,6 +9,8 @@ import type { ScanSummary } from '../types/ScanSummary'
 
 export const openPath = (path: string) => invoke<OpenResult>('open_path', { path })
 
+export const openInNewWindow = (path: string) => invoke<string>('open_in_new_window', { path })
+
 export const scanDirectory = (dir: string, onBatch: (batch: ScanBatch) => void) => {
     const channel = new Channel<ScanBatch>()
     channel.onmessage = onBatch
