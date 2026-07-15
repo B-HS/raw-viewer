@@ -361,6 +361,48 @@ pub fn extract_thumb(path: &Path) -> Result<ThumbData, DecodeError> {
     })
 }
 
+#[cfg(openmp)]
+mod omp_control {
+    use std::os::raw::c_int;
+
+    extern "C" {
+        fn omp_get_max_threads() -> c_int;
+        fn omp_set_num_threads(num: c_int);
+    }
+
+    pub struct XtransThreadPin(Option<c_int>);
+
+    impl XtransThreadPin {
+        pub fn for_xtrans(is_xtrans: bool) -> Self {
+            if !is_xtrans {
+                return Self(None);
+            }
+            let previous = unsafe { omp_get_max_threads() };
+            unsafe { omp_set_num_threads(1) };
+            Self(Some(previous))
+        }
+    }
+
+    impl Drop for XtransThreadPin {
+        fn drop(&mut self) {
+            if let Some(previous) = self.0 {
+                unsafe { omp_set_num_threads(previous) };
+            }
+        }
+    }
+}
+
+#[cfg(not(openmp))]
+mod omp_control {
+    pub struct XtransThreadPin;
+
+    impl XtransThreadPin {
+        pub fn for_xtrans(_is_xtrans: bool) -> Self {
+            Self
+        }
+    }
+}
+
 pub fn decode(path: &Path, level: DecodeLevel, cancel: &CancelFlag) -> Result<DecodedRaw, DecodeError> {
     guarded(move || {
         check_cancel(cancel)?;
@@ -374,6 +416,8 @@ pub fn decode(path: &Path, level: DecodeLevel, cancel: &CancelFlag) -> Result<De
             (idata.filters, idata.colors)
         };
         let is_xtrans = filters == 9;
+        // SPEC-GAP: X-Trans Markesteijn (user_qual=3) is pinned to a single OpenMP thread for the whole decode - LibRaw 0.21.5 xtrans_interpolate uses `#pragma omp parallel for schedule(dynamic)` over overlapping tiles that write shared border pixels, so with >1 thread the border resolution is scheduling-dependent and NOT byte-deterministic (measured 213..4819/30M samples drift), which breaks concurrent_decode_stays_byte_identical_to_isolated. Bayer/mono stay byte-identical so OpenMP is left on globally and only X-Trans is serialized here. No-op unless the `openmp` cfg (build.rs static libomp) is set.
+        let _xtrans_thread_pin = omp_control::XtransThreadPin::for_xtrans(is_xtrans);
         let is_monochrome = source_colors == 1;
         let camera_flip = normalize_flip(unsafe { (*handle.ptr).sizes.flip });
 

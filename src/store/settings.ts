@@ -1,7 +1,9 @@
 import { load } from '@tauri-apps/plugin-store'
 import { create } from 'zustand'
 import { applyLanguage } from '../i18n'
+import { sanitizeOverrides } from '../shortcuts/keymap'
 import type { AppLanguage } from '../i18n'
+import type { Binding } from '../shortcuts/keymap'
 
 export type AppTheme = 'system' | 'dark' | 'light'
 
@@ -15,6 +17,8 @@ export type SettingsValues = {
     l2Policy: L2Policy
     recentApps: string[]
     filmstripHeight: number
+    gridCellSize: number
+    shortcutOverrides: Record<string, Binding>
 }
 
 const RECENT_APPS_MAX = 6
@@ -22,9 +26,14 @@ const RECENT_APPS_MAX = 6
 const FILMSTRIP_MIN = 60
 const FILMSTRIP_MAX = 200
 
+export const GRID_CELL_MIN = 90
+export const GRID_CELL_MAX = 260
+
 const STORE_PATH = 'settings.json'
 
 const clampFilmstripHeight = (value: number) => Math.max(FILMSTRIP_MIN, Math.min(FILMSTRIP_MAX, Math.round(value)))
+
+const clampGridCellSize = (value: number) => Math.max(GRID_CELL_MIN, Math.min(GRID_CELL_MAX, Math.round(value)))
 
 const DEFAULTS: SettingsValues = {
     language: 'system',
@@ -34,6 +43,8 @@ const DEFAULTS: SettingsValues = {
     l2Policy: 'idle',
     recentApps: [],
     filmstripHeight: 96,
+    gridCellSize: 140,
+    shortcutOverrides: {},
 }
 
 let storeRef: Awaited<ReturnType<typeof load>> | null = null
@@ -77,6 +88,11 @@ type SettingsStore = SettingsValues & {
     addRecentApp: (path: string) => void
     setFilmstripHeight: (height: number) => void
     commitFilmstripHeight: () => void
+    setGridCellSize: (size: number) => void
+    commitGridCellSize: () => void
+    setShortcutBinding: (id: string, binding: Binding) => void
+    resetShortcutBinding: (id: string) => void
+    resetShortcutBindings: () => void
 }
 
 export const useSettings = create<SettingsStore>((set, get) => ({
@@ -93,6 +109,8 @@ export const useSettings = create<SettingsStore>((set, get) => ({
             const l2Policy = await store.get('l2Policy')
             const recentApps = await store.get('recentApps')
             const filmstripHeight = await store.get('filmstripHeight')
+            const gridCellSize = await store.get('gridCellSize')
+            const shortcutOverrides = await store.get('shortcutOverrides')
             values = {
                 language: isLanguage(language) ? language : DEFAULTS.language,
                 theme: isTheme(theme) ? theme : DEFAULTS.theme,
@@ -101,6 +119,8 @@ export const useSettings = create<SettingsStore>((set, get) => ({
                 l2Policy: isL2Policy(l2Policy) ? l2Policy : DEFAULTS.l2Policy,
                 recentApps: Array.isArray(recentApps) ? recentApps.filter((item): item is string => typeof item === 'string') : DEFAULTS.recentApps,
                 filmstripHeight: typeof filmstripHeight === 'number' ? clampFilmstripHeight(filmstripHeight) : DEFAULTS.filmstripHeight,
+                gridCellSize: typeof gridCellSize === 'number' ? clampGridCellSize(gridCellSize) : DEFAULTS.gridCellSize,
+                shortcutOverrides: sanitizeOverrides(shortcutOverrides),
             }
         } catch {}
         set({ ...values, hydrated: true })
@@ -142,4 +162,21 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     },
     setFilmstripHeight: (height) => set({ filmstripHeight: clampFilmstripHeight(height) }),
     commitFilmstripHeight: () => persist('filmstripHeight', get().filmstripHeight),
+    setGridCellSize: (size) => set({ gridCellSize: clampGridCellSize(size) }),
+    commitGridCellSize: () => persist('gridCellSize', get().gridCellSize),
+    setShortcutBinding: (id, binding) => {
+        const shortcutOverrides = { ...get().shortcutOverrides, [id]: binding }
+        set({ shortcutOverrides })
+        persist('shortcutOverrides', shortcutOverrides)
+    },
+    resetShortcutBinding: (id) => {
+        const shortcutOverrides = { ...get().shortcutOverrides }
+        delete shortcutOverrides[id]
+        set({ shortcutOverrides })
+        persist('shortcutOverrides', shortcutOverrides)
+    },
+    resetShortcutBindings: () => {
+        set({ shortcutOverrides: {} })
+        persist('shortcutOverrides', {})
+    },
 }))

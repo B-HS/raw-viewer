@@ -24,6 +24,7 @@ type HistoryState = {
     record: (imageId: string, entry: HistoryEntry) => void
     undo: () => void
     redo: () => void
+    jumpTo: (imageId: string, target: number) => void
     canUndo: (imageId: string | null) => boolean
     canRedo: (imageId: string | null) => boolean
 }
@@ -77,6 +78,20 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
         const entry = stack.redo[stack.redo.length - 1]
         useEditStore.getState().applyPatches(entry.patches)
         set({ stacks: { ...get().stacks, [imageId]: { undo: [...stack.undo, entry], redo: stack.redo.slice(0, -1) } } })
+    },
+    jumpTo: (imageId, target) => {
+        if (useEditStore.getState().imageId !== imageId) return
+        const stack = get().stacks[imageId]
+        if (!stack) return
+        const timeline = [...stack.undo, ...[...stack.redo].reverse()]
+        const current = stack.undo.length - 1
+        const clamped = target < -1 ? -1 : target > timeline.length - 1 ? timeline.length - 1 : target
+        if (clamped === current) return
+        const patches: Patch[] = []
+        if (clamped > current) for (let index = current + 1; index <= clamped; index++) patches.push(...timeline[index].patches)
+        else for (let index = current; index > clamped; index--) patches.push(...timeline[index].inversePatches)
+        useEditStore.getState().applyPatches(patches)
+        set({ stacks: { ...get().stacks, [imageId]: { undo: timeline.slice(0, clamped + 1), redo: timeline.slice(clamped + 1).reverse() } } })
     },
     canUndo: (imageId) => (imageId ? (get().stacks[imageId]?.undo.length ?? 0) > 0 : false),
     canRedo: (imageId) => (imageId ? (get().stacks[imageId]?.redo.length ?? 0) > 0 : false),
