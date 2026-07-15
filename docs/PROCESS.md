@@ -106,8 +106,19 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 통합: cargo test 241 + bun run build + 실기동(패닉 0). 시각 확인 보류(화면 잠금)
 - 3d SPEC-GAP: 보간은 선형(lensfun 4점 Hermite 대비 3점+ 시 미세 편차), subjectDistance 기본 1000, DNG OpcodeList 우선 규칙(FR-8) 미구현, aperture 미상 시 비네팅 없음
 
+### 3e (계약: docs/phase3e-contract.md) — **완료, dev 반영(c77cd48)**
+- [x] QA: perf 하니스(release)·run-acceptance.sh(12/12 PASS)·docs/quality-assurance/phase3-acceptance.md(§8.2 45항목: 자동통과 9·수동 35·성능 미달 1)
+- [x] P1: 워터마크(raw body + OETF 후 합성)·배치 실패 요약/재시도·필름스트립 높이 드래그·Y 비교 나란히
+- [x] deny.toml IJG/NCSA 허용(permissive — R4 무관), licenses ok 복구
+- **성능 실측(M4 Pro/48GB — M1 기준기보다 유리)**: L0 전 기종 ≤2ms ✓ · **L1 목표 250ms 광범위 초과(R5 410ms)** · **X-Trans L1 13.4s**(half_size가 X-Trans에 무효, 풀해상도 단일스레드 Markesteijn — PRD §3.3 지정 방식의 내재 한계) · L2는 Bayer ✓ / X-Trans·GFX100 ✗
+- 기타: nikon-z8 고효율 NEF에 LibRaw "data corrupted" 경고(디코드는 완료 — 육안 재검증 필요)
+
+### 미결 결정 (사용자)
+1. **prod 병합 시점** — dev(0~3e) 상태. 허락 대기.
+2. **X-Trans/L1 성능 전략** — ① LibRaw OpenMP 활성화(권장, 검증 웨이브 진행 중) ② X-Trans L1 저품질 프록시(bilinear) ③ 현행 유지. OpenMP 검증 결과 나오면 재보고.
+
 ### Phase 3 이후 잔여
-Export batch 고도화 · 워터마크(FR-14.1 P1) · 필름스트립 높이 드래그 · 히스토리 패널 · §8.2 수용 기준 전수 점검 · 성능 목표 실측(release 빌드, M1 기준은 사용자 하드웨어로 근사)
+§8.2 수동 35항목(사용자 재석 필요 — quality-assurance 문서에 확인 방법 기재) · Z8 고효율 NEF 육안 검증 · Phase 4(§11)
 
 ## Phase 4 (미착수)
 PRD §11 체크리스트를 그대로 따른다.

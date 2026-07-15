@@ -3,6 +3,7 @@ import { smartCopyCurrent } from '../lib/smartCopy'
 import { isFilterActive, useFilter } from '../store/filter'
 import { useEditStore } from '../store/editStore'
 import { useExportStore } from '../store/exportStore'
+import { useGridView } from '../store/gridView'
 import { useLayout } from '../store/layout'
 import { useOrganize } from '../store/organize'
 import { useOverlays } from '../store/overlays'
@@ -85,6 +86,8 @@ export const buildActions = (t: TFunction, ctx: { openFile: () => void }): Palet
         { id: 'panel.meta', group: panel, title: t('palette.action.toggleMeta'), run: () => useLayout.getState().toggleMetaPanel() },
         { id: 'panel.preset', group: panel, title: t('palette.action.togglePreset'), run: () => useLayout.getState().selectRightPanel('preset') },
         { id: 'panel.filmstrip', group: panel, title: t('palette.action.toggleFilmstrip'), run: () => useLayout.getState().toggleFilmstrip() },
+        { id: 'panel.history', group: panel, title: t('palette.action.toggleHistory'), run: () => useLayout.getState().selectRightPanel('history') },
+        { id: 'view.grid', group: panel, title: t('palette.action.toggleGrid'), run: () => useGridView.getState().toggle() },
         { id: 'edit.copyImage', group: edit, title: t('palette.action.copyImage'), run: () => smartCopyCurrent() },
         {
             id: 'edit.copyPath',

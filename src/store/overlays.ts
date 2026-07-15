@@ -23,3 +23,8 @@ export const useOverlays = create<OverlaysState>((set) => ({
     togglePalette: () => set((state) => ({ paletteOpen: !state.paletteOpen })),
     closePalette: () => set({ paletteOpen: false }),
 }))
+
+export const isOverlayBlocking = () => {
+    const state = useOverlays.getState()
+    return state.settingsOpen || state.aboutOpen || state.paletteOpen
+}

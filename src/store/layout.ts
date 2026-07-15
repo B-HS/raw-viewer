@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type RightPanel = 'edit' | 'meta' | 'preset' | 'none'
+export type RightPanel = 'edit' | 'meta' | 'preset' | 'history' | 'none'
 
 const LAYOUT_KEY = 'raw-viewer:layout'
 

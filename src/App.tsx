@@ -13,6 +13,8 @@ import { ExportDialog } from './components/ExportDialog'
 import { Filmstrip } from './components/filmstrip/Filmstrip'
 import { FilmstripResizer } from './components/filmstrip/FilmstripResizer'
 import { FilterBar } from './components/filmstrip/FilterBar'
+import { GridView } from './components/gridview/GridView'
+import { HistoryPanel } from './components/HistoryPanel'
 import { PerfOverlay } from './components/PerfOverlay'
 import { EditPanel } from './components/panels/EditPanel'
 import { MetaPanel } from './components/panels/MetaPanel/MetaPanel'
@@ -26,13 +28,14 @@ import { flushOrganize } from './ipc/organize'
 import { copyFilesToClipboard, noteRecent } from './ipc/platform'
 import { smartCopyCurrent } from './lib/smartCopy'
 import { confirmAndTrash } from './lib/trash'
-import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
+import { digitValue, isEditableTarget, KEYMAP, matchAction, PAGE_STEP, resolveBinding } from './shortcuts/keymap'
 import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from './store/crop'
 import { useContextMenu } from './store/contextMenu'
 import { useEditClipboard } from './store/editClipboard'
 import { useEditStore } from './store/editStore'
 import { useExportStore } from './store/exportStore'
 import { isFilterActive, matchesFilter, useFilter } from './store/filter'
+import { useGridView } from './store/gridView'
 import { useHistoryStore } from './store/historyStore'
 import { useLayout } from './store/layout'
 import { useLens } from './store/lens'
@@ -40,7 +43,7 @@ import { usePresetStore } from './store/presetStore'
 import { useSettings } from './store/settings'
 import type { RightPanel } from './store/layout'
 import { useMeta } from './store/meta'
-import { useOverlays } from './store/overlays'
+import { isOverlayBlocking, useOverlays } from './store/overlays'
 import { LABELS, useOrganize } from './store/organize'
 import { usePairs } from './store/pairs'
 import { neighbors, usePlaylist, WINDOW_RADIUS } from './store/playlist'
@@ -118,7 +121,7 @@ const selectAllFiltered = () => {
     usePlaylist.getState().selectAll(list.map((index) => state.entries[index].imageId))
 }
 
-const PANEL_TABS: readonly Exclude<RightPanel, 'none'>[] = ['edit', 'meta', 'preset']
+const PANEL_TABS: readonly Exclude<RightPanel, 'none'>[] = ['edit', 'meta', 'preset', 'history']
 
 export const App = () => {
     const pendingIndexRef = useRef<number | null>(null)
@@ -139,6 +142,7 @@ export const App = () => {
     const toastMessage = useToast((state) => state.message)
     const currentName = usePlaylist((state) => state.entries[state.currentIndex]?.fileName ?? '')
     const currentPosition = usePlaylist((state) => state.currentIndex)
+    const gridActive = useGridView((state) => state.active)
     const { t } = useTranslation()
 
     const handleOpen = async (path: string) => {
@@ -307,15 +311,16 @@ export const App = () => {
         }
         const onKeyDown = (event: KeyboardEvent) => {
             if (isEditableTarget(document.activeElement) || event.metaKey) return
+            if (isOverlayBlocking() || useGridView.getState().active) return
             if (usePlaylist.getState().entries.length === 0) return
             const base = pendingIndexRef.current ?? usePlaylist.getState().currentIndex
             let direction: NavDirection | null = null
-            if (event.code === KEYMAP.navigate.previous) direction = 'prev'
-            else if (event.code === KEYMAP.navigate.next) direction = 'next'
-            else if (event.code === KEYMAP.navigate.first) direction = 'first'
-            else if (event.code === KEYMAP.navigate.last) direction = 'last'
-            else if (event.code === KEYMAP.navigate.pageBack) direction = 'pageBack'
-            else if (event.code === KEYMAP.navigate.pageForward) direction = 'pageForward'
+            if (matchAction(event, 'nav.previous')) direction = 'prev'
+            else if (matchAction(event, 'nav.next')) direction = 'next'
+            else if (matchAction(event, 'nav.first')) direction = 'first'
+            else if (matchAction(event, 'nav.last')) direction = 'last'
+            else if (matchAction(event, 'nav.pageBack')) direction = 'pageBack'
+            else if (matchAction(event, 'nav.pageForward')) direction = 'pageForward'
             if (!direction) return
             event.preventDefault()
             const target = nextFilteredEntryIndex(base, direction)
@@ -342,134 +347,133 @@ export const App = () => {
         }
         const onKeyDown = (event: KeyboardEvent) => {
             if (isEditableTarget(document.activeElement)) return
+            if (isOverlayBlocking()) return
             const ui = useUiStore.getState()
-            if (event.metaKey) {
-                if (event.code === KEYMAP.edit.undo && !event.altKey && !event.shiftKey) {
-                    event.preventDefault()
-                    useHistoryStore.getState().undo()
-                } else if (event.code === KEYMAP.edit.redo && event.shiftKey && !event.altKey) {
-                    event.preventDefault()
-                    useHistoryStore.getState().redo()
-                } else if (event.code === KEYMAP.file.reveal && event.shiftKey) {
-                    event.preventDefault()
-                    const current = usePlaylist.getState().entries[usePlaylist.getState().currentIndex]
-                    if (current) revealItemInDir(current.path).catch(() => undefined)
-                } else if (event.code === KEYMAP.edit.resetAll) {
-                    event.preventDefault()
-                    if (event.altKey) useEditStore.getState().resetSection(ui.activeSection)
-                    else useEditStore.getState().resetAll()
-                } else if (event.code === KEYMAP.tool.rotateLeft) {
-                    event.preventDefault()
-                    rotate(-1)
-                } else if (event.code === KEYMAP.tool.rotateRight) {
-                    event.preventDefault()
-                    rotate(1)
-                } else if (digitValue(event.code) >= 0) {
-                    event.preventDefault()
-                    event.stopImmediatePropagation()
-                    const value = digitValue(event.code)
-                    useOrganize.getState().setLabel(organizeTargets(), value === 0 ? null : LABELS[value - 1].name)
-                    if (event.shiftKey) advanceToNextFiltered()
-                } else if (event.code === KEYMAP.file.open) {
-                    event.preventDefault()
-                    pickAndOpen()
-                } else if (event.code === KEYMAP.misc.settings) {
-                    event.preventDefault()
-                    useOverlays.getState().openSettings()
-                } else if (event.code === KEYMAP.misc.palette && event.shiftKey) {
-                    event.preventDefault()
-                    useOverlays.getState().togglePalette()
-                } else if (event.code === KEYMAP.clipboard.copyImage && !event.shiftKey && !event.altKey) {
-                    event.preventDefault()
-                    smartCopyCurrent()
-                } else if (event.code === KEYMAP.clipboard.copyFiles && event.altKey && !event.shiftKey) {
-                    event.preventDefault()
-                    copyFilesToClipboard(organizeTargets()).catch(() => undefined)
-                } else if (event.code === KEYMAP.clipboard.copyEdit && event.shiftKey && !event.altKey) {
-                    event.preventDefault()
-                    useEditClipboard.getState().copy()
-                } else if (event.code === KEYMAP.clipboard.copyEdit && event.shiftKey && event.altKey) {
-                    event.preventDefault()
-                    const current = usePlaylist.getState().entries[usePlaylist.getState().currentIndex]
-                    if (current)
-                        navigator.clipboard
-                            .writeText(current.path)
-                            .then(() => useToast.getState().show(t('toast.pathCopied')))
-                            .catch(() => undefined)
-                } else if (event.code === KEYMAP.clipboard.pasteEdit && event.shiftKey && !event.altKey) {
-                    event.preventDefault()
-                    useEditClipboard.getState().pasteTo(organizeTargets())
-                } else if (event.code === KEYMAP.clipboard.pastePrevious && event.altKey && !event.shiftKey) {
-                    event.preventDefault()
-                    useEditClipboard.getState().pastePrevious()
-                } else if (event.code === KEYMAP.export.raster && !event.altKey) {
-                    event.preventDefault()
-                    const playlist = usePlaylist.getState()
-                    const current = playlist.entries[playlist.currentIndex]
-                    if (current) {
-                        const targets = event.shiftKey && playlist.selection.length > 0 ? playlist.selection : [current.imageId]
-                        useExportStore.getState().openDialog(targets)
-                    }
-                } else if (event.code === KEYMAP.export.dng && event.shiftKey) {
-                    event.preventDefault()
-                    const playlist = usePlaylist.getState()
-                    const current = playlist.entries[playlist.currentIndex]
-                    if (current) useExportStore.getState().runDng(current.imageId, current.fileName, current)
-                } else if (event.code === 'KeyA') {
-                    event.preventDefault()
-                    selectAllFiltered()
+            if (matchAction(event, 'view.history')) {
+                event.preventDefault()
+                useLayout.getState().selectRightPanel('history')
+            } else if (matchAction(event, 'edit.undo')) {
+                event.preventDefault()
+                useHistoryStore.getState().undo()
+            } else if (matchAction(event, 'edit.redo')) {
+                event.preventDefault()
+                useHistoryStore.getState().redo()
+            } else if (matchAction(event, 'file.reveal')) {
+                event.preventDefault()
+                const current = usePlaylist.getState().entries[usePlaylist.getState().currentIndex]
+                if (current) revealItemInDir(current.path).catch(() => undefined)
+            } else if (matchAction(event, 'edit.reset')) {
+                event.preventDefault()
+                if (event.altKey) useEditStore.getState().resetSection(ui.activeSection)
+                else useEditStore.getState().resetAll()
+            } else if (matchAction(event, 'edit.rotateLeft')) {
+                event.preventDefault()
+                rotate(-1)
+            } else if (matchAction(event, 'edit.rotateRight')) {
+                event.preventDefault()
+                rotate(1)
+            } else if (event.metaKey && digitValue(event.code) >= 0) {
+                event.preventDefault()
+                event.stopImmediatePropagation()
+                const value = digitValue(event.code)
+                useOrganize.getState().setLabel(organizeTargets(), value === 0 ? null : LABELS[value - 1].name)
+                if (event.shiftKey) advanceToNextFiltered()
+            } else if (matchAction(event, 'file.open')) {
+                event.preventDefault()
+                pickAndOpen()
+            } else if (matchAction(event, 'view.settings')) {
+                event.preventDefault()
+                useOverlays.getState().openSettings()
+            } else if (matchAction(event, 'view.palette')) {
+                event.preventDefault()
+                useOverlays.getState().togglePalette()
+            } else if (matchAction(event, 'clip.copyImage')) {
+                event.preventDefault()
+                smartCopyCurrent()
+            } else if (matchAction(event, 'clip.copyFiles')) {
+                event.preventDefault()
+                copyFilesToClipboard(organizeTargets()).catch(() => undefined)
+            } else if (matchAction(event, 'clip.copyPath')) {
+                event.preventDefault()
+                const current = usePlaylist.getState().entries[usePlaylist.getState().currentIndex]
+                if (current)
+                    navigator.clipboard
+                        .writeText(current.path)
+                        .then(() => useToast.getState().show(t('toast.pathCopied')))
+                        .catch(() => undefined)
+            } else if (matchAction(event, 'clip.copyEdit')) {
+                event.preventDefault()
+                useEditClipboard.getState().copy()
+            } else if (matchAction(event, 'clip.pasteEdit')) {
+                event.preventDefault()
+                useEditClipboard.getState().pasteTo(organizeTargets())
+            } else if (matchAction(event, 'clip.pastePrevious')) {
+                event.preventDefault()
+                useEditClipboard.getState().pastePrevious()
+            } else if (matchAction(event, 'export.raster')) {
+                event.preventDefault()
+                const playlist = usePlaylist.getState()
+                const current = playlist.entries[playlist.currentIndex]
+                if (current) {
+                    const targets = event.shiftKey && playlist.selection.length > 0 ? playlist.selection : [current.imageId]
+                    useExportStore.getState().openDialog(targets)
                 }
-                return
-            }
-            if (event.altKey && !event.shiftKey && /^Digit[1-9]$/.test(event.code)) {
+            } else if (matchAction(event, 'export.dng')) {
+                event.preventDefault()
+                const playlist = usePlaylist.getState()
+                const current = playlist.entries[playlist.currentIndex]
+                if (current) useExportStore.getState().runDng(current.imageId, current.fileName, current)
+            } else if (matchAction(event, 'file.selectAll')) {
+                event.preventDefault()
+                selectAllFiltered()
+            } else if (!event.metaKey && event.altKey && !event.shiftKey && /^Digit[1-9]$/.test(event.code)) {
                 event.preventDefault()
                 const preset = usePresetStore.getState().presets[Number(event.code.slice(5)) - 1]
                 if (preset) usePresetStore.getState().applyToCurrent(preset.id, preset.name)
-                return
-            }
-            const rating = digitValue(event.code)
-            if (rating >= 0) {
+            } else if (!event.metaKey && digitValue(event.code) >= 0) {
                 event.preventDefault()
-                useOrganize.getState().setRating(organizeTargets(), rating)
+                useOrganize.getState().setRating(organizeTargets(), digitValue(event.code))
                 if (event.shiftKey) advanceToNextFiltered()
-            } else if (event.code === KEYMAP.organize.flagPick) {
+            } else if (matchAction(event, 'view.grid')) {
+                event.preventDefault()
+                useGridView.getState().toggle()
+            } else if (matchAction(event, 'organize.flagPick')) {
                 event.preventDefault()
                 useOrganize.getState().setFlag(organizeTargets(), 'pick')
                 if (event.shiftKey) advanceToNextFiltered()
-            } else if (event.code === KEYMAP.organize.flagClear) {
+            } else if (matchAction(event, 'organize.flagClear')) {
                 event.preventDefault()
                 useOrganize.getState().setFlag(organizeTargets(), null)
                 if (event.shiftKey) advanceToNextFiltered()
-            } else if (event.code === KEYMAP.panel.meta) {
+            } else if (matchAction(event, 'view.metaPanel')) {
                 event.preventDefault()
                 useLayout.getState().toggleMetaPanel()
-            } else if (event.code === KEYMAP.panel.filmstrip && event.altKey) {
+            } else if (matchAction(event, 'view.editPanel')) {
+                event.preventDefault()
+                useLayout.getState().toggleEditPanel()
+            } else if (matchAction(event, 'view.filmstrip')) {
                 event.preventDefault()
                 useLayout.getState().toggleFilmstrip()
-            } else if (event.code === 'Tab') {
-                event.preventDefault()
-                if (event.shiftKey) useLayout.getState().toggleFilmstrip()
-                else useLayout.getState().toggleEditPanel()
-            } else if (event.code === KEYMAP.trash.move || event.code === KEYMAP.trash.remove) {
+            } else if (matchAction(event, 'file.trash') || event.code === 'Delete') {
                 event.preventDefault()
                 confirmAndTrash(organizeTargets())
-            } else if (event.code === KEYMAP.inspect.clip) {
+            } else if (matchAction(event, 'inspect.clip')) {
                 event.preventDefault()
                 ui.toggleClipping(event.shiftKey ? 'highlight' : event.altKey ? 'shadow' : 'both')
-            } else if (event.code === KEYMAP.compare.split) {
+            } else if (matchAction(event, 'compare.split')) {
                 event.preventDefault()
                 if (event.shiftKey || event.altKey) ui.toggleCompare(event.altKey ? 'y' : 'x')
                 else ui.toggleSideBySide()
-            } else if (event.code === KEYMAP.inspect.before && !event.repeat) {
+            } else if (matchAction(event, 'inspect.before') && !event.repeat) {
                 event.preventDefault()
                 ui.engine?.setEditState(null)
-            } else if (event.code === KEYMAP.tool.crop) {
+            } else if (matchAction(event, 'tool.crop')) {
                 event.preventDefault()
                 toggleCropMode()
-            } else if (event.code === KEYMAP.tool.eyedropper) {
+            } else if (matchAction(event, 'tool.eyedropper')) {
                 event.preventDefault()
                 if (useEditStore.getState().isRaw) useUiStore.getState().setEyedropper(!useUiStore.getState().eyedropper)
-            } else if (useUiStore.getState().cropEditMode) {
+            } else if (ui.cropEditMode) {
                 if (event.code === KEYMAP.tool.aspect && event.shiftKey) {
                     event.preventDefault()
                     cycleAspect()
@@ -480,14 +484,14 @@ export const App = () => {
                     event.preventDefault()
                     useUiStore.getState().cycleCropOverlay()
                 }
-            } else if (event.code === KEYMAP.organize.flagReject) {
+            } else if (matchAction(event, 'organize.flagReject')) {
                 event.preventDefault()
                 useOrganize.getState().setFlag(organizeTargets(), 'reject')
                 if (event.shiftKey) advanceToNextFiltered()
             }
         }
         const onKeyUp = (event: KeyboardEvent) => {
-            if (event.code === KEYMAP.inspect.before) useUiStore.getState().engine?.setEditState(useEditStore.getState().state)
+            if (event.code === resolveBinding('inspect.before').code) useUiStore.getState().engine?.setEditState(useEditStore.getState().state)
         }
         window.addEventListener('keydown', onKeyDown, true)
         window.addEventListener('keyup', onKeyUp)
@@ -596,6 +600,7 @@ export const App = () => {
                         </button>
                     )}
                     <PerfOverlay visible={false} />
+                    {gridActive && <GridView />}
                 </div>
                 {rightPanel !== 'none' && (
                     <div className='flex h-full w-80 shrink-0 flex-col'>
@@ -614,6 +619,7 @@ export const App = () => {
                             {rightPanel === 'edit' && <EditPanel />}
                             {rightPanel === 'meta' && <MetaPanel />}
                             {rightPanel === 'preset' && <PresetPanel />}
+                            {rightPanel === 'history' && <HistoryPanel />}
                         </div>
                     </div>
                 )}
