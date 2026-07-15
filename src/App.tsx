@@ -4,6 +4,10 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import { AboutDialog } from './components/AboutDialog'
+import { CommandPalette } from './components/CommandPalette'
+import { SettingsDialog } from './components/settings/SettingsDialog'
 import { ContextMenu } from './components/ContextMenu'
 import { ExportDialog } from './components/ExportDialog'
 import { Filmstrip } from './components/filmstrip/Filmstrip'
@@ -15,9 +19,11 @@ import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
 import { frontendReady, navigate, openPath, scanDirectory } from './ipc/commands'
-import { onFsChanged } from './ipc/events'
+import { onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
 import { watchDirectory } from './ipc/fs'
 import { flushOrganize } from './ipc/organize'
+import { copyFilesToClipboard, noteRecent } from './ipc/platform'
+import { smartCopyCurrent } from './lib/smartCopy'
 import { confirmAndTrash } from './lib/trash'
 import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
 import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from './store/crop'
@@ -31,40 +37,37 @@ import { useLayout } from './store/layout'
 import { usePresetStore } from './store/presetStore'
 import type { RightPanel } from './store/layout'
 import { useMeta } from './store/meta'
+import { useOverlays } from './store/overlays'
 import { LABELS, useOrganize } from './store/organize'
+import { usePairs } from './store/pairs'
 import { neighbors, usePlaylist, WINDOW_RADIUS } from './store/playlist'
 import { useToast } from './store/toast'
 import { useUiStore } from './store/uiStore'
 import type { ImageEntry } from './types/ImageEntry'
 
-const OPEN_FILTERS = [
-    {
-        name: '이미지',
-        extensions: [
-            'cr2',
-            'cr3',
-            'arw',
-            'nef',
-            'nrw',
-            'raf',
-            'dng',
-            'orf',
-            'rw2',
-            'pef',
-            'x3f',
-            'jpg',
-            'jpeg',
-            'png',
-            'webp',
-            'tif',
-            'tiff',
-            'heic',
-            'heif',
-            'avif',
-            'bmp',
-            'gif',
-        ],
-    },
+const IMAGE_EXTENSIONS = [
+    'cr2',
+    'cr3',
+    'arw',
+    'nef',
+    'nrw',
+    'raf',
+    'dng',
+    'orf',
+    'rw2',
+    'pef',
+    'x3f',
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'tif',
+    'tiff',
+    'heic',
+    'heif',
+    'avif',
+    'bmp',
+    'gif',
 ]
 
 type NavDirection = 'prev' | 'next' | 'first' | 'last' | 'pageBack' | 'pageForward'
@@ -112,11 +115,7 @@ const selectAllFiltered = () => {
     usePlaylist.getState().selectAll(list.map((index) => state.entries[index].imageId))
 }
 
-const PANEL_TABS: readonly (readonly [Exclude<RightPanel, 'none'>, string])[] = [
-    ['edit', '편집'],
-    ['meta', '메타'],
-    ['preset', '프리셋'],
-]
+const PANEL_TABS: readonly Exclude<RightPanel, 'none'>[] = ['edit', 'meta', 'preset']
 
 export const App = () => {
     const pendingIndexRef = useRef<number | null>(null)
@@ -134,6 +133,9 @@ export const App = () => {
     const rightPanel = useLayout((state) => state.rightPanel)
     const filmstripVisible = useLayout((state) => state.filmstripVisible)
     const toastMessage = useToast((state) => state.message)
+    const currentName = usePlaylist((state) => state.entries[state.currentIndex]?.fileName ?? '')
+    const currentPosition = usePlaylist((state) => state.currentIndex)
+    const { t } = useTranslation()
 
     const handleOpen = async (path: string) => {
         setOpenError('')
@@ -141,20 +143,27 @@ export const App = () => {
             const result = await openPath(path)
             usePlaylist.getState().openWith(result.entry, result.dir)
             useOrganize.getState().loadMany([result.entry.imageId])
+            noteRecent(path).catch(() => undefined)
             watchDirectory(result.dir).catch(() => undefined)
             const summary = await scanDirectory(result.dir, (batch) => {
                 usePlaylist.getState().addEntries(batch.entries, batch.done)
                 useOrganize.getState().loadMany(batch.entries.map((entry) => entry.imageId))
             })
             usePlaylist.getState().setScanTotal(summary.total)
+            usePairs.getState().load(result.dir)
         } catch (error) {
-            setOpenError(error instanceof Error ? error.message : '열기에 실패했습니다')
+            setOpenError(error instanceof Error ? error.message : t('app.openFailed'))
         }
     }
     handleOpenRef.current = handleOpen
 
     const pickAndOpen = async () => {
-        const selected = await openDialog({ multiple: false, directory: false, title: '이미지 열기', filters: OPEN_FILTERS }).catch(() => null)
+        const selected = await openDialog({
+            multiple: false,
+            directory: false,
+            title: t('app.openTitle'),
+            filters: [{ name: t('app.imageFilter'), extensions: IMAGE_EXTENSIONS }],
+        }).catch(() => null)
         if (typeof selected === 'string') handleOpenRef.current(selected)
     }
 
@@ -322,7 +331,7 @@ export const App = () => {
         const rotate = (delta: number) =>
             useEditStore
                 .getState()
-                .edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), { label: '회전' })
+                .edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), { label: t('history.rotate') })
         const cycleAspect = () => {
             const aspect = useEditStore.getState().state?.crop?.aspect ?? 'original'
             applyCropAspect(CROP_ASPECTS[(CROP_ASPECTS.indexOf(aspect) + 1) % CROP_ASPECTS.length])
@@ -360,6 +369,18 @@ export const App = () => {
                 } else if (event.code === KEYMAP.file.open) {
                     event.preventDefault()
                     pickAndOpen()
+                } else if (event.code === KEYMAP.misc.settings) {
+                    event.preventDefault()
+                    useOverlays.getState().openSettings()
+                } else if (event.code === KEYMAP.misc.palette && event.shiftKey) {
+                    event.preventDefault()
+                    useOverlays.getState().togglePalette()
+                } else if (event.code === KEYMAP.clipboard.copyImage && !event.shiftKey && !event.altKey) {
+                    event.preventDefault()
+                    smartCopyCurrent()
+                } else if (event.code === KEYMAP.clipboard.copyFiles && event.altKey && !event.shiftKey) {
+                    event.preventDefault()
+                    copyFilesToClipboard(organizeTargets()).catch(() => undefined)
                 } else if (event.code === KEYMAP.clipboard.copyEdit && event.shiftKey && !event.altKey) {
                     event.preventDefault()
                     useEditClipboard.getState().copy()
@@ -369,7 +390,7 @@ export const App = () => {
                     if (current)
                         navigator.clipboard
                             .writeText(current.path)
-                            .then(() => useToast.getState().show('경로 복사됨'))
+                            .then(() => useToast.getState().show(t('toast.pathCopied')))
                             .catch(() => undefined)
                 } else if (event.code === KEYMAP.clipboard.pasteEdit && event.shiftKey && !event.altKey) {
                     event.preventDefault()
@@ -472,6 +493,22 @@ export const App = () => {
     }, [])
 
     useEffect(() => {
+        let disposed = false
+        const unlisteners: Array<() => void> = []
+        const handle = (payload: { path: string }) => handleOpenRef.current(payload.path)
+        onOpenRequest(handle)
+            .then((dispose) => (disposed ? dispose() : unlisteners.push(dispose)))
+            .catch(() => undefined)
+        onDockOpen(handle)
+            .then((dispose) => (disposed ? dispose() : unlisteners.push(dispose)))
+            .catch(() => undefined)
+        return () => {
+            disposed = true
+            for (const unlisten of unlisteners) unlisten()
+        }
+    }, [])
+
+    useEffect(() => {
         usePresetStore.getState().load()
     }, [])
 
@@ -503,7 +540,7 @@ export const App = () => {
             <main className='flex h-screen w-screen select-none flex-col items-center justify-center gap-6 bg-viewport text-neutral-300'>
                 <div className='text-center'>
                     <h1 className='text-xl font-semibold'>raw-viewer</h1>
-                    <p className='mt-2 text-sm text-neutral-400'>이미지 파일이나 폴더를 창에 끌어다 놓으세요</p>
+                    <p className='mt-2 text-sm text-neutral-400'>{t('app.dropHint')}</p>
                 </div>
                 <form
                     onSubmit={(event) => {
@@ -514,17 +551,17 @@ export const App = () => {
                     <input
                         value={pathInput}
                         onChange={(event) => setPathInput(event.target.value)}
-                        placeholder='/절대/경로/이미지.CR2'
+                        placeholder={t('app.pathPlaceholder')}
                         className='flex-1 rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-400'
                     />
                     <button
                         type='button'
                         onClick={pickAndOpen}
                         className='rounded border border-neutral-600 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800'>
-                        파일 선택 (⌘O)
+                        {t('app.pickFile')}
                     </button>
                     <button type='submit' className='rounded bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white'>
-                        열기
+                        {t('app.open')}
                     </button>
                 </form>
                 {openError && <p className='px-6 text-xs text-red-400'>{openError}</p>}
@@ -538,7 +575,7 @@ export const App = () => {
                     <Viewport />
                     {scanning && (
                         <div className='absolute bottom-3 left-3 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-300'>
-                            {total > 0 ? `${entryCount} / ${total} 스캔 중...` : `${entryCount}개 스캔 중...`}
+                            {total > 0 ? t('app.scanningTotal', { count: entryCount, total }) : t('app.scanning', { count: entryCount })}
                         </div>
                     )}
                     {selectionCount > 1 && (
@@ -546,7 +583,7 @@ export const App = () => {
                             type='button'
                             onClick={() => useEditClipboard.getState().syncSelection(usePlaylist.getState().selection)}
                             className='absolute bottom-3 right-3 rounded bg-neutral-200/90 px-3 py-1 text-xs font-medium text-neutral-900 shadow hover:bg-white'>
-                            {selectionCount}개 설정 동기화
+                            {t('app.syncSelection', { count: selectionCount })}
                         </button>
                     )}
                     <PerfOverlay visible={false} />
@@ -554,13 +591,13 @@ export const App = () => {
                 {rightPanel !== 'none' && (
                     <div className='flex h-full w-80 shrink-0 flex-col'>
                         <div className='flex shrink-0 border-b border-l border-neutral-800 bg-neutral-900 text-[11px]'>
-                            {PANEL_TABS.map(([id, label]) => (
+                            {PANEL_TABS.map((id) => (
                                 <button
                                     key={id}
                                     type='button'
                                     onClick={() => useLayout.getState().selectRightPanel(id)}
                                     className={`flex-1 py-1.5 ${rightPanel === id ? 'bg-neutral-800 text-neutral-100' : 'text-neutral-500 hover:text-neutral-300'}`}>
-                                    {label}
+                                    {t(`app.tab.${id}`)}
                                 </button>
                             ))}
                         </div>
@@ -586,8 +623,14 @@ export const App = () => {
                     {toastMessage}
                 </div>
             )}
+            <div aria-live='polite' className='sr-only'>
+                {currentName ? t('app.ariaPosition', { position: currentPosition + 1, total: entryCount, name: currentName }) : ''}
+            </div>
             <ContextMenu />
             <ExportDialog />
+            <SettingsDialog />
+            <AboutDialog />
+            <CommandPalette onOpenFile={pickAndOpen} onOpenPath={(path) => handleOpenRef.current(path)} />
         </main>
     )
 }

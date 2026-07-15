@@ -2,6 +2,7 @@ import { open as openFolder } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect } from 'react'
 import type { FC, PropsWithChildren } from 'react'
+import { useTranslation } from 'react-i18next'
 import { usePlaylist } from '../store/playlist'
 import { useExportStore } from '../store/exportStore'
 import type { ConflictPolicy } from '../types/ConflictPolicy'
@@ -24,30 +25,6 @@ const COLOR_SPACES: readonly (readonly [ExportColorSpace, string])[] = [
     ['rec2020', 'Rec.2020'],
     ['adobe-rgb', 'Adobe RGB'],
     ['prophoto', 'ProPhoto'],
-]
-
-const METADATA: readonly (readonly [ExportMetadata, string])[] = [
-    ['all', '전체'],
-    ['gps-strip', 'GPS 제거'],
-    ['none', '없음'],
-]
-
-const RESIZE_MODES: readonly (readonly [ResizeMode, string])[] = [
-    ['none', '원본'],
-    ['long-edge', '긴 변'],
-    ['percent', '퍼센트'],
-]
-
-const CONFLICTS: readonly (readonly [ConflictPolicy, string])[] = [
-    ['rename', '번호 추가'],
-    ['overwrite', '덮어쓰기'],
-    ['skip', '건너뛰기'],
-]
-
-const OUTPUTS: readonly (readonly [ExportOutputMode, string])[] = [
-    ['source', '원본 폴더'],
-    ['exported', 'Exported 하위'],
-    ['custom', '지정 폴더'],
 ]
 
 const EXTENSIONS: Record<RasterFormat, string> = { jpeg: 'jpg', png: 'png', tiff: 'tif', webp: 'webp' }
@@ -112,6 +89,7 @@ const Field: FC<PropsWithChildren<{ label: string }>> = ({ label, children }) =>
 )
 
 export const ExportDialog: FC = () => {
+    const { t } = useTranslation()
     const open = useExportStore((state) => state.open)
     const dngPrompt = useExportStore((state) => state.dngPrompt)
     const settings = useExportStore((state) => state.settings)
@@ -126,6 +104,27 @@ export const ExportDialog: FC = () => {
     const lastOutputPath = useExportStore((state) => state.lastOutputPath)
     const gpsNoticeNeeded = useExportStore((state) => state.gpsNoticeNeeded)
     const firstName = usePlaylist((state) => state.entries.find((entry) => entry.imageId === targets[0])?.fileName ?? 'IMG_0001.ARW')
+
+    const metadataOptions: readonly (readonly [ExportMetadata, string])[] = [
+        ['all', t('export.metaAll')],
+        ['gps-strip', t('export.metaGpsStrip')],
+        ['none', t('export.metaNone')],
+    ]
+    const resizeOptions: readonly (readonly [ResizeMode, string])[] = [
+        ['none', t('export.resizeNone')],
+        ['long-edge', t('export.resizeLongEdge')],
+        ['percent', t('export.resizePercent')],
+    ]
+    const conflictOptions: readonly (readonly [ConflictPolicy, string])[] = [
+        ['rename', t('export.conflictRename')],
+        ['overwrite', t('export.conflictOverwrite')],
+        ['skip', t('export.conflictSkip')],
+    ]
+    const outputOptions: readonly (readonly [ExportOutputMode, string])[] = [
+        ['source', t('export.outputSource')],
+        ['exported', t('export.outputExported')],
+        ['custom', t('export.outputCustom')],
+    ]
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -144,23 +143,21 @@ export const ExportDialog: FC = () => {
         return (
             <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60'>
                 <div className='w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900 p-5 text-neutral-200 shadow-2xl'>
-                    <h2 className='text-sm font-semibold'>DNG 변환 불가</h2>
-                    <p className='mt-2 text-xs leading-relaxed text-neutral-400'>
-                        {dngPrompt.name} 은(는) 현재 DNG 모자이크 변환을 지원하지 않습니다.
-                    </p>
+                    <h2 className='text-sm font-semibold'>{t('export.dngTitle')}</h2>
+                    <p className='mt-2 text-xs leading-relaxed text-neutral-400'>{t('export.dngBody', { name: dngPrompt.name })}</p>
                     <p className='mt-1 break-all text-[10px] text-neutral-600'>{dngPrompt.message}</p>
                     <div className='mt-4 flex justify-end gap-2'>
                         <button
                             type='button'
                             onClick={() => useExportStore.getState().dismissDng()}
                             className='rounded px-3 py-1.5 text-xs text-neutral-400 hover:bg-neutral-800'>
-                            취소
+                            {t('export.cancel')}
                         </button>
                         <button
                             type='button'
                             onClick={() => useExportStore.getState().dngToTiff()}
                             className='rounded bg-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-900 hover:bg-white'>
-                            16-bit TIFF로 내보내기
+                            {t('export.dngToTiff')}
                         </button>
                     </div>
                 </div>
@@ -177,7 +174,7 @@ export const ExportDialog: FC = () => {
     const percent = total > 0 ? Math.round((done / total) * 100) : 0
 
     const pickFolder = async () => {
-        const selected = await openFolder({ directory: true, multiple: false, title: '출력 폴더 선택' }).catch(() => null)
+        const selected = await openFolder({ directory: true, multiple: false, title: t('export.pickFolderTitle') }).catch(() => null)
         if (typeof selected === 'string') update({ output: 'custom', customDir: selected })
     }
 
@@ -189,7 +186,9 @@ export const ExportDialog: FC = () => {
                 onClick={(event) => event.stopPropagation()}
                 className='flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-200 shadow-2xl'>
                 <div className='flex items-center justify-between border-b border-neutral-800 px-5 py-3'>
-                    <h2 className='text-sm font-semibold'>내보내기 {targets.length > 1 ? `(${targets.length}개)` : ''}</h2>
+                    <h2 className='text-sm font-semibold'>
+                        {targets.length > 1 ? t('export.titleCount', { count: targets.length }) : t('export.title')}
+                    </h2>
                     {!running && (
                         <button
                             type='button'
@@ -203,24 +202,21 @@ export const ExportDialog: FC = () => {
                 <div className='flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4'>
                     {gpsNoticeNeeded && (
                         <div className='flex items-start justify-between gap-3 rounded border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-[11px] text-amber-200'>
-                            <span>
-                                기본값은 GPS를 포함한 전체 메타데이터입니다. SNS 공유 시 위치가 노출될 수 있어 필요하면 &apos;GPS 제거&apos;를
-                                선택하세요.
-                            </span>
+                            <span>{t('export.gpsNotice')}</span>
                             <button
                                 type='button'
                                 onClick={() => useExportStore.getState().acknowledgeGps()}
                                 className='shrink-0 rounded px-2 py-0.5 text-amber-300 hover:bg-amber-900/40'>
-                                확인
+                                {t('common.confirm')}
                             </button>
                         </div>
                     )}
 
-                    <Field label='포맷'>
+                    <Field label={t('export.format')}>
                         <Choice value={settings.format} options={FORMATS} onChange={(format) => update({ format })} />
                     </Field>
 
-                    <Field label={`품질 ${settings.quality}`}>
+                    <Field label={t('export.quality', { value: settings.quality })}>
                         <input
                             type='range'
                             min={1}
@@ -234,15 +230,15 @@ export const ExportDialog: FC = () => {
                     </Field>
 
                     <div className='flex gap-6'>
-                        <Field label='색 공간'>
+                        <Field label={t('export.colorSpace')}>
                             <Choice value={settings.colorSpace} options={COLOR_SPACES} onChange={(colorSpace) => update({ colorSpace })} />
                         </Field>
-                        <Field label='비트'>
+                        <Field label={t('export.bits')}>
                             <Choice
                                 value={String(bitsDisabled ? 8 : settings.bits)}
                                 options={[
-                                    ['8', '8-bit'],
-                                    ['16', '16-bit'],
+                                    ['8', t('export.bit8')],
+                                    ['16', t('export.bit16')],
                                 ]}
                                 disabled={bitsDisabled}
                                 onChange={(value) => update({ bits: Number(value) })}
@@ -250,9 +246,9 @@ export const ExportDialog: FC = () => {
                         </Field>
                     </div>
 
-                    <Field label='리사이즈'>
+                    <Field label={t('export.resize')}>
                         <div className='flex items-center gap-2'>
-                            <Choice value={settings.resizeMode} options={RESIZE_MODES} onChange={(resizeMode) => update({ resizeMode })} />
+                            <Choice value={settings.resizeMode} options={resizeOptions} onChange={(resizeMode) => update({ resizeMode })} />
                             {settings.resizeMode !== 'none' && (
                                 <div className='flex items-center gap-1'>
                                     <input
@@ -268,11 +264,11 @@ export const ExportDialog: FC = () => {
                         </div>
                     </Field>
 
-                    <Field label='메타데이터'>
-                        <Choice value={settings.metadata} options={METADATA} onChange={(metadata) => update({ metadata })} />
+                    <Field label={t('export.metadata')}>
+                        <Choice value={settings.metadata} options={metadataOptions} onChange={(metadata) => update({ metadata })} />
                     </Field>
 
-                    <Field label='파일명 템플릿'>
+                    <Field label={t('export.filenameTemplate')}>
                         <input
                             value={settings.filenameTemplate}
                             onChange={(event) => update({ filenameTemplate: event.target.value })}
@@ -280,29 +276,29 @@ export const ExportDialog: FC = () => {
                             className='w-full rounded bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:ring-1 focus:ring-neutral-500'
                         />
                         <span className='truncate text-[11px] text-neutral-500'>
-                            미리보기: {previewName(settings.filenameTemplate, firstName, settings.format)}
+                            {t('export.preview', { name: previewName(settings.filenameTemplate, firstName, settings.format) })}
                         </span>
                     </Field>
 
-                    <Field label='출력 위치'>
-                        <Choice value={settings.output} options={OUTPUTS} onChange={(output) => update({ output })} />
+                    <Field label={t('export.output')}>
+                        <Choice value={settings.output} options={outputOptions} onChange={(output) => update({ output })} />
                         {settings.output === 'custom' && (
                             <div className='flex items-center gap-2'>
                                 <span className='min-w-0 flex-1 truncate rounded bg-neutral-800 px-2 py-1 text-[11px] text-neutral-400'>
-                                    {settings.customDir || '폴더가 지정되지 않았습니다'}
+                                    {settings.customDir || t('export.noFolder')}
                                 </span>
                                 <button
                                     type='button'
                                     onClick={pickFolder}
                                     className='shrink-0 rounded border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300 hover:bg-neutral-800'>
-                                    폴더 선택
+                                    {t('export.pickFolder')}
                                 </button>
                             </div>
                         )}
                     </Field>
 
-                    <Field label='충돌 처리'>
-                        <Choice value={settings.conflict} options={CONFLICTS} onChange={(conflict) => update({ conflict })} />
+                    <Field label={t('export.conflict')}>
+                        <Choice value={settings.conflict} options={conflictOptions} onChange={(conflict) => update({ conflict })} />
                     </Field>
 
                     {warning && (
@@ -319,7 +315,9 @@ export const ExportDialog: FC = () => {
                                     {done} / {total}
                                     {running && currentName ? ` · ${currentName}` : ''}
                                 </span>
-                                {finished && !running && <span>{failures.length > 0 ? `실패 ${failures.length}건` : '완료'}</span>}
+                                {finished && !running && (
+                                    <span>{failures.length > 0 ? t('export.failedCount', { count: failures.length }) : t('export.done')}</span>
+                                )}
                             </div>
                             {failures.length > 0 && (
                                 <ul className='max-h-24 overflow-y-auto rounded bg-neutral-950/60 px-2 py-1 text-[10px] text-red-300'>
@@ -340,7 +338,7 @@ export const ExportDialog: FC = () => {
                             type='button'
                             onClick={() => revealItemInDir(lastOutputPath).catch(() => undefined)}
                             className='mr-auto rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800'>
-                            Finder에서 보기
+                            {t('export.reveal')}
                         </button>
                     )}
                     {running ? (
@@ -348,7 +346,7 @@ export const ExportDialog: FC = () => {
                             type='button'
                             onClick={() => useExportStore.getState().cancel()}
                             className='rounded bg-red-900/70 px-4 py-1.5 text-xs font-medium text-red-100 hover:bg-red-800'>
-                            취소
+                            {t('export.cancel')}
                         </button>
                     ) : (
                         <>
@@ -356,14 +354,14 @@ export const ExportDialog: FC = () => {
                                 type='button'
                                 onClick={() => useExportStore.getState().close()}
                                 className='rounded px-3 py-1.5 text-xs text-neutral-400 hover:bg-neutral-800'>
-                                닫기
+                                {t('export.close')}
                             </button>
                             <button
                                 type='button'
                                 disabled={startDisabled}
                                 onClick={() => useExportStore.getState().start()}
                                 className='rounded bg-neutral-200 px-4 py-1.5 text-xs font-medium text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40'>
-                                {finished ? '다시 내보내기' : '내보내기'}
+                                {finished ? t('export.rerun') : t('export.run')}
                             </button>
                         </>
                     )}

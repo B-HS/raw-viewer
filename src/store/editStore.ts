@@ -1,5 +1,6 @@
 import { applyPatches as applyImmerPatches, enablePatches, produceWithPatches } from 'immer'
 import { create } from 'zustand'
+import { i18n } from '../i18n'
 import { cloneDefaultSection, DEFAULT_EDIT_STATE, isDefault } from './editDefaults'
 import { useHistoryStore } from './historyStore'
 import { useUiStore } from './uiStore'
@@ -11,15 +12,6 @@ import type { EditState } from '../types/EditState'
 enablePatches()
 
 const SAVE_DEBOUNCE_MS = 500
-
-const SECTION_LABEL: Record<EditSection, string> = {
-    basic: '기본',
-    'tone-curve': '톤 커브',
-    hsl: 'HSL',
-    detail: '디테일',
-    effects: '효과',
-    crop: '크롭 · 기하',
-}
 
 const EDIT_KEYS = Object.keys(DEFAULT_EDIT_STATE) as (keyof EditState)[]
 
@@ -156,14 +148,19 @@ export const useEditStore = create<EditStoreState>((set, get) => {
             try {
                 const envelope = await resetEditState(imageId)
                 if (get().imageId !== imageId) return
-                commitReplacement(imageId, get().state ?? state, envelope.state, '전체 초기화', { persist: false, version: envelope.editVersion })
+                commitReplacement(imageId, get().state ?? state, envelope.state, i18n.t('history.resetAll'), {
+                    persist: false,
+                    version: envelope.editVersion,
+                })
             } catch {}
         },
         resetSection: (section) => {
             const { imageId, state } = get()
             if (!imageId || !state) return
             const next = cloneDefaultSection(section, state)
-            commitReplacement(imageId, state, next, `${SECTION_LABEL[section]} 초기화`, { persist: true })
+            commitReplacement(imageId, state, next, i18n.t('history.sectionReset', { section: i18n.t(`panel.section.${section}`) }), {
+                persist: true,
+            })
         },
         applyServerState: async (label) => {
             const { imageId, state } = get()

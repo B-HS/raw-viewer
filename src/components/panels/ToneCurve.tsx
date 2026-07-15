@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MAX_CURVE_POINTS, sampleMonotoneCurve } from '../../store/curve'
 import { useEditStore } from '../../store/editStore'
 import { useHistogram } from '../../store/histogramStore'
@@ -23,11 +24,7 @@ const CHANNELS: { id: Channel; label: string; color: string }[] = [
     { id: 'blue', label: 'B', color: '#6b9bff' },
 ]
 
-const BASE_CURVES: { id: BaseCurveMode; label: string }[] = [
-    { id: 'linear', label: '선형' },
-    { id: 'standard', label: '표준' },
-    { id: 'filmic', label: '필름' },
-]
+const BASE_CURVES: BaseCurveMode[] = ['linear', 'standard', 'filmic']
 
 const clamp01 = (value: number) => (value < 0 ? 0 : value > 1 ? 1 : value)
 
@@ -55,6 +52,7 @@ const histogramPath = (bins: Uint32Array) => {
 }
 
 export const ToneCurve: FC = () => {
+    const { t } = useTranslation()
     const svgRef = useRef<SVGSVGElement>(null)
     const dragRef = useRef<number | null>(null)
     const [channel, setChannel] = useState<Channel>('rgb')
@@ -82,7 +80,7 @@ export const ToneCurve: FC = () => {
         const nextX =
             index === 0 ? 0 : index === points.length - 1 ? 1 : Math.min(Math.max(x, points[index - 1].x + MIN_DX), points[index + 1].x - MIN_DX)
         const next = points.map((point, i) => (i === index ? { x: nextX, y: clamp01(y) } : point))
-        commit(next, `${active.label} 커브`, false)
+        commit(next, t('panel.tone.curve', { channel: active.label }), false)
     }
 
     const onPointDown = (index: number) => (event: React.PointerEvent) => {
@@ -107,20 +105,20 @@ export const ToneCurve: FC = () => {
         const position = pointerNorm(event)
         if (points.some((point) => Math.abs(point.x - position.x) < NEAR)) return
         const next = [...points, position].sort((a, b) => a.x - b.x)
-        commit(next, `${active.label} 점 추가`, true)
+        commit(next, t('panel.tone.pointAdd', { channel: active.label }), true)
     }
     const onDeletePoint = (index: number) => (event: React.MouseEvent) => {
         event.stopPropagation()
         if (points.length <= 2 || index === 0 || index === points.length - 1) return
         commit(
             points.filter((_, i) => i !== index),
-            `${active.label} 점 삭제`,
+            t('panel.tone.pointDelete', { channel: active.label }),
             true,
         )
     }
 
     return (
-        <Section id='tone-curve' title='톤 커브'>
+        <Section id='tone-curve' title={t('panel.tone.title')}>
             <div className='flex gap-1'>
                 {CHANNELS.map((entry) => (
                     <button
@@ -167,14 +165,14 @@ export const ToneCurve: FC = () => {
                 ))}
             </svg>
             <div className='flex items-center gap-1'>
-                <span className='text-[10px] text-neutral-500'>베이스</span>
-                {BASE_CURVES.map((entry) => (
+                <span className='text-[10px] text-neutral-500'>{t('panel.tone.base')}</span>
+                {BASE_CURVES.map((mode) => (
                     <button
-                        key={entry.id}
+                        key={mode}
                         type='button'
-                        onClick={() => edit((draft) => void (draft.baseCurve = entry.id), { label: '베이스 커브' })}
-                        className={`flex-1 rounded py-1 text-[11px] ${baseCurve === entry.id ? 'bg-neutral-700 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}`}>
-                        {entry.label}
+                        onClick={() => edit((draft) => void (draft.baseCurve = mode), { label: t('history.baseCurve') })}
+                        className={`flex-1 rounded py-1 text-[11px] ${baseCurve === mode ? 'bg-neutral-700 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}`}>
+                        {t(`panel.tone.${mode}`)}
                     </button>
                 ))}
             </div>

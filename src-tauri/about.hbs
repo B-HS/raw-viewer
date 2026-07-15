@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>오픈소스 라이선스 · raw-viewer</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  margin: 0;
+  padding: 24px;
+  color: #1c1c1e;
+  background: #ffffff;
+}
+h1 { font-size: 20px; margin: 0 0 4px; }
+h2 { font-size: 16px; margin: 28px 0 8px; border-bottom: 1px solid #d1d1d6; padding-bottom: 4px; }
+h3 { font-size: 14px; margin: 20px 0 4px; }
+p { margin: 4px 0; }
+.subtitle { color: #6e6e73; font-size: 13px; margin-bottom: 16px; }
+.notice { border: 1px solid #d1d1d6; border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+.notice h2 { border: 0; margin-top: 12px; }
+.notice h2:first-child { margin-top: 0; }
+.badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #e5e5ea; color: #1c1c1e; margin-left: 6px; }
+.used-by { color: #6e6e73; font-size: 12px; margin: 0 0 6px; }
+.overview { columns: 2; font-size: 13px; padding-left: 18px; }
+.npm ul { columns: 2; font-size: 13px; padding-left: 18px; }
+.npm .ver { color: #6e6e73; }
+a { color: #0a84ff; text-decoration: none; }
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: #f2f2f7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+@media (prefers-color-scheme: dark) {
+  body { color: #f2f2f7; background: #1c1c1e; }
+  h2 { border-color: #3a3a3c; }
+  .notice { border-color: #3a3a3c; }
+  .badge { background: #3a3a3c; color: #f2f2f7; }
+  .subtitle, .used-by, .npm .ver { color: #98989d; }
+  pre { background: #2c2c2e; }
+}
+</style>
+</head>
+<body>
+<h1>오픈소스 라이선스</h1>
+<p class="subtitle">raw-viewer는 MIT 라이선스로 배포됩니다. 아래는 번들된 서드파티 구성요소의 고지입니다.</p>
+
+<section class="notice">
+  <h2>번들 구성요소 고지 (NOTICE)</h2>
+
+  <h3>LibRaw <span class="badge">CDDL-1.0</span></h3>
+  <p>RAW 디코딩. LibRaw는 LGPL-2.1 / CDDL-1.0 이중 라이선스이며 raw-viewer는 <strong>CDDL-1.0을 선택</strong>합니다. CDDL은 파일 단위 copyleft로, 소스를 무수정으로 벤더링(<code>src-tauri/vendor/libraw/</code>)하는 한 본체는 MIT를 유지합니다. GPL demosaic-pack(AMaZE 등)은 링크하지 않습니다.</p>
+
+  <h3>dnglab <span class="badge">LGPL-2.1</span></h3>
+  <p>DNG 변환 사이드카(v0.7.2, 무수정 번들). 프로세스 격리(sidecar)로 실행하며 정적 링크가 아니므로 LGPL 전파가 없습니다. 소스 획득: <a href="https://github.com/dnglab/dnglab">https://github.com/dnglab/dnglab</a> (릴리스 태그 v0.7.2).</p>
+
+  <h3>Lensfun 렌즈 데이터베이스 <span class="badge">CC-BY-SA-3.0</span></h3>
+  <p>Lens profiles from the Lensfun project (CC BY-SA 3.0). C 라이브러리는 링크하지 않고 XML DB만 사용하며 보정 수식은 자체 구현합니다. DB 수정 배포 시 동일 조건(ShareAlike)으로 공개합니다. <em>(현재 번들 전 · 예약)</em></p>
+
+  <h3>OpenStreetMap <span class="badge">ODbL</span></h3>
+  <p>© OpenStreetMap contributors. GPS/지도 표시에 렌더된 타일을 사용할 경우 저작자 표시 의무가 있으며 지도 UI에 상시 표기합니다.</p>
+</section>
+
+<!--NPM_LIST-->
+
+<h2>Rust 크레이트</h2>
+<ul class="overview">
+{{#each overview}}
+  <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
+{{/each}}
+</ul>
+
+{{#each licenses}}
+<h3 id="{{id}}">{{name}}</h3>
+<p class="used-by">
+{{#each used_by}}{{crate.name}} {{crate.version}}{{#unless @last}} · {{/unless}}{{/each}}
+</p>
+<pre>{{text}}</pre>
+{{/each}}
+
+</body>
+</html>

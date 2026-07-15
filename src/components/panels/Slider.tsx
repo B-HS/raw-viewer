@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useHistoryStore } from '../../store/historyStore'
 
 type SliderProps = {
@@ -24,6 +25,7 @@ const roundTo = (value: number, step: number) => {
 }
 
 export const Slider: FC<SliderProps> = ({ label, value, min, max, step, defaultValue, coalesceKey, onChange, disabled, bigStep, format }) => {
+    const { t } = useTranslation()
     const trackRef = useRef<HTMLDivElement>(null)
     const draggingRef = useRef(false)
     const [text, setText] = useState('')
@@ -88,7 +90,7 @@ export const Slider: FC<SliderProps> = ({ label, value, min, max, step, defaultV
     return (
         <div className={`flex flex-col gap-1 ${disabled ? 'opacity-40' : ''}`}>
             <div className='flex items-center justify-between text-xs'>
-                <span onDoubleClick={reset} className='cursor-default select-none text-neutral-300' title='더블클릭으로 초기화'>
+                <span onDoubleClick={reset} className='cursor-default select-none text-neutral-300' title={t('panel.slider.resetHint')}>
                     {label}
                 </span>
                 <input
@@ -101,7 +103,7 @@ export const Slider: FC<SliderProps> = ({ label, value, min, max, step, defaultV
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') event.currentTarget.blur()
                     }}
-                    aria-label={`${label} 값`}
+                    aria-label={t('panel.slider.valueAria', { label })}
                     className='w-14 rounded bg-neutral-800 px-1.5 py-0.5 text-right text-neutral-100 outline-none focus:ring-1 focus:ring-neutral-500'
                 />
             </div>

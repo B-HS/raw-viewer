@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { i18n } from '../i18n'
 import { useToast } from './toast'
 import { LEVEL_RANK, usePlaylist } from './playlist'
 import { useEditStore } from './editStore'
@@ -151,7 +152,7 @@ const waitForLevel = (imageId: string, timeoutMs: number) =>
         })
     })
 
-const ensureAethSource = async (imageId: string) => {
+export const ensureAethSource = async (imageId: string) => {
     const best = usePlaylist.getState().best[imageId]
     let chosen: LevelReadyPayload | null = best && best.level === 'l2' ? best : null
     if (!chosen) chosen = await waitForLevel(imageId, LEVEL_TIMEOUT_MS)
@@ -255,7 +256,7 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
         try {
             engine = createExportEngine()
         } catch {
-            set({ running: false, warning: '이 GPU는 고정밀 내보내기를 지원하지 않습니다' })
+            set({ running: false, warning: i18n.t('export.warnGpu') })
             return
         }
         try {
@@ -271,14 +272,14 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                     const resolved = await ensureAethSource(imageId)
                     if (!resolved) {
                         set((state) => ({
-                            failures: [...state.failures, { name, message: '고품질 디코드를 사용할 수 없습니다' }],
+                            failures: [...state.failures, { name, message: i18n.t('export.warnNoDecode') }],
                             done: state.done + 1,
                         }))
                         continue
                     }
-                    if (resolved.level !== 'l2') set({ warning: '일부 이미지는 L2가 준비되지 않아 저해상도(L1)로 내보내졌습니다' })
+                    if (resolved.level !== 'l2') set({ warning: i18n.t('export.warnL1') })
                     const job = engine.prepare(resolved.source, envelope.state)
-                    if (job.downscaled) set({ warning: '일부 이미지는 GPU 텍스처 한계로 축소되어 내보내졌습니다' })
+                    if (job.downscaled) set({ warning: i18n.t('export.warnDownscaled') })
                     const outputDir = resolveOutputDir(get().settings, entry)
                     const request = buildRequest(
                         get().settings,
@@ -311,15 +312,15 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
             const cancelled = get().cancelRequested
             set({ running: false, currentName: '', finished: true })
             const failed = get().failures.length
-            if (!cancelled && failed === 0 && get().lastOutputPath) useToast.getState().show('내보내기 완료')
-            else if (cancelled) useToast.getState().show('내보내기 취소됨')
+            if (!cancelled && failed === 0 && get().lastOutputPath) useToast.getState().show(i18n.t('toast.exportDone'))
+            else if (cancelled) useToast.getState().show(i18n.t('toast.exportCancelled'))
         }
     },
     runDng: async (imageId, name, entry) => {
         const outDir = resolveOutputDir(get().settings, entry)
         try {
             const path = await exportDng(imageId, outDir)
-            useToast.getState().show('DNG 내보내기 완료')
+            useToast.getState().show(i18n.t('toast.dngDone'))
             revealItemInDir(path).catch(() => undefined)
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)

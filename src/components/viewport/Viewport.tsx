@@ -1,17 +1,16 @@
 import { useEffect } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { REC2020_LUMA } from '../../gl/colorSpaces'
 import { useEditStore } from '../../store/editStore'
 import { useHistogram } from '../../store/histogramStore'
 import { usePlaylist } from '../../store/playlist'
 import { useUiStore } from '../../store/uiStore'
-import type { ProxyLevel } from '../../types/ProxyLevel'
 import { CropOverlay } from './CropOverlay'
 import { useRenderEngine } from './useRenderEngine'
 
-const LEVEL_LABEL: Record<ProxyLevel, string> = { l0: 'L0 · 프리뷰', l1: 'L1 · 편집 품질', l2: 'L2 · 100%' }
-
 export const Viewport: FC = () => {
+    const { t } = useTranslation()
     const { canvasRef, caps, gpuError, engine } = useRenderEngine()
     const currentIndex = usePlaylist((state) => state.currentIndex)
     const entries = usePlaylist((state) => state.entries)
@@ -63,7 +62,7 @@ export const Viewport: FC = () => {
                 draft.wb.temp = temp
                 draft.wb.tint = tint
             },
-            { label: '화이트밸런스 스포이드' },
+            { label: t('history.whiteBalanceEyedropper') },
         )
     }
 
@@ -104,15 +103,17 @@ export const Viewport: FC = () => {
             {cropEditMode && <CropOverlay />}
 
             <div className='pointer-events-none absolute left-3 top-3 flex flex-col gap-2'>
-                {caps?.lowPrecision && <span className='rounded bg-amber-500/80 px-2 py-1 text-xs font-medium text-black'>⚠ 저정밀 모드</span>}
-                {noProfile && <span className='rounded bg-amber-500/80 px-2 py-1 text-xs font-medium text-black'>⚠ 프로파일 없음 (색 부정확)</span>}
+                {caps?.lowPrecision && (
+                    <span className='rounded bg-amber-500/80 px-2 py-1 text-xs font-medium text-black'>{t('viewport.lowPrecision')}</span>
+                )}
+                {noProfile && <span className='rounded bg-amber-500/80 px-2 py-1 text-xs font-medium text-black'>{t('viewport.noProfile')}</span>}
             </div>
 
             {gpuError && (
                 <div className='absolute inset-0 flex items-center justify-center'>
                     <div className='rounded-lg bg-black/70 px-6 py-4 text-center text-sm text-neutral-200'>
                         <p className='text-lg'>⚠</p>
-                        <p className='mt-1'>GPU 가속을 사용할 수 없습니다</p>
+                        <p className='mt-1'>{t('viewport.gpuUnavailable')}</p>
                     </div>
                 </div>
             )}
@@ -121,7 +122,7 @@ export const Viewport: FC = () => {
                 <div className='absolute inset-0 flex items-center justify-center p-6'>
                     <div className='w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900/90 px-6 py-5 text-center text-neutral-200'>
                         <p className='text-2xl'>⚠</p>
-                        <p className='mt-2 text-base font-medium'>이미지를 불러올 수 없습니다</p>
+                        <p className='mt-2 text-base font-medium'>{t('viewport.loadFailed')}</p>
                         <p className='mt-3 break-all text-sm text-neutral-300'>{current.fileName}</p>
                         <p className='mt-1 text-xs text-neutral-400'>{error}</p>
                         <div className='mt-4 flex justify-center'>
@@ -129,17 +130,17 @@ export const Viewport: FC = () => {
                                 type='button'
                                 onClick={() => navigator.clipboard.writeText(`${current.fileName}\n${error}`)}
                                 className='rounded border border-neutral-600 px-3 py-1 text-xs text-neutral-200 hover:bg-neutral-800'>
-                                세부 정보 복사
+                                {t('viewport.copyDetails')}
                             </button>
                         </div>
-                        <p className='mt-4 text-xs text-neutral-500'>← → 로 계속 탐색할 수 있습니다</p>
+                        <p className='mt-4 text-xs text-neutral-500'>{t('viewport.navHint')}</p>
                     </div>
                 </div>
             )}
 
             {!gpuError && !error && (
                 <div className='pointer-events-none absolute bottom-3 right-3 flex items-center gap-2 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-200'>
-                    <span>{level ? LEVEL_LABEL[level.level] : '디코딩 중'}</span>
+                    <span>{level ? t(`viewport.level.${level.level}`) : t('viewport.decoding')}</span>
                     {(!level || level.level !== 'l2') && (
                         <span className='h-3 w-3 animate-spin rounded-full border-2 border-neutral-500 border-t-neutral-200' />
                     )}

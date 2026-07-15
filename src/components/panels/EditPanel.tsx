@@ -1,4 +1,5 @@
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Histogram } from '../Histogram'
 import { useEditStore } from '../../store/editStore'
 import { BasicSection } from './BasicSection'
@@ -9,6 +10,7 @@ import { HslSection } from './HslSection'
 import { ToneCurve } from './ToneCurve'
 
 export const EditPanel: FC = () => {
+    const { t } = useTranslation()
     const hasState = useEditStore((state) => state.state !== null)
     const edited = useEditStore((state) => state.dirtyFromDefault)
 
@@ -17,14 +19,14 @@ export const EditPanel: FC = () => {
             <Histogram />
             <div className='flex items-center justify-between border-b border-neutral-800 px-3 py-2'>
                 <span className='flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400'>
-                    보정
-                    {edited && <span className='h-1.5 w-1.5 rounded-full bg-amber-400' title='편집됨' />}
+                    {t('panel.adjust')}
+                    {edited && <span className='h-1.5 w-1.5 rounded-full bg-amber-400' title={t('common.edited')} />}
                 </span>
                 <button
                     type='button'
                     onClick={() => useEditStore.getState().resetAll()}
                     className='rounded px-2 py-0.5 text-[10px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100'>
-                    전체 초기화 (⌘R)
+                    {t('panel.resetAll')}
                 </button>
             </div>
             {hasState ? (
@@ -37,7 +39,7 @@ export const EditPanel: FC = () => {
                     <CropGeometrySection />
                 </div>
             ) : (
-                <div className='flex flex-1 items-center justify-center px-4 text-center text-xs text-neutral-500'>이미지를 선택하세요</div>
+                <div className='flex flex-1 items-center justify-center px-4 text-center text-xs text-neutral-500'>{t('common.selectImage')}</div>
             )}
         </aside>
     )

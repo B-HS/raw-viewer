@@ -4,6 +4,8 @@ use std::sync::{PoisonError, RwLock};
 
 use crate::types::{ImageEntry, ScanBatch, ScanSummary};
 
+pub mod pairing;
+
 pub const BATCH_SIZE: usize = 100;
 
 const RAW_EXTS: &[&str] = &[
@@ -82,6 +84,7 @@ impl Registry {
 pub fn scan_stream(dir: &Path, registry: &Registry, mut on_batch: impl FnMut(ScanBatch)) -> ScanSummary {
     let mut buffer: Vec<ImageEntry> = Vec::with_capacity(BATCH_SIZE);
     let mut total: u32 = 0;
+    let raw_stems = pairing::raw_stems(dir);
     if let Ok(read) = std::fs::read_dir(dir) {
         for entry in read.flatten() {
             let path = entry.path();
@@ -93,6 +96,9 @@ pub fn scan_stream(dir: &Path, registry: &Registry, mut on_batch: impl FnMut(Sca
                 continue;
             }
             if !path.is_file() || !is_supported(&path) {
+                continue;
+            }
+            if pairing::is_paired_secondary(&path, &raw_stems) {
                 continue;
             }
             let image_entry = make_entry(path.clone());
@@ -177,6 +183,24 @@ mod tests {
         if let Some(raw) = raw {
             assert_eq!(registry.resolve(&raw.image_id), Some(dir.join("IMG_1.CR2")));
         }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn scan_excludes_paired_jpeg_and_keeps_standalone_jpeg() {
+        let dir = temp_dir("pairing");
+        write_file(&dir, "IMG_1.CR2");
+        write_file(&dir, "IMG_1.JPG");
+        write_file(&dir, "IMG_2.JPG");
+
+        let registry = Registry::new();
+        let mut collected: Vec<ImageEntry> = Vec::new();
+        let summary = scan_stream(&dir, &registry, |batch| collected.extend(batch.entries));
+
+        assert_eq!(summary.total, 2);
+        assert!(collected.iter().any(|entry| entry.file_name == "IMG_1.CR2"));
+        assert!(collected.iter().any(|entry| entry.file_name == "IMG_2.JPG"));
+        assert!(!collected.iter().any(|entry| entry.file_name == "IMG_1.JPG"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -7,6 +7,7 @@ use crate::edit::EditService;
 use crate::error::{AppError, AppResult};
 use crate::organize::OrganizeService;
 use crate::pipeline::AppState;
+use crate::platform::OpenQueue;
 use crate::preset::{self, PresetService};
 use crate::scan::{self, Registry};
 use crate::types::{EditState, EditStateEnvelope, OpenResult, PendingOpenRequest, ScanBatch, ScanSummary};
@@ -32,13 +33,16 @@ fn resolve_targets(registry: &Registry, image_ids: &[String]) -> Vec<(String, Pa
 }
 
 #[tauri::command]
-pub async fn frontend_ready() -> AppResult<Vec<PendingOpenRequest>> {
+pub async fn frontend_ready(queue: State<'_, OpenQueue>) -> AppResult<Vec<PendingOpenRequest>> {
     tracing::info!("frontend ready");
-    let pending = std::env::var("RAW_VIEWER_OPEN")
+    let mut pending: Vec<PendingOpenRequest> = std::env::var("RAW_VIEWER_OPEN")
         .ok()
         .map(|path| PendingOpenRequest { path: PathBuf::from(path) })
         .into_iter()
         .collect();
+    for path in queue.ready_and_drain() {
+        pending.push(PendingOpenRequest { path });
+    }
     Ok(pending)
 }
 

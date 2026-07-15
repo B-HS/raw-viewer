@@ -8,6 +8,7 @@ import { onDecodeFailed, onLevelReady } from '../../ipc/events'
 import { fetchPixels } from '../../ipc/pixels'
 import { isEditableTarget, KEYMAP } from '../../shortcuts/keymap'
 import { LEVEL_RANK, neighbors, usePlaylist, WINDOW_RADIUS } from '../../store/playlist'
+import { onZoomCommand } from '../../store/viewportCommand'
 import type { LevelReadyPayload } from '../../types/LevelReadyPayload'
 
 const cursorPoint = (event: { clientX: number; clientY: number }, canvas: HTMLCanvasElement, dpr: number) => {
@@ -217,8 +218,19 @@ export const useRenderEngine = () => {
         window.addEventListener('keydown', onKeyDown)
         window.addEventListener('keyup', onKeyUp)
 
+        const unsubZoom = onZoomCommand((command) => {
+            const metrics = renderer.getMetrics()
+            if (!metrics) return
+            if (command === 'fit') viewRef.current = { fit: true, zoom: viewRef.current.zoom, pan: { x: 0, y: 0 } }
+            else if (command === 'actual') viewRef.current = zoomTo(1)
+            else if (command === 'double') viewRef.current = zoomTo(2)
+            else viewRef.current = toggleFit(viewRef.current, metrics, { x: 0, y: 0 })
+            scheduleRender()
+        })
+
         return () => {
             observer.disconnect()
+            unsubZoom()
             canvas.removeEventListener('wheel', onWheel)
             canvas.removeEventListener('pointerdown', onPointerDown)
             canvas.removeEventListener('pointermove', onPointerMove)
