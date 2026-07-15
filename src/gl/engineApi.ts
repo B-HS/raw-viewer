@@ -1,6 +1,7 @@
 import { tempTintFromGains, wbGainsFromState } from './wbModel'
 import type { Renderer } from './renderer'
 import type { EditState } from '../types/EditState'
+import type { LensProfileMatch } from '../types/LensProfileMatch'
 import type { WbState } from '../types/WbState'
 
 export type ClippingMode = 'none' | 'both' | 'highlight' | 'shadow'
@@ -9,6 +10,7 @@ export type CompareSplit = { axis: 'x' | 'y'; position: number } | null
 
 export type EngineApi = {
     setEditState: (state: EditState | null) => void
+    setLensProfile: (imageId: string | null, profile: LensProfileMatch | null) => void
     setClipping: (mode: ClippingMode) => void
     setCompare: (split: CompareSplit) => void
     setCropEditMode: (on: boolean) => void
@@ -21,6 +23,10 @@ export type EngineApi = {
 export const createEngineApi = (renderer: Renderer, requestRender: () => void): EngineApi => ({
     setEditState: (state) => {
         renderer.setEditState(state)
+        requestRender()
+    },
+    setLensProfile: (imageId, profile) => {
+        renderer.setLensProfile(imageId, profile)
         requestRender()
     },
     setClipping: (mode) => {

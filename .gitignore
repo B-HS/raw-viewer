@@ -4,6 +4,7 @@ src-tauri/target/
 src-tauri/gen/
 src-tauri/vendor/
 src-tauri/binaries/
+src-tauri/resources/lensfun/
 tests/fixtures/tier1/
 tests/fixtures/tier2/
 *.log

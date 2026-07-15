@@ -13,7 +13,10 @@ export type SettingsValues = {
     viewportBackground: string
     preloadRadius: number
     l2Policy: L2Policy
+    recentApps: string[]
 }
+
+const RECENT_APPS_MAX = 6
 
 const STORE_PATH = 'settings.json'
 
@@ -23,6 +26,7 @@ const DEFAULTS: SettingsValues = {
     viewportBackground: '#3C3C3C',
     preloadRadius: 3,
     l2Policy: 'idle',
+    recentApps: [],
 }
 
 let storeRef: Awaited<ReturnType<typeof load>> | null = null
@@ -63,6 +67,7 @@ type SettingsStore = SettingsValues & {
     setViewportBackground: (color: string) => void
     setPreloadRadius: (radius: number) => void
     setL2Policy: (policy: L2Policy) => void
+    addRecentApp: (path: string) => void
 }
 
 export const useSettings = create<SettingsStore>((set, get) => ({
@@ -77,12 +82,14 @@ export const useSettings = create<SettingsStore>((set, get) => ({
             const viewportBackground = await store.get('viewportBackground')
             const preloadRadius = await store.get('preloadRadius')
             const l2Policy = await store.get('l2Policy')
+            const recentApps = await store.get('recentApps')
             values = {
                 language: isLanguage(language) ? language : DEFAULTS.language,
                 theme: isTheme(theme) ? theme : DEFAULTS.theme,
                 viewportBackground: typeof viewportBackground === 'string' ? viewportBackground : DEFAULTS.viewportBackground,
                 preloadRadius: typeof preloadRadius === 'number' ? Math.max(0, Math.min(10, Math.round(preloadRadius))) : DEFAULTS.preloadRadius,
                 l2Policy: isL2Policy(l2Policy) ? l2Policy : DEFAULTS.l2Policy,
+                recentApps: Array.isArray(recentApps) ? recentApps.filter((item): item is string => typeof item === 'string') : DEFAULTS.recentApps,
             }
         } catch {}
         set({ ...values, hydrated: true })
@@ -116,5 +123,10 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     setL2Policy: (policy) => {
         set({ l2Policy: policy })
         persist('l2Policy', policy)
+    },
+    addRecentApp: (path) => {
+        const recentApps = [path, ...get().recentApps.filter((item) => item !== path)].slice(0, RECENT_APPS_MAX)
+        set({ recentApps })
+        persist('recentApps', recentApps)
     },
 }))

@@ -13,6 +13,7 @@ import {
     stageActive,
 } from './dirty'
 import { buildGeometryWarp } from './geometry'
+import { applyLensUniforms, buildLensPass, PASS2_UNIFORMS } from './lensUniforms'
 import { createHistogramService } from './histogram'
 import { createGlContext, createProgram, uniformLocations } from './glContext'
 import { effectsUniforms, hslUniforms, nrUniforms, sharpenUniforms, toneUniforms } from './passUniforms'
@@ -38,8 +39,10 @@ import { effectiveMaxTexture, extractTile, needsTiling, planTiles, TILE_OVERLAP,
 import { buildModelMatrix, computeFitScale, dispDims, viewScale } from './viewTransform'
 import { wbGainsFromState } from './wbModel'
 import type { ClippingMode, CompareSplit } from './engineApi'
+import type { LensPass } from './lensUniforms'
 import type { ViewState } from './viewTransform'
 import type { EditState } from '../types/EditState'
+import type { LensProfileMatch } from '../types/LensProfileMatch'
 
 type GpuImage = {
     imageId: string
@@ -95,6 +98,10 @@ export class Renderer {
     private current: string | null = null
 
     private editState: EditState = NEUTRAL_EDIT_STATE
+    private lensProfile: LensProfileMatch | null = null
+    private lensProfileImageId: string | null = null
+    private lensPass: LensPass | null = null
+    private lensSig = ''
     private rebuildFrom = 0
     private clipMode: ClippingMode = 'none'
     private compareSplit: CompareSplit = null
@@ -141,7 +148,7 @@ export class Renderer {
     private buildResources() {
         const gl = this.gl
         this.pass1 = this.compile(VERT_FULLSCREEN, FRAG_PASS1, ['uTex', 'uColorMatrix', 'uWbGain'])
-        this.pass2 = this.compile(VERT_FULLSCREEN, FRAG_PASS2, ['uTex', 'uWarp'])
+        this.pass2 = this.compile(VERT_FULLSCREEN, FRAG_PASS2, PASS2_UNIFORMS)
         this.pass3 = this.compile(VERT_FULLSCREEN, FRAG_PASS3, [
             'uTex',
             'uExposure',
@@ -271,6 +278,7 @@ export class Renderer {
         this.current = imageId
         this.processedFor = null
         this.baseFor = null
+        this.refreshLens()
     }
 
     setWindow(windowIds: string[]) {
@@ -296,6 +304,23 @@ export class Renderer {
             this.toneLut = this.createToneTexture(buildToneCurveLut(next.curves))
         }
         this.editState = next
+        this.refreshLens()
+    }
+
+    setLensProfile(imageId: string | null, profile: LensProfileMatch | null) {
+        this.lensProfileImageId = imageId
+        this.lensProfile = profile
+        this.refreshLens()
+    }
+
+    private refreshLens() {
+        const profile = this.lensProfileImageId === this.current ? this.lensProfile : null
+        const next = buildLensPass(this.editState.lens, profile)
+        const sig = next ? JSON.stringify(next) : ''
+        if (sig === this.lensSig) return
+        this.lensPass = next
+        this.lensSig = sig
+        if (STAGE_GEOMETRY < this.rebuildFrom) this.rebuildFrom = STAGE_GEOMETRY
     }
 
     setClipping(mode: ClippingMode) {
@@ -546,6 +571,7 @@ export class Renderer {
             gl.bindTexture(gl.TEXTURE_2D, input)
             gl.uniform1i(this.pass2.u.uTex, 0)
             gl.uniformMatrix3fv(this.pass2.u.uWarp, false, buildGeometryWarp(this.editState.geometry))
+            applyLensUniforms(gl, this.pass2, this.lensPass, this.procW, this.procH)
             this.drawFullscreen()
             return target.tex
         }
@@ -669,7 +695,11 @@ export class Renderer {
 
     private activeStages() {
         const list: number[] = []
-        for (let stage = 0; stage < STAGE_COUNT; stage++) if (stageActive(stage, this.editState)) list.push(stage)
+        for (let stage = 0; stage < STAGE_COUNT; stage++) {
+            const active =
+                stage === STAGE_GEOMETRY ? stageActive(stage, this.editState) || this.lensPass !== null : stageActive(stage, this.editState)
+            if (active) list.push(stage)
+        }
         return list
     }
 

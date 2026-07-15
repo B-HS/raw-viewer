@@ -7,6 +7,7 @@ import { CropGeometrySection } from './CropGeometrySection'
 import { DetailSection } from './DetailSection'
 import { EffectsSection } from './EffectsSection'
 import { HslSection } from './HslSection'
+import { LensSection } from './LensSection'
 import { ToneCurve } from './ToneCurve'
 
 export const EditPanel: FC = () => {
@@ -35,6 +36,7 @@ export const EditPanel: FC = () => {
                     <ToneCurve />
                     <HslSection />
                     <DetailSection />
+                    <LensSection />
                     <EffectsSection />
                     <CropGeometrySection />
                 </div>

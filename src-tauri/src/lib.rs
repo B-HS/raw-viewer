@@ -8,6 +8,7 @@ pub mod error;
 pub mod events;
 pub mod exiftool;
 pub mod export;
+pub mod lens;
 pub mod meta;
 pub mod organize;
 pub mod pipeline;
@@ -18,6 +19,7 @@ pub mod scan;
 pub mod trashbin;
 pub mod types;
 pub mod types_export;
+pub mod types_lens;
 pub mod types_meta;
 pub mod types_platform;
 pub mod types_preset;
@@ -91,6 +93,19 @@ pub fn run() {
             };
             app.manage(preset_service);
 
+            let lens_db_dir = app
+                .path()
+                .resolve("resources/lensfun", tauri::path::BaseDirectory::Resource)
+                .unwrap_or_else(|_| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/lensfun"));
+            let lens_service = match lens::LensService::open_default(lens_db_dir.clone()) {
+                Ok(service) => service,
+                Err(error) => {
+                    tracing::error!(%error, "lens catalog open failed; falling back to in-memory catalog");
+                    lens::LensService::open_memory(lens_db_dir).map_err(|inner| Box::<dyn std::error::Error>::from(inner.to_string()))?
+                }
+            };
+            app.manage(lens_service);
+
             let services = app.state::<pipeline::AppState>().services.clone();
             let emit_handle = app.handle().clone();
             let emit: watch::EmitFn = Arc::new(move |payload| {
@@ -136,13 +151,19 @@ pub fn run() {
             export::commands::export_finish,
             export::commands::export_cancel,
             export::commands::export_dng,
+            export::handoff::open_with_edited,
             commands::list_presets,
             commands::save_preset,
             commands::apply_preset,
             commands::delete_preset,
+            commands::export_preset,
+            commands::import_preset,
             commands::copy_settings,
             exiftool::detect_exiftool,
             exiftool::get_deep_metadata,
+            lens::find_lens_profile,
+            lens::list_lens_profiles,
+            lens::set_lens_override,
             about::licenses::get_licenses,
             about::cache::get_cache_stats,
             about::cache::clear_cache,

@@ -1,7 +1,9 @@
 pub mod bundled;
+pub mod io;
 pub mod mask;
 mod service;
 
+pub use io::{export_preset, import_preset};
 pub use mask::{apply_mask, copy_settings, masked_from_default, merge_onto_target, PRESET_SECTIONS};
 pub use service::PresetService;
 

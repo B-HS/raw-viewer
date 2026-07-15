@@ -143,7 +143,7 @@ const DEFAULT_SIGNATURE = stateSignature(DEFAULT_EDIT_STATE)
 
 export const isDefault = (state: EditState) => stateSignature(state) === DEFAULT_SIGNATURE
 
-export type EditSection = 'basic' | 'tone-curve' | 'hsl' | 'detail' | 'effects' | 'crop'
+export type EditSection = 'basic' | 'tone-curve' | 'hsl' | 'lens' | 'detail' | 'effects' | 'crop'
 
 export const cloneDefaultSection = (section: EditSection, state: EditState): EditState => {
     const next: EditState = { ...state }
@@ -169,13 +169,14 @@ export const cloneDefaultSection = (section: EditSection, state: EditState): Edi
                 magenta: { hue: 0, sat: 0, lum: 0 },
             },
         }
+    } else if (section === 'lens') {
+        next.lens = { ...DEFAULT_EDIT_STATE.lens }
     } else if (section === 'detail') {
         next.detail = { ...DEFAULT_EDIT_STATE.detail }
     } else if (section === 'effects') {
         next.effects = { ...DEFAULT_EDIT_STATE.effects }
     } else {
         next.geometry = { ...DEFAULT_EDIT_STATE.geometry }
-        next.lens = { ...DEFAULT_EDIT_STATE.lens }
         next.crop = null
     }
     return next

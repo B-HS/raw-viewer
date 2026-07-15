@@ -3,6 +3,7 @@ import { createExportEngine } from './exportRenderer'
 import { floatToHalf } from './half'
 import type { ExportSource } from './exportRenderer'
 import type { EditState } from '../types/EditState'
+import type { LensProfileMatch } from '../types/LensProfileMatch'
 
 const CLIPBOARD_MAX_EDGE = 4096
 
@@ -62,11 +63,16 @@ const downscaleSource = (source: ExportSource, maxEdge: number): ExportSource =>
 const canvasToPng = (canvas: HTMLCanvasElement) =>
     new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png'))
 
-export const renderClipboardPng = async (source: ExportSource, state: EditState, maxEdge = CLIPBOARD_MAX_EDGE) => {
+export const renderClipboardPng = async (
+    source: ExportSource,
+    state: EditState,
+    lensProfile: LensProfileMatch | null,
+    maxEdge = CLIPBOARD_MAX_EDGE,
+) => {
     const scaled = downscaleSource(source, maxEdge)
     const engine = createExportEngine()
     try {
-        const job = engine.prepare(scaled, state)
+        const job = engine.prepare(scaled, state, lensProfile)
         const canvas = document.createElement('canvas')
         canvas.width = job.width
         canvas.height = job.height

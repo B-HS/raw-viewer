@@ -60,6 +60,10 @@ impl PresetService {
     }
 
     pub fn save(&self, name: String, folder: String, source: &EditState, mask: Vec<String>) -> AppResult<PresetInfo> {
+        self.save_with_source(name, folder, source, mask, PresetSource::Native)
+    }
+
+    pub fn save_with_source(&self, name: String, folder: String, source: &EditState, mask: Vec<String>, origin: PresetSource) -> AppResult<PresetInfo> {
         let normalized = masked_from_default(source, &mask);
         let record = PresetRecord {
             id: new_id(),
@@ -67,12 +71,20 @@ impl PresetService {
             folder,
             edit_state: serialize_state(&normalized)?,
             field_mask: serialize_mask(&mask)?,
-            source: PresetSource::Native.as_str().to_owned(),
+            source: origin.as_str().to_owned(),
             builtin: false,
             created_at: now_ms(),
         };
         self.catalog.insert_preset(&record)?;
         record_to_info(record)
+    }
+
+    pub fn load_state(&self, preset_id: &str) -> AppResult<EditState> {
+        let record = self
+            .catalog
+            .load_preset(preset_id)?
+            .ok_or_else(|| AppError::Io(format!("unknown preset id: {preset_id}")))?;
+        deserialize_state(&record.edit_state)
     }
 
     pub fn delete(&self, preset_id: &str) -> AppResult<()> {

@@ -4,6 +4,7 @@ import { STAGE_COLOR, STAGE_COUNT, STAGE_CURVE, STAGE_DETAIL, STAGE_GEOMETRY, ST
 import { buildGeometryWarp } from './geometry'
 import { createProgram, uniformLocations } from './glContext'
 import { floatToHalf } from './half'
+import { applyLensUniforms, buildLensPass, PASS2_UNIFORMS } from './lensUniforms'
 import { effectsUniforms, hslUniforms, nrUniforms, sharpenUniforms, toneUniforms } from './passUniforms'
 import {
     FRAG_NR,
@@ -23,7 +24,9 @@ import { extractTile, planTiles, TILE_OVERLAP, TILE_SIZE } from './tiles'
 import { buildToneCurveLut, TONE_LUT_SIZE } from './toneCurveLut'
 import { dispDims, flipAngle } from './viewTransform'
 import { wbGainsFromState } from './wbModel'
+import type { LensPass } from './lensUniforms'
 import type { EditState } from '../types/EditState'
+import type { LensProfileMatch } from '../types/LensProfileMatch'
 
 export type ExportSource = { width: number; height: number; data: Uint16Array; colorMatrix: number[] | null; flip: number }
 
@@ -37,7 +40,10 @@ export type ExportJob = {
     release: () => void
 }
 
-export type ExportEngine = { prepare: (source: ExportSource, state: EditState) => ExportJob; dispose: () => void }
+export type ExportEngine = {
+    prepare: (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null) => ExportJob
+    dispose: () => void
+}
 
 type ProgramInfo = { program: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 
@@ -104,7 +110,7 @@ export const createExportEngine = (): ExportEngine => {
     }
 
     const pass1 = compile(VERT_FULLSCREEN, FRAG_PASS1, ['uTex', 'uColorMatrix', 'uWbGain'])
-    const pass2 = compile(VERT_FULLSCREEN, FRAG_PASS2, ['uTex', 'uWarp'])
+    const pass2 = compile(VERT_FULLSCREEN, FRAG_PASS2, PASS2_UNIFORMS)
     const pass3 = compile(VERT_FULLSCREEN, FRAG_PASS3, [
         'uTex',
         'uExposure',
@@ -237,6 +243,7 @@ export const createExportEngine = (): ExportEngine => {
         state: EditState,
         baseLut: WebGLTexture,
         toneLut: WebGLTexture,
+        lensPass: LensPass | null,
     ) => {
         const texel = new Float32Array([1 / w, 1 / h])
         const targets: Target[] = []
@@ -259,7 +266,10 @@ export const createExportEngine = (): ExportEngine => {
         }
 
         const active: number[] = []
-        for (let stage = 0; stage < STAGE_COUNT; stage++) if (stageActive(stage, state)) active.push(stage)
+        for (let stage = 0; stage < STAGE_COUNT; stage++) {
+            const on = stage === STAGE_GEOMETRY ? stageActive(stage, state) || lensPass !== null : stageActive(stage, state)
+            if (on) active.push(stage)
+        }
 
         let input = sourceTex
         let output = primary
@@ -277,6 +287,7 @@ export const createExportEngine = (): ExportEngine => {
                 gl.bindTexture(gl.TEXTURE_2D, input)
                 gl.uniform1i(pass2.u.uTex, 0)
                 gl.uniformMatrix3fv(pass2.u.uWarp, false, buildGeometryWarp(state.geometry))
+                applyLensUniforms(gl, pass2, lensPass, w, h)
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
             } else if (id === STAGE_TONE) {
                 const t = toneUniforms(state.tone)
@@ -372,7 +383,7 @@ export const createExportEngine = (): ExportEngine => {
         return { finalTex: last, targets }
     }
 
-    const prepare = (source: ExportSource, state: EditState): ExportJob => {
+    const prepare = (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null): ExportJob => {
         const longEdge = Math.max(source.width, source.height)
         const scale = longEdge > maxTexture ? maxTexture / longEdge : 1
         const renderW = Math.max(1, Math.round(source.width * scale))
@@ -386,7 +397,8 @@ export const createExportEngine = (): ExportEngine => {
         const toneLut = createToneTexture(buildToneCurveLut(state.curves))
         textures.push(baseLut, toneLut)
 
-        const passes = runPasses(sourceTex, source, renderW, renderH, state, baseLut, toneLut)
+        const lensPass = buildLensPass(state.lens, lensProfile)
+        const passes = runPasses(sourceTex, source, renderW, renderH, state, baseLut, toneLut, lensPass)
         owned.push(...passes.targets)
 
         const dims = dispDims(renderW, renderH, source.flip)

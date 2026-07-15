@@ -34,6 +34,7 @@ import { useExportStore } from './store/exportStore'
 import { isFilterActive, matchesFilter, useFilter } from './store/filter'
 import { useHistoryStore } from './store/historyStore'
 import { useLayout } from './store/layout'
+import { useLens } from './store/lens'
 import { usePresetStore } from './store/presetStore'
 import type { RightPanel } from './store/layout'
 import { useMeta } from './store/meta'
@@ -515,9 +516,13 @@ export const App = () => {
     useEffect(() => {
         if (!currentImageId) {
             useMeta.getState().clear()
+            useLens.getState().clear()
             return
         }
-        const timer = setTimeout(() => useMeta.getState().loadForImage(currentImageId), 150)
+        const timer = setTimeout(() => {
+            useMeta.getState().loadForImage(currentImageId)
+            useLens.getState().loadForImage(currentImageId)
+        }, 150)
         return () => clearTimeout(timer)
     }, [currentImageId])
 
