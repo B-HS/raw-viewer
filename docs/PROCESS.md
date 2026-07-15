@@ -128,8 +128,12 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] C4: Rust CPU 렌더러(①③④⑤⑦⑧, rayon) — TS 원본→bun 패리티 벡터(LUT 바이트 일치, WB/색공간 1e-3), aether `pixels/{id}/cpu`(AETH u8) + cpu:frame-ready, 5D3@2048px 25~51ms — 테스트 277
 - [x] D4: WebGL2 실패 폴백 뷰(강제 플래그 rawviewer.forceCpuRender)·TAT·샘플러 핀(5개)·히스토그램 호버
 - 4a SPEC-GAP: CPU 경로는 ②기하/렌즈·⑥NR/샤프닝 미지원, 비-RAW 미지원, 출력 sRGB 고정, 오버레이류 없음
-### 4 잔여
-격리 디코딩 프로세스(P2) · 역지오코딩(Nominatim, 기본 off) · 성능 설정 백엔드 배선(preloadRadius/l2Policy — 3c SPEC-GAP 부채) · 다중 윈도우 · 모니터 ICC 전체 적용 · WebGPU(이 기기 미검증 가능) · Windows/Linux platform(하드웨어 필요) · JPEG XL
+### 4b — **완료, dev 반영(40ec75a)**
+- [x] 격리 디코딩(__decode 서브커맨드, 크래시 루프 감지→배너, 기본 off) · 성능 설정 배선(preloadRadius/l2Policy/isolatedDecode — 3c 부채 해소) · 역지오코딩(Nominatim 정책 준수, 기본 off) — 테스트 297
+- 후속: 격리 디코드 통합테스트가 스위트를 40분까지 늘림 → #[ignore] 게이팅 또는 nextest 분리 필요
+
+### 4 잔여 (이 기기에서 진행 불가/저가치)
+다중 윈도우(P2) · 모니터 ICC 전체 적용 · WebGPU(macOS 26+ 필요) · Windows/Linux platform(하드웨어 필요) · JPEG XL(P2) · 로컬 보정(별도 논의 §12.2)
 
 ### Phase 3 검증 잔여
 §8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인
