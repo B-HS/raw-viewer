@@ -84,8 +84,15 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 통합 검증: cargo test 122건·bun run build·tauri dev 실기동·**스크린샷 시각 확인**(iPhone DNG 세로 렌더 정상, 히스토그램/슬라이더/필름스트립/필터바/상태바 표시, 색 자연스러움 — 다크/라이트 토글 및 조작감은 사용자 확인 필요)
 
 **3a PRD 이탈 기록**: ① macOS `trash` 크레이트는 복원 API 미지원 → 휴지통 ⌘Z 복원 불가(Finder '되돌려 놓기' 안내로 대체, Phase 4에서 objc2 NSFileManager 경로 재검토) ② lens.mount·driveMode·stabilization·hasOpcodeList·iccProfileName은 ExifTool 통합(FR-16.4) 전까지 None ③ iPhone ProRAW(linear DNG)는 sensorType=unknown
-### 3b 잔여 (미착수)
-프리셋(FR-12)+동기화(FR-13) · Export 래스터/DNG/배치(FR-14, dnglab sidecar) · 스마트 복사/클립보드(FR-15, platform macOS 구현) · RAW+JPEG 페어링(FR-1.6) · Dock(FR-18) · 파일연결/싱글인스턴스(FR-19) · 렌즈보정(FR-8) · ExifTool(FR-16.4) · 설정·커맨드팔레트·i18n·접근성(FR-20) · 라이선스 화면(cargo-about)
+### 3b (계약: docs/phase3b-contract.md) — 구현 완료, 통합 중
+- [x] X: Export 엔진 — export_begin/tile(raw body)/finish/cancel, 4포맷 전부 ICC 임베드, linear Lanczos3, little_exif(GPS는 어떤 모드도 미기록), 파일명 템플릿, dnglab v0.7.2 sidecar(macOS arm64 릴리스) — 테스트 184건
+- [x] Q: 프리셋(003 마이그레이션, 8섹션 마스크, 번들 10종 시드) + copy_settings — EditService 영속 경로 탑승
+- [x] W: ExportDialog·PresetPanel·exportRenderer(타일 interior 전송)·⌘⇧C/V/⌘⌥V·⌥1~9
+- [x] 검증: cargo test 184 + bun run build + prettier 통과
+- [ ] **차단 버그(통합 중 발견)**: Bayer RAW(5D3) L1/L2 뷰포트 렌더 깨짐 — iPhone linear DNG는 정상, 마진 포함 raw 치수(5796×3870) 표기로 보아 **processed 치수 vs payload 치수 불일치(row stride)** 유력. 3b 이전부터 존재(Bayer 파일 시각 검증 이번이 처음). 디버그 에이전트 진행 중. **해결·재검증 후 dev 커밋/푸시.**
+
+### 3c 잔여 (미착수)
+스마트 복사/클립보드(FR-15, platform macOS 구현) · RAW+JPEG 페어링(FR-1.6) · Dock(FR-18) · 파일연결/싱글인스턴스(FR-19) · 렌즈보정(FR-8) · ExifTool(FR-16.4) · 설정·커맨드팔레트·i18n·접근성(FR-20) · 라이선스 화면(cargo-about) · 프리셋 xmp import/export · DNG XMP tag700 주입 · Export batch UI 고도화
 
 ## Phase 4 (미착수)
 PRD §11 체크리스트를 그대로 따른다.

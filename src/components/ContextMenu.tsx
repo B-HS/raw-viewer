@@ -31,7 +31,7 @@ export const ContextMenu: FC = () => {
     const x = useContextMenu((state) => state.x)
     const y = useContextMenu((state) => state.y)
     const imageIds = useContextMenu((state) => state.imageIds)
-    const hasClip = useEditClipboard((state) => state.clip !== null)
+    const hasClip = useEditClipboard((state) => state.sourceImageId !== null)
 
     const [pos, setPos] = useState({ x, y })
     const [sub, setSub] = useState<'rating' | 'label' | null>(null)
@@ -55,14 +55,8 @@ export const ContextMenu: FC = () => {
     const reveal = () => {
         if (entry) revealItemInDir(entry.path).catch(() => undefined)
     }
-    const copyEdit = () => {
-        const state = useEditStore.getState().state
-        if (state) {
-            useEditClipboard.getState().copy(state)
-            useToast.getState().show('편집 설정 복사됨')
-        }
-    }
-    const pasteEdit = () => useEditClipboard.getState().paste()
+    const copyEdit = () => useEditClipboard.getState().copy()
+    const pasteEdit = () => useEditClipboard.getState().pasteTo(imageIds)
     const trash = () => {
         close()
         confirmAndTrash(imageIds)

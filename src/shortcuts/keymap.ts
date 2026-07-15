@@ -57,6 +57,11 @@ export const KEYMAP = {
     clipboard: {
         copyEdit: 'KeyC',
         pasteEdit: 'KeyV',
+        pastePrevious: 'KeyV',
+    },
+    export: {
+        raster: 'KeyE',
+        dng: 'KeyD',
     },
     trash: {
         move: 'Backspace',

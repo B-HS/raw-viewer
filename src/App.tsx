@@ -5,11 +5,13 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import { ContextMenu } from './components/ContextMenu'
+import { ExportDialog } from './components/ExportDialog'
 import { Filmstrip } from './components/filmstrip/Filmstrip'
 import { FilterBar } from './components/filmstrip/FilterBar'
 import { PerfOverlay } from './components/PerfOverlay'
 import { EditPanel } from './components/panels/EditPanel'
 import { MetaPanel } from './components/panels/MetaPanel/MetaPanel'
+import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
 import { frontendReady, navigate, openPath, scanDirectory } from './ipc/commands'
@@ -22,9 +24,12 @@ import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from '.
 import { useContextMenu } from './store/contextMenu'
 import { useEditClipboard } from './store/editClipboard'
 import { useEditStore } from './store/editStore'
+import { useExportStore } from './store/exportStore'
 import { isFilterActive, matchesFilter, useFilter } from './store/filter'
 import { useHistoryStore } from './store/historyStore'
 import { useLayout } from './store/layout'
+import { usePresetStore } from './store/presetStore'
+import type { RightPanel } from './store/layout'
 import { useMeta } from './store/meta'
 import { LABELS, useOrganize } from './store/organize'
 import { neighbors, usePlaylist, WINDOW_RADIUS } from './store/playlist'
@@ -107,6 +112,12 @@ const selectAllFiltered = () => {
     usePlaylist.getState().selectAll(list.map((index) => state.entries[index].imageId))
 }
 
+const PANEL_TABS: readonly (readonly [Exclude<RightPanel, 'none'>, string])[] = [
+    ['edit', '편집'],
+    ['meta', '메타'],
+    ['preset', '프리셋'],
+]
+
 export const App = () => {
     const pendingIndexRef = useRef<number | null>(null)
     const rafRef = useRef<number | null>(null)
@@ -119,6 +130,7 @@ export const App = () => {
     const currentImageId = usePlaylist((state) => state.entries[state.currentIndex]?.imageId ?? null)
     const scanning = usePlaylist((state) => state.scanning)
     const total = usePlaylist((state) => state.total)
+    const selectionCount = usePlaylist((state) => state.selection.length)
     const rightPanel = useLayout((state) => state.rightPanel)
     const filmstripVisible = useLayout((state) => state.filmstripVisible)
     const toastMessage = useToast((state) => state.message)
@@ -350,11 +362,7 @@ export const App = () => {
                     pickAndOpen()
                 } else if (event.code === KEYMAP.clipboard.copyEdit && event.shiftKey && !event.altKey) {
                     event.preventDefault()
-                    const state = useEditStore.getState().state
-                    if (state) {
-                        useEditClipboard.getState().copy(state)
-                        useToast.getState().show('편집 설정 복사됨')
-                    }
+                    useEditClipboard.getState().copy()
                 } else if (event.code === KEYMAP.clipboard.copyEdit && event.shiftKey && event.altKey) {
                     event.preventDefault()
                     const current = usePlaylist.getState().entries[usePlaylist.getState().currentIndex]
@@ -363,13 +371,35 @@ export const App = () => {
                             .writeText(current.path)
                             .then(() => useToast.getState().show('경로 복사됨'))
                             .catch(() => undefined)
-                } else if (event.code === KEYMAP.clipboard.pasteEdit && event.shiftKey) {
+                } else if (event.code === KEYMAP.clipboard.pasteEdit && event.shiftKey && !event.altKey) {
                     event.preventDefault()
-                    useEditClipboard.getState().paste()
+                    useEditClipboard.getState().pasteTo(organizeTargets())
+                } else if (event.code === KEYMAP.clipboard.pastePrevious && event.altKey && !event.shiftKey) {
+                    event.preventDefault()
+                    useEditClipboard.getState().pastePrevious()
+                } else if (event.code === KEYMAP.export.raster && !event.altKey) {
+                    event.preventDefault()
+                    const playlist = usePlaylist.getState()
+                    const current = playlist.entries[playlist.currentIndex]
+                    if (current) {
+                        const targets = event.shiftKey && playlist.selection.length > 0 ? playlist.selection : [current.imageId]
+                        useExportStore.getState().openDialog(targets)
+                    }
+                } else if (event.code === KEYMAP.export.dng && event.shiftKey) {
+                    event.preventDefault()
+                    const playlist = usePlaylist.getState()
+                    const current = playlist.entries[playlist.currentIndex]
+                    if (current) useExportStore.getState().runDng(current.imageId, current.fileName, current)
                 } else if (event.code === 'KeyA') {
                     event.preventDefault()
                     selectAllFiltered()
                 }
+                return
+            }
+            if (event.altKey && !event.shiftKey && /^Digit[1-9]$/.test(event.code)) {
+                event.preventDefault()
+                const preset = usePresetStore.getState().presets[Number(event.code.slice(5)) - 1]
+                if (preset) usePresetStore.getState().applyToCurrent(preset.id, preset.name)
                 return
             }
             const rating = digitValue(event.code)
@@ -442,6 +472,10 @@ export const App = () => {
     }, [])
 
     useEffect(() => {
+        usePresetStore.getState().load()
+    }, [])
+
+    useEffect(() => {
         if (!currentImageId) {
             useMeta.getState().clear()
             return
@@ -507,10 +541,36 @@ export const App = () => {
                             {total > 0 ? `${entryCount} / ${total} 스캔 중...` : `${entryCount}개 스캔 중...`}
                         </div>
                     )}
+                    {selectionCount > 1 && (
+                        <button
+                            type='button'
+                            onClick={() => useEditClipboard.getState().syncSelection(usePlaylist.getState().selection)}
+                            className='absolute bottom-3 right-3 rounded bg-neutral-200/90 px-3 py-1 text-xs font-medium text-neutral-900 shadow hover:bg-white'>
+                            {selectionCount}개 설정 동기화
+                        </button>
+                    )}
                     <PerfOverlay visible={false} />
                 </div>
-                {rightPanel === 'edit' && <EditPanel />}
-                {rightPanel === 'meta' && <MetaPanel />}
+                {rightPanel !== 'none' && (
+                    <div className='flex h-full w-80 shrink-0 flex-col'>
+                        <div className='flex shrink-0 border-b border-l border-neutral-800 bg-neutral-900 text-[11px]'>
+                            {PANEL_TABS.map(([id, label]) => (
+                                <button
+                                    key={id}
+                                    type='button'
+                                    onClick={() => useLayout.getState().selectRightPanel(id)}
+                                    className={`flex-1 py-1.5 ${rightPanel === id ? 'bg-neutral-800 text-neutral-100' : 'text-neutral-500 hover:text-neutral-300'}`}>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className='flex min-h-0 flex-1'>
+                            {rightPanel === 'edit' && <EditPanel />}
+                            {rightPanel === 'meta' && <MetaPanel />}
+                            {rightPanel === 'preset' && <PresetPanel />}
+                        </div>
+                    </div>
+                )}
             </div>
             {filmstripVisible && (
                 <div className='flex shrink-0 flex-col'>
@@ -527,6 +587,7 @@ export const App = () => {
                 </div>
             )}
             <ContextMenu />
+            <ExportDialog />
         </main>
     )
 }

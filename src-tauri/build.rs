@@ -97,8 +97,7 @@ fn main() {
         .flag_if_supported("-w")
         .include(&vendor)
         .define("USE_ZLIB", "1")
-        .define("USE_X3FTOOLS", "1")
-        .define("LIBRAW_NOTHREADS", None::<&str>);
+        .define("USE_X3FTOOLS", "1");
 
     for source in LIBRAW_SOURCES {
         build.file(vendor.join(source));
