@@ -355,6 +355,7 @@ export const en = {
             googleMaps: 'Google Maps',
             appleMaps: 'Apple Maps',
             mapFailed: 'Failed to load map',
+            osmAttribution: '© OpenStreetMap contributors (Nominatim)',
         },
         aether: {
             edited: 'Edited',
@@ -473,13 +474,19 @@ export const en = {
         themeDark: 'Dark',
         themeLight: 'Light',
         viewportBackground: 'Viewport background',
+        map: 'Map',
+        showAddress: 'Show address (Nominatim)',
+        showAddressNote:
+            'When on, GPS coordinates are sent to the OpenStreetMap Nominatim service to look up an address. Requests are rate-limited to one per second and results are cached locally. Off by default.',
         performance: 'Performance',
         preloadRadius: 'Preload range',
         l2Policy: 'L2 auto decode',
         l2Always: 'Always',
         l2Idle: 'When idle',
         l2Zoom: 'At 100% zoom only',
-        performanceNote: 'Performance settings are saved and applied to the engine in a later update.',
+        isolatedDecode: 'Isolated decoding',
+        isolatedDecodeNote: 'Decode RAW files in a separate process so a corrupt file cannot crash the app. Slightly slower.',
+        performanceNote: 'Settings are saved and applied to the decode engine immediately.',
         cache: 'Cache',
         cacheUsage: 'Usage',
         cacheTotal: 'Total',
@@ -558,6 +565,11 @@ export const en = {
     trash: {
         title: 'Move to Trash',
         confirm: '{{count}} file(s) will be moved to Trash.',
+    },
+    crashLoop: {
+        message: 'Image decoding keeps failing. Turn on "Isolated decoding" in Settings to keep working with problematic files.',
+        openSettings: 'Open settings',
+        dismiss: 'Dismiss',
     },
     toast: {
         copying: 'Copying...',

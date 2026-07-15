@@ -14,9 +14,10 @@ use crate::scan::{self, Registry};
 use crate::types::{EditState, EditStateEnvelope, OpenResult, PendingOpenRequest, ScanBatch, ScanSummary};
 use crate::types_cpurender::{CpuFrameReadyPayload, EVENT_CPU_FRAME_READY};
 use crate::types_meta::{Flag, ImageMetadata, OrganizeEntry};
+use crate::types_performance::{L2Policy, PerfSettings};
 use crate::types_preset::PresetInfo;
 use crate::watch::WatchService;
-use crate::{meta, trashbin};
+use crate::{geocode, meta, trashbin};
 
 fn resolve_path(registry: &Registry, image_id: &str) -> AppResult<PathBuf> {
     registry.resolve(image_id).ok_or_else(|| AppError::Io(format!("unknown image id: {image_id}")))
@@ -191,6 +192,43 @@ pub async fn render_cpu_frame(
         tracing::warn!(%error, "emit cpu:frame-ready failed");
     }
     Ok(payload)
+}
+
+#[tauri::command]
+pub async fn set_performance_settings(preload_radius: u32, l2_policy: L2Policy, isolated_decode: bool, state: State<'_, AppState>) -> AppResult<()> {
+    state.pipeline.set_settings(PerfSettings {
+        preload_radius,
+        l2_policy,
+        isolated_decode,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_performance_settings(state: State<'_, AppState>) -> AppResult<PerfSettings> {
+    Ok(state.pipeline.settings())
+}
+
+#[tauri::command]
+pub async fn request_l2(image_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    state.pipeline.request_l2(image_id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_reverse_geocode(image_id: String, state: State<'_, AppState>) -> AppResult<Option<String>> {
+    let path = resolve_path(&state.services.registry, &image_id)?;
+    let span = tracing::info_span!("get_reverse_geocode", image_id = %image_id);
+    let _guard = span.enter();
+    let resolved = tauri::async_runtime::spawn_blocking(move || {
+        let exif = meta::exif::ExifData::read(&path);
+        let gps = meta::gps::from_exif(&exif)?;
+        geocode::reverse(gps.lat, gps.lng)
+    })
+    .await
+    .ok()
+    .flatten();
+    Ok(resolved)
 }
 
 #[tauri::command]

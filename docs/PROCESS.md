@@ -123,8 +123,16 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 1. **prod 병합 시점** — dev(0~3f) 상태. 허락 대기.
 2. **X-Trans 병렬화** — ① 바이트 동일성 게이트 완화(±1 LSB 허용) 후 병렬(13.4→2.2s) ② bilinear L1 프록시 ③ 현행(결정적, 느림). 권장 ①.
 
-### Phase 3 이후 잔여
-§8.2 수동 35항목(사용자 재석 필요 — quality-assurance 문서에 확인 방법 기재) · Z8 고효율 NEF 육안 검증 · Phase 4(§11)
+## Phase 4 (진행 중)
+### 4a — **완료, dev 반영(c6f93c9)**
+- [x] C4: Rust CPU 렌더러(①③④⑤⑦⑧, rayon) — TS 원본→bun 패리티 벡터(LUT 바이트 일치, WB/색공간 1e-3), aether `pixels/{id}/cpu`(AETH u8) + cpu:frame-ready, 5D3@2048px 25~51ms — 테스트 277
+- [x] D4: WebGL2 실패 폴백 뷰(강제 플래그 rawviewer.forceCpuRender)·TAT·샘플러 핀(5개)·히스토그램 호버
+- 4a SPEC-GAP: CPU 경로는 ②기하/렌즈·⑥NR/샤프닝 미지원, 비-RAW 미지원, 출력 sRGB 고정, 오버레이류 없음
+### 4 잔여
+격리 디코딩 프로세스(P2) · 역지오코딩(Nominatim, 기본 off) · 성능 설정 백엔드 배선(preloadRadius/l2Policy — 3c SPEC-GAP 부채) · 다중 윈도우 · 모니터 ICC 전체 적용 · WebGPU(이 기기 미검증 가능) · Windows/Linux platform(하드웨어 필요) · JPEG XL
+
+### Phase 3 검증 잔여
+§8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인
 
 ## Phase 4 (미착수)
 PRD §11 체크리스트를 그대로 따른다.

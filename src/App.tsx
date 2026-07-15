@@ -21,8 +21,10 @@ import { MetaPanel } from './components/panels/MetaPanel/MetaPanel'
 import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
+import { useSettingsTab } from './components/settings/settingsTab'
 import { frontendReady, navigate, openPath, scanDirectory } from './ipc/commands'
-import { onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
+import { onDecodeCrashLoop, onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
+import { requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
 import { flushOrganize } from './ipc/organize'
 import { copyFilesToClipboard, noteRecent } from './ipc/platform'
@@ -46,9 +48,10 @@ import { useMeta } from './store/meta'
 import { isOverlayBlocking, useOverlays } from './store/overlays'
 import { LABELS, useOrganize } from './store/organize'
 import { usePairs } from './store/pairs'
-import { neighbors, usePlaylist, WINDOW_RADIUS } from './store/playlist'
+import { neighbors, usePlaylist } from './store/playlist'
 import { useToast } from './store/toast'
 import { useUiStore } from './store/uiStore'
+import { useViewportProjection } from './store/viewportProjection'
 import type { ImageEntry } from './types/ImageEntry'
 
 const IMAGE_EXTENSIONS = [
@@ -128,8 +131,10 @@ export const App = () => {
     const rafRef = useRef<number | null>(null)
     const closingRef = useRef(false)
     const handleOpenRef = useRef<(path: string) => void>(() => {})
+    const l2ZoomRef = useRef<string | null>(null)
     const [pathInput, setPathInput] = useState('')
     const [openError, setOpenError] = useState('')
+    const [crashLoopVisible, setCrashLoopVisible] = useState(false)
 
     const entryCount = usePlaylist((state) => state.entries.length)
     const currentImageId = usePlaylist((state) => state.entries[state.currentIndex]?.imageId ?? null)
@@ -182,6 +187,12 @@ export const App = () => {
         if (!current) return
         const targets = state.selection.length > 1 ? state.selection : [current.imageId]
         useContextMenu.getState().openAt(event.clientX, event.clientY, targets)
+    }
+
+    const openIsolationSettings = () => {
+        useSettingsTab.getState().setTab('performance')
+        useOverlays.getState().openSettings()
+        setCrashLoopVisible(false)
     }
 
     useEffect(() => {
@@ -246,7 +257,7 @@ export const App = () => {
                 usePlaylist.getState().invalidate(touched.map((entry) => entry.imageId))
                 const current = state.entries[state.currentIndex]
                 if (current) {
-                    const range = neighbors(state.entries, state.currentIndex, WINDOW_RADIUS)
+                    const range = neighbors(state.entries, state.currentIndex, useSettings.getState().preloadRadius)
                     navigate(current.imageId, range.prevIds, range.nextIds).catch(() => undefined)
                     if (touched.some((entry) => entry.imageId === current.imageId)) {
                         useMeta.getState().clear()
@@ -541,12 +552,50 @@ export const App = () => {
             if (!current) return
             const edit = useEditStore.getState()
             if (edit.imageId && edit.imageId !== current.imageId) await edit.flushPending()
-            const nav = neighbors(state.entries, state.currentIndex, WINDOW_RADIUS)
+            const nav = neighbors(state.entries, state.currentIndex, useSettings.getState().preloadRadius)
             await navigate(current.imageId, nav.prevIds, nav.nextIds).catch(() => undefined)
             if (useEditStore.getState().imageId !== current.imageId) await useEditStore.getState().loadForImage(current.imageId, current.isRaw)
         }
         run().catch(() => undefined)
     }, [currentImageId, scanning])
+
+    useEffect(() => {
+        let disposed = false
+        let unlisten: (() => void) | null = null
+        onDecodeCrashLoop(() => {
+            if (!useSettings.getState().isolatedDecode) setCrashLoopVisible(true)
+        })
+            .then((dispose) => (disposed ? dispose() : (unlisten = dispose)))
+            .catch(() => undefined)
+        return () => {
+            disposed = true
+            unlisten?.()
+        }
+    }, [])
+
+    useEffect(() => {
+        const evaluate = () => {
+            if (useSettings.getState().l2Policy !== 'zoom') return
+            const { model, clientW, clientH, imageId } = useViewportProjection.getState()
+            if (!model || !imageId) {
+                l2ZoomRef.current = null
+                return
+            }
+            const best = usePlaylist.getState().best[imageId]
+            if (!best || best.level === 'l2' || best.width <= 0) return
+            const percent = Math.hypot(model[0] * clientW, model[1] * clientH) / best.width
+            if (percent >= 0.999) {
+                if (l2ZoomRef.current !== imageId) {
+                    l2ZoomRef.current = imageId
+                    requestL2(imageId).catch(() => undefined)
+                }
+            } else if (percent < 0.95 && l2ZoomRef.current === imageId) {
+                l2ZoomRef.current = null
+            }
+        }
+        evaluate()
+        return useViewportProjection.subscribe(evaluate)
+    }, [])
 
     if (entryCount === 0)
         return (
@@ -634,6 +683,25 @@ export const App = () => {
                 </div>
             )}
             <StatusBar />
+            {crashLoopVisible && (
+                <div
+                    role='alert'
+                    className='absolute left-1/2 top-3 z-[70] flex w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 items-center gap-3 rounded-md border border-amber-500/40 bg-neutral-900/95 px-4 py-2.5 text-xs text-neutral-200 shadow-lg'>
+                    <span className='min-w-0 flex-1 leading-snug'>{t('crashLoop.message')}</span>
+                    <button
+                        type='button'
+                        onClick={openIsolationSettings}
+                        className='shrink-0 rounded bg-neutral-200 px-2.5 py-1 font-medium text-neutral-900 hover:bg-white'>
+                        {t('crashLoop.openSettings')}
+                    </button>
+                    <button
+                        type='button'
+                        onClick={() => setCrashLoopVisible(false)}
+                        className='shrink-0 rounded border border-neutral-600 px-2.5 py-1 text-neutral-300 hover:bg-neutral-800'>
+                        {t('crashLoop.dismiss')}
+                    </button>
+                </div>
+            )}
             {toastMessage && (
                 <div className='pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 rounded bg-black/80 px-3 py-1.5 text-xs text-neutral-100 shadow-lg'>
                     {toastMessage}

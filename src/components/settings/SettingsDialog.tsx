@@ -10,8 +10,8 @@ import { useToast } from '../../store/toast'
 import type { CacheStats } from '../../types/CacheStats'
 import { formatBytes } from '../panels/MetaPanel/format'
 import { ShortcutsSettings } from './ShortcutsSettings'
-
-type SettingsTab = 'general' | 'performance' | 'shortcuts' | 'cache' | 'about'
+import { useSettingsTab } from './settingsTab'
+import type { SettingsTab } from './settingsTab'
 
 const Segmented = <T extends string>({
     value,
@@ -38,6 +38,20 @@ const Segmented = <T extends string>({
     </div>
 )
 
+const Toggle: FC<{ checked: boolean; onChange: (value: boolean) => void; label: string }> = ({ checked, onChange, label }) => (
+    <button
+        type='button'
+        role='switch'
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${checked ? 'bg-emerald-600' : 'bg-neutral-700'}`}>
+        <span
+            className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
+        />
+    </button>
+)
+
 const Field: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
     <div className='flex items-center justify-between gap-4'>
         <span className='text-xs text-neutral-400'>{label}</span>
@@ -58,7 +72,9 @@ export const SettingsDialog: FC = () => {
     const viewportBackground = useSettings((state) => state.viewportBackground)
     const preloadRadius = useSettings((state) => state.preloadRadius)
     const l2Policy = useSettings((state) => state.l2Policy)
-    const [tab, setTab] = useState<SettingsTab>('general')
+    const isolatedDecode = useSettings((state) => state.isolatedDecode)
+    const showAddress = useSettings((state) => state.showAddress)
+    const tab = useSettingsTab((state) => state.tab)
     const [version, setVersion] = useState('')
     const [stats, setStats] = useState<CacheStats | null>(null)
 
@@ -124,7 +140,7 @@ export const SettingsDialog: FC = () => {
                             <button
                                 key={id}
                                 type='button'
-                                onClick={() => setTab(id)}
+                                onClick={() => useSettingsTab.getState().setTab(id)}
                                 aria-current={tab === id}
                                 className={`rounded px-2.5 py-1.5 text-left text-xs transition-colors ${
                                     tab === id ? 'bg-neutral-800 text-neutral-100' : 'text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-200'
@@ -169,6 +185,15 @@ export const SettingsDialog: FC = () => {
                                         className='h-7 w-12 cursor-pointer rounded border border-neutral-700 bg-neutral-800'
                                     />
                                 </Field>
+                                <SectionTitle>{t('settings.map')}</SectionTitle>
+                                <Field label={t('settings.showAddress')}>
+                                    <Toggle
+                                        checked={showAddress}
+                                        onChange={(value) => useSettings.getState().setShowAddress(value)}
+                                        label={t('settings.showAddress')}
+                                    />
+                                </Field>
+                                <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.showAddressNote')}</p>
                             </>
                         )}
 
@@ -198,6 +223,14 @@ export const SettingsDialog: FC = () => {
                                         ]}
                                     />
                                 </Field>
+                                <Field label={t('settings.isolatedDecode')}>
+                                    <Toggle
+                                        checked={isolatedDecode}
+                                        onChange={(value) => useSettings.getState().setIsolatedDecode(value)}
+                                        label={t('settings.isolatedDecode')}
+                                    />
+                                </Field>
+                                <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.isolatedDecodeNote')}</p>
                                 <p className='text-[10px] text-neutral-500'>{t('settings.performanceNote')}</p>
                             </>
                         )}
