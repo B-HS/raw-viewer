@@ -19,7 +19,7 @@
 
 ## 결정 로그 (사용자 이의 시 재검토)
 1. **패키지 매니저 = bun (사용자 확정 지시, 2026-07-15).** 처음 pnpm으로 셋업했다가 사용자 지시로 bun 전환. `bun install` / `bun run dev|build|tauri`. esbuild postinstall은 `trustedDependencies`로 허용. tauri.conf의 before*Command도 bun.
-2-0. **git 운용 (사용자 지시, 2026-07-15 오후):** 원격 = `https://github.com/B-HS/raw-viewer` (B-HS 계정, gh 인증 확인). 메인 브랜치 = **prod**, **dev** 분리, feature 브랜치 → dev → prod 흐름. **phase마다 commit/push.** 커밋: Conventional Commits(type 영어·설명 한국어), author = Hyunseok Byun 단독, Co-Authored-By/Claude 트레일러 절대 금지(커밋 후 `git log --format='%B' | grep -i 'co-author\|claude'`로 검증). Phase 0~3b는 소급 분리가 불가능해 baseline 커밋 1개로 시작(3b 통합 검증 후), 이후 phase별 feature 브랜치. gitignore: vendor/·binaries/·fixtures/는 스크립트(sync-vendor·fetch-fixtures·NOTICE 기재 dnglab URL)로 재현하므로 미추적.
+2-0. **git 운용 (사용자 지시, 2026-07-15 오후, 같은 날 보완):** 원격 = `https://github.com/B-HS/raw-viewer` (B-HS 계정, gh 인증 확인). 메인 브랜치 = **prod**, **dev** 분리. **워크플로(웨이브) 완료 시마다 검증 후 dev에 자동 commit/push. prod 병합은 사용자 허락을 받아서만 수행.** feature 브랜치는 웨이브 단위로 사용 후 dev에 머지. 커밋: Conventional Commits(type 영어·설명 한국어), author = Hyunseok Byun 단독, Co-Authored-By/Claude 트레일러 절대 금지(커밋 후 `git log --format='%B' | grep -i 'co-author\|claude'`로 검증). Phase 0~3b는 소급 분리가 불가능해 baseline 커밋 1개로 시작(3b 통합 검증 후), 이후 phase별 feature 브랜치. gitignore: vendor/·binaries/·fixtures/는 스크립트(sync-vendor·fetch-fixtures·NOTICE 기재 dnglab URL)로 재현하므로 미추적.
 2. ~~git 미초기화 상태 유지~~ (해제됨 — 위 2-0). 과거 결정 기록:
    - PRD Phase 0의 "vendor/libraw 서브모듈" → **LibRaw 공식 릴리스 tarball을 `src-tauri/vendor/libraw/`에 무수정 전개**로 대체. git init 후 서브모듈 전환 예정.
    - "tests/fixtures git-lfs" → fetch 스크립트로 대체 (`scripts/fetch-fixtures.sh`).
