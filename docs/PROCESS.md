@@ -113,9 +113,15 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - **성능 실측(M4 Pro/48GB — M1 기준기보다 유리)**: L0 전 기종 ≤2ms ✓ · **L1 목표 250ms 광범위 초과(R5 410ms)** · **X-Trans L1 13.4s**(half_size가 X-Trans에 무효, 풀해상도 단일스레드 Markesteijn — PRD §3.3 지정 방식의 내재 한계) · L2는 Bayer ✓ / X-Trans·GFX100 ✗
 - 기타: nikon-z8 고효율 NEF에 LibRaw "data corrupted" 경고(디코드는 완료 — 육안 재검증 필요)
 
+### 3f — **완료, dev 반영(5bafcb4)**
+- [x] OpenMP 정적 링크(libomp.a, LIBRAW_FORCE_OPENMP, 미탐지 시 무OpenMP 빌드 폴백): **R5 L1 410→166ms(목표 250 통과)** · GFX100 L2 4070→**1156ms 통과** · 5D3 L2 735→433ms. 바이너리 dylib 의존 0(otool 검증), 동시성 게이트 249 그린
+- [x] X-Trans는 Markesteijn OMP 타일 경계 비결정성 실측(스케줄 의존) → **디코드당 단일 스레드 핀**(결정성 유지, 13.4s 유지 — 병렬 시 2.16s 가능)
+- [x] 그리드 뷰(G)·히스토리 패널(⌘⌥Z, jumpTo)·단축키 리매핑(38액션 레지스트리+녹화+충돌감지)
+- 3f 후속: 워커×내부OMP 오버서브스크립션 튜닝, Bayer L2 재현성 필요 시 동일 핀, GFX100은 X-Trans가 아니라 Bayer 중형(문서 정정 — quality-assurance 반영 필요), 줌/팬 키는 리매핑 제외(GL 소유), 크롭 도구·숫자키 패밀리 fixed
+
 ### 미결 결정 (사용자)
-1. **prod 병합 시점** — dev(0~3e) 상태. 허락 대기.
-2. **X-Trans/L1 성능 전략** — ① LibRaw OpenMP 활성화(권장, 검증 웨이브 진행 중) ② X-Trans L1 저품질 프록시(bilinear) ③ 현행 유지. OpenMP 검증 결과 나오면 재보고.
+1. **prod 병합 시점** — dev(0~3f) 상태. 허락 대기.
+2. **X-Trans 병렬화** — ① 바이트 동일성 게이트 완화(±1 LSB 허용) 후 병렬(13.4→2.2s) ② bilinear L1 프록시 ③ 현행(결정적, 느림). 권장 ①.
 
 ### Phase 3 이후 잔여
 §8.2 수동 35항목(사용자 재석 필요 — quality-assurance 문서에 확인 방법 기재) · Z8 고효율 NEF 육안 검증 · Phase 4(§11)

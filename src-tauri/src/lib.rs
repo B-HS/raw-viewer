@@ -3,6 +3,7 @@ pub mod cache;
 pub mod catalog;
 pub mod color;
 pub mod commands;
+pub mod cpurender;
 pub mod edit;
 pub mod error;
 pub mod events;
@@ -21,6 +22,7 @@ pub mod types;
 pub mod types_export;
 pub mod types_lens;
 pub mod types_meta;
+pub mod types_cpurender;
 pub mod types_platform;
 pub mod types_preset;
 pub mod watch;
@@ -55,6 +57,7 @@ pub fn run() {
             let handle = app.handle().clone();
             app.manage(pipeline::AppState::new(handle));
             app.manage(export::ExportService::new());
+            app.manage(cpurender::CpuFrameStore::new());
             app.manage(platform::OpenQueue::new());
             #[cfg(target_os = "macos")]
             app.manage(platform::macos::MacOsPlatform::new(app.handle().clone()));
@@ -146,6 +149,7 @@ pub fn run() {
             commands::flush_organize,
             commands::move_to_trash,
             commands::watch_directory,
+            commands::render_cpu_frame,
             export::commands::export_begin,
             export::commands::export_tile,
             export::commands::export_set_watermark,

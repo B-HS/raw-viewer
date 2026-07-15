@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { HSL_BANDS } from '../../store/editDefaults'
 import { useEditStore } from '../../store/editStore'
+import { useUiStore } from '../../store/uiStore'
 import type { HslAdjust } from '../../types/HslAdjust'
 import type { HslBand } from '../../types/HslBand'
 import { Section } from './Section'
@@ -29,6 +30,12 @@ export const HslSection: FC = () => {
     const hsl = useEditStore((state) => state.state?.color.hsl)
     const bw = useEditStore((state) => state.state?.color.bw)
     const edit = useEditStore((state) => state.edit)
+    const tatActive = useUiStore((state) => state.tatActive)
+    const tatBand = useUiStore((state) => state.tatBand)
+
+    useEffect(() => {
+        if (tatBand) setBand(tatBand)
+    }, [tatBand])
 
     if (!hsl || bw === undefined) return null
 
@@ -65,14 +72,24 @@ export const HslSection: FC = () => {
             id='hsl'
             title={t('panel.hsl.title')}
             right={
-                <label className='flex items-center gap-1 text-[10px] text-neutral-400'>
-                    <input
-                        type='checkbox'
-                        checked={bw}
-                        onChange={(event) => edit((draft) => void (draft.color.bw = event.target.checked), { label: t('history.bwConvert') })}
-                    />
-                    {t('panel.hsl.bw')}
-                </label>
+                <div className='flex items-center gap-2'>
+                    <button
+                        type='button'
+                        onClick={() => useUiStore.getState().toggleTat()}
+                        aria-pressed={tatActive}
+                        title={t('panel.hsl.tatHint')}
+                        className={`rounded px-1.5 py-0.5 text-[10px] ${tatActive ? 'bg-white text-black' : 'bg-neutral-800 text-neutral-300 hover:text-neutral-100'}`}>
+                        {t('panel.hsl.tat')}
+                    </button>
+                    <label className='flex items-center gap-1 text-[10px] text-neutral-400'>
+                        <input
+                            type='checkbox'
+                            checked={bw}
+                            onChange={(event) => edit((draft) => void (draft.color.bw = event.target.checked), { label: t('history.bwConvert') })}
+                        />
+                        {t('panel.hsl.bw')}
+                    </label>
+                </div>
             }>
             <div className='flex justify-between gap-1'>
                 {HSL_BANDS.map((item) => (
@@ -88,6 +105,7 @@ export const HslSection: FC = () => {
                 ))}
             </div>
             <p className='text-xs font-medium text-neutral-300'>{bandLabel(band)}</p>
+            {tatActive && <p className='text-[10px] text-sky-300'>{t('panel.hsl.tatActive')}</p>}
             {bw ? (
                 <>
                     <p className='text-[10px] text-neutral-500'>{t('panel.hsl.bwMixerHint')}</p>

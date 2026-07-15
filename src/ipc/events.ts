@@ -1,4 +1,5 @@
 import { listen } from '@tauri-apps/api/event'
+import type { CpuFrameReadyPayload } from '../types/CpuFrameReadyPayload'
 import type { DecodeFailedPayload } from '../types/DecodeFailedPayload'
 import type { FsChangedPayload } from '../types/FsChangedPayload'
 import type { LevelReadyPayload } from '../types/LevelReadyPayload'
@@ -19,3 +20,6 @@ export const onDockOpen = (handler: (payload: OpenRequestPayload) => void) =>
     listen<OpenRequestPayload>('dock:open', (event) => handler(event.payload))
 
 export const onRecentsChanged = (handler: () => void) => listen('recents:changed', () => handler())
+
+export const onCpuFrameReady = (handler: (payload: CpuFrameReadyPayload) => void) =>
+    listen<CpuFrameReadyPayload>('cpu:frame-ready', (event) => handler(event.payload))
