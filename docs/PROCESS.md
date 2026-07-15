@@ -19,7 +19,7 @@
 
 ## 결정 로그 (사용자 이의 시 재검토)
 1. **패키지 매니저 = bun (사용자 확정 지시, 2026-07-15).** 처음 pnpm으로 셋업했다가 사용자 지시로 bun 전환. `bun install` / `bun run dev|build|tauri`. esbuild postinstall은 `trustedDependencies`로 허용. tauri.conf의 before*Command도 bun.
-2-0. **git 운용 (사용자 지시, 2026-07-15 오후):** 원격 = `https://github.com/B-HS/raw-viewer` (B-HS 계정, gh 인증 확인). 메인 브랜치 = **prod**, **dev** 분리, feature 브랜치 → dev → prod 흐름. **phase마다 commit/push.** 커밋: Conventional Commits(type 영어·설명 한국어), author = Hyunseok Byun 단독, Co-Authored-By/Claude 트레일러 절대 금지(커밋 후 `git log --format='%B' | grep -i 'co-author\|claude'`로 검증). Phase 0~3b는 소급 분리가 불가능해 baseline 커밋 1개로 시작(3b 통합 검증 후), 이후 phase별 feature 브랜치. gitignore: vendor/·binaries/·fixtures/는 스크립트(sync-vendor·fetch-fixtures·NOTICE 기재 dnglab URL)로 재현하므로 미추적.
+2-0. **git 운용 (사용자 지시, 2026-07-15 오후, 같은 날 보완):** 원격 = `https://github.com/B-HS/raw-viewer` (B-HS 계정, gh 인증 확인). 메인 브랜치 = **prod**, **dev** 분리. **워크플로(웨이브) 완료 시마다 검증 후 dev에 자동 commit/push. prod 병합은 사용자 허락을 받아서만 수행.** feature 브랜치는 웨이브 단위로 사용 후 dev에 머지. 커밋: Conventional Commits(type 영어·설명 한국어), author = Hyunseok Byun 단독, Co-Authored-By/Claude 트레일러 절대 금지(커밋 후 `git log --format='%B' | grep -i 'co-author\|claude'`로 검증). Phase 0~3b는 소급 분리가 불가능해 baseline 커밋 1개로 시작(3b 통합 검증 후), 이후 phase별 feature 브랜치. gitignore: vendor/·binaries/·fixtures/는 스크립트(sync-vendor·fetch-fixtures·NOTICE 기재 dnglab URL)로 재현하므로 미추적.
 2. ~~git 미초기화 상태 유지~~ (해제됨 — 위 2-0). 과거 결정 기록:
    - PRD Phase 0의 "vendor/libraw 서브모듈" → **LibRaw 공식 릴리스 tarball을 `src-tauri/vendor/libraw/`에 무수정 전개**로 대체. git init 후 서브모듈 전환 예정.
    - "tests/fixtures git-lfs" → fetch 스크립트로 대체 (`scripts/fetch-fixtures.sh`).
@@ -84,8 +84,59 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 통합 검증: cargo test 122건·bun run build·tauri dev 실기동·**스크린샷 시각 확인**(iPhone DNG 세로 렌더 정상, 히스토그램/슬라이더/필름스트립/필터바/상태바 표시, 색 자연스러움 — 다크/라이트 토글 및 조작감은 사용자 확인 필요)
 
 **3a PRD 이탈 기록**: ① macOS `trash` 크레이트는 복원 API 미지원 → 휴지통 ⌘Z 복원 불가(Finder '되돌려 놓기' 안내로 대체, Phase 4에서 objc2 NSFileManager 경로 재검토) ② lens.mount·driveMode·stabilization·hasOpcodeList·iccProfileName은 ExifTool 통합(FR-16.4) 전까지 None ③ iPhone ProRAW(linear DNG)는 sensorType=unknown
-### 3b 잔여 (미착수)
-프리셋(FR-12)+동기화(FR-13) · Export 래스터/DNG/배치(FR-14, dnglab sidecar) · 스마트 복사/클립보드(FR-15, platform macOS 구현) · RAW+JPEG 페어링(FR-1.6) · Dock(FR-18) · 파일연결/싱글인스턴스(FR-19) · 렌즈보정(FR-8) · ExifTool(FR-16.4) · 설정·커맨드팔레트·i18n·접근성(FR-20) · 라이선스 화면(cargo-about)
+### 3b (계약: docs/phase3b-contract.md) — **완료, dev 반영(31473c8)**
+> 차단 버그 해결: Bayer L1/L2 렌더 깨짐의 근본 원인은 **build.rs의 LIBRAW_NOTHREADS** — LibRaw 비트리더(getbithuff)·AHD LUT가 프로세스 전역 static이 되어 병렬 디코드에서 상호 오염(비결정적, iPhone 정상은 요행). 조치: 정의 제거(인스턴스 TLS), 캐시 키에 CACHE_SCHEMA_VERSION 혼입으로 오염된 L1 디스크 캐시 무효화, 격리-vs-동시 바이트 동일성 회귀 테스트(5D3·X-T5·모노) 추가. cargo test 185. 수정 후 동시 디코드 덤프 PNG 육안 검증 정상. 결정 로그 4의 LIBRAW_NOTHREADS 채택은 폐기.
+- [x] X: Export 엔진 — export_begin/tile(raw body)/finish/cancel, 4포맷 전부 ICC 임베드, linear Lanczos3, little_exif(GPS는 어떤 모드도 미기록), 파일명 템플릿, dnglab v0.7.2 sidecar(macOS arm64 릴리스) — 테스트 184건
+- [x] Q: 프리셋(003 마이그레이션, 8섹션 마스크, 번들 10종 시드) + copy_settings — EditService 영속 경로 탑승
+- [x] W: ExportDialog·PresetPanel·exportRenderer(타일 interior 전송)·⌘⇧C/V/⌘⌥V·⌥1~9
+- [x] 검증: cargo test 184 + bun run build + prettier 통과
+- [ ] **차단 버그(통합 중 발견)**: Bayer RAW(5D3) L1/L2 뷰포트 렌더 깨짐 — iPhone linear DNG는 정상, 마진 포함 raw 치수(5796×3870) 표기로 보아 **processed 치수 vs payload 치수 불일치(row stride)** 유력. 3b 이전부터 존재(Bayer 파일 시각 검증 이번이 처음). 디버그 에이전트 진행 중. **해결·재검증 후 dev 커밋/푸시.**
+
+### 3c (계약: docs/phase3c-contract.md) — **완료, dev 반영(13ecc05)**
+- [x] PL: objc2 실구현(NSPasteboard PNG+TIFF 스마트복사·파일/텍스트·Finder·open-with·recents)·Dock 메뉴(델리게이트 무교체 class_addMethod 주입, ● 점 표시)·파일연결(rank=Alternate)·Opened 콜드스타트 큐·싱글인스턴스·RAW+JPEG 페어링(get_pairs)·recents(004) — 테스트 206
+- [x] T: ExifTool(감지+subprocess 3s deep metadata)·라이선스 화면(cargo-about → resources/licenses-rust.html, NOTICE 합성)·캐시 통계/삭제
+- [x] FE: 설정 화면(언어/테마/뷰포트 배경/성능/캐시, plugin-store)·커맨드 팔레트(퍼지)·i18n ko/en 전수 치환·스마트 복사(⌘C, 4096 상한)·페어 배지·reduced-motion
+- [x] 통합: cargo test 206 + bun run build + 실기동(패닉 0). 시각 확인은 화면 잠금으로 보류(사용자 재석 시)
+- 3c SPEC-GAP: Dock setState 체크마크 미시도(점 표시 고정), open-with 편집본 TIFF는 3d로, 클립보드 TIFF 무압축(메인스레드 히치 가능), fileAssociations 이미지 그룹 mimeType `image/*` 제거(부적합 와일드카드)
+
+### 3d (계약: docs/phase3d-contract.md) — **완료, dev 반영(fb2bb96·2ec6712)**
+- [x] LN: Lensfun v0.3.95(pin+sync, CC-BY-SA 고지) 파싱 카메라 751·렌즈 952, 매칭(토큰 스코어·mount 호환·crop 게이트 0.96)·초점 선형보간·비네팅 IDW(3.5), override(005) — 테스트 241
+- [x] DX: DNG tag700 주입(EOF append+IFD 재작성 — 기존 오프셋 불변, 재파싱+meta 검증, 원자 rename) 실측 라운드트립(aether:state 100% 복원)·프리셋 .xmp IO·open_with_edited
+- [x] FL: gl 패스② 렌즈 보정(poly3/poly5 Newton·ptlens 사전스케일·TCA·pa 비네팅 선형 곱)·LensSection·프리셋 IO UI·편집 적용본 TIFF 외부 열기
+- [x] 통합: cargo test 241 + bun run build + 실기동(패닉 0). 시각 확인 보류(화면 잠금)
+- 3d SPEC-GAP: 보간은 선형(lensfun 4점 Hermite 대비 3점+ 시 미세 편차), subjectDistance 기본 1000, DNG OpcodeList 우선 규칙(FR-8) 미구현, aperture 미상 시 비네팅 없음
+
+### 3e (계약: docs/phase3e-contract.md) — **완료, dev 반영(c77cd48)**
+- [x] QA: perf 하니스(release)·run-acceptance.sh(12/12 PASS)·docs/quality-assurance/phase3-acceptance.md(§8.2 45항목: 자동통과 9·수동 35·성능 미달 1)
+- [x] P1: 워터마크(raw body + OETF 후 합성)·배치 실패 요약/재시도·필름스트립 높이 드래그·Y 비교 나란히
+- [x] deny.toml IJG/NCSA 허용(permissive — R4 무관), licenses ok 복구
+- **성능 실측(M4 Pro/48GB — M1 기준기보다 유리)**: L0 전 기종 ≤2ms ✓ · **L1 목표 250ms 광범위 초과(R5 410ms)** · **X-Trans L1 13.4s**(half_size가 X-Trans에 무효, 풀해상도 단일스레드 Markesteijn — PRD §3.3 지정 방식의 내재 한계) · L2는 Bayer ✓ / X-Trans·GFX100 ✗
+- 기타: nikon-z8 고효율 NEF에 LibRaw "data corrupted" 경고(디코드는 완료 — 육안 재검증 필요)
+
+### 3f — **완료, dev 반영(5bafcb4)**
+- [x] OpenMP 정적 링크(libomp.a, LIBRAW_FORCE_OPENMP, 미탐지 시 무OpenMP 빌드 폴백): **R5 L1 410→166ms(목표 250 통과)** · GFX100 L2 4070→**1156ms 통과** · 5D3 L2 735→433ms. 바이너리 dylib 의존 0(otool 검증), 동시성 게이트 249 그린
+- [x] X-Trans는 Markesteijn OMP 타일 경계 비결정성 실측(스케줄 의존) → **디코드당 단일 스레드 핀**(결정성 유지, 13.4s 유지 — 병렬 시 2.16s 가능)
+- [x] 그리드 뷰(G)·히스토리 패널(⌘⌥Z, jumpTo)·단축키 리매핑(38액션 레지스트리+녹화+충돌감지)
+- 3f 후속: 워커×내부OMP 오버서브스크립션 튜닝, Bayer L2 재현성 필요 시 동일 핀, GFX100은 X-Trans가 아니라 Bayer 중형(문서 정정 — quality-assurance 반영 필요), 줌/팬 키는 리매핑 제외(GL 소유), 크롭 도구·숫자키 패밀리 fixed
+
+### 미결 결정 (사용자)
+1. **prod 병합 시점** — dev(0~3f) 상태. 허락 대기.
+2. **X-Trans 병렬화** — ① 바이트 동일성 게이트 완화(±1 LSB 허용) 후 병렬(13.4→2.2s) ② bilinear L1 프록시 ③ 현행(결정적, 느림). 권장 ①.
+
+## Phase 4 (진행 중)
+### 4a — **완료, dev 반영(c6f93c9)**
+- [x] C4: Rust CPU 렌더러(①③④⑤⑦⑧, rayon) — TS 원본→bun 패리티 벡터(LUT 바이트 일치, WB/색공간 1e-3), aether `pixels/{id}/cpu`(AETH u8) + cpu:frame-ready, 5D3@2048px 25~51ms — 테스트 277
+- [x] D4: WebGL2 실패 폴백 뷰(강제 플래그 rawviewer.forceCpuRender)·TAT·샘플러 핀(5개)·히스토그램 호버
+- 4a SPEC-GAP: CPU 경로는 ②기하/렌즈·⑥NR/샤프닝 미지원, 비-RAW 미지원, 출력 sRGB 고정, 오버레이류 없음
+### 4b — **완료, dev 반영(40ec75a)**
+- [x] 격리 디코딩(__decode 서브커맨드, 크래시 루프 감지→배너, 기본 off) · 성능 설정 배선(preloadRadius/l2Policy/isolatedDecode — 3c 부채 해소) · 역지오코딩(Nominatim 정책 준수, 기본 off) — 테스트 297
+- 후속: 격리 디코드 통합테스트가 스위트를 40분까지 늘림 → #[ignore] 게이팅 또는 nextest 분리 필요
+
+### 4 잔여 (이 기기에서 진행 불가/저가치)
+다중 윈도우(P2) · 모니터 ICC 전체 적용 · WebGPU(macOS 26+ 필요) · Windows/Linux platform(하드웨어 필요) · JPEG XL(P2) · 로컬 보정(별도 논의 §12.2)
+
+### Phase 3 검증 잔여
+§8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인
 
 ## Phase 4 (미착수)
 PRD §11 체크리스트를 그대로 따른다.

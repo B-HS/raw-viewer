@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useHistogram } from '../store/histogramStore'
 import type { HistogramData, HistogramMode } from '../store/histogramStore'
 import { useUiStore } from '../store/uiStore'
@@ -59,13 +60,20 @@ const render = (canvas: HTMLCanvasElement, data: HistogramData | null, mode: His
     ctx.globalCompositeOperation = 'source-over'
 }
 
-const MODE_LABEL: Record<HistogramMode, string> = { rgb: 'RGB', luma: '휘도', separate: '분리' }
-
 export const Histogram: FC = () => {
+    const { t } = useTranslation()
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const data = useHistogram((state) => state.data)
     const mode = useHistogram((state) => state.mode)
+    const hoverRange = useHistogram((state) => state.hoverRange)
     const clipping = useUiStore((state) => state.clipping)
+    const modeLabel = t(`histogram.${mode}`)
+
+    const onHover = (event: React.MouseEvent) => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        const frac = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+        useHistogram.getState().setHoverRange({ lo: Math.max(0, frac - 0.05), hi: Math.min(1, frac + 0.05) })
+    }
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -95,22 +103,30 @@ export const Histogram: FC = () => {
             <button
                 type='button'
                 onClick={() => useUiStore.getState().toggleClipping('shadow')}
-                aria-label='쉐도우 클리핑 토글'
+                aria-label={t('histogram.shadowClipAria')}
                 className={`absolute left-1 top-1 z-10 h-0 w-0 border-b-8 border-r-8 border-b-transparent ${loActive ? 'border-r-blue-400' : 'border-r-neutral-600'}`}
             />
             <button
                 type='button'
                 onClick={() => useUiStore.getState().toggleClipping('highlight')}
-                aria-label='하이라이트 클리핑 토글'
+                aria-label={t('histogram.highlightClipAria')}
                 className={`absolute right-1 top-1 z-10 h-0 w-0 border-b-8 border-l-8 border-b-transparent ${hiActive ? 'border-l-red-400' : 'border-l-neutral-600'}`}
             />
             <canvas
                 ref={canvasRef}
                 onClick={() => useHistogram.getState().cycleMode()}
+                onMouseMove={onHover}
+                onMouseLeave={() => useHistogram.getState().setHoverRange(null)}
                 className='block h-24 w-full cursor-pointer'
-                aria-label={`히스토그램 (${MODE_LABEL[mode]})`}
+                aria-label={t('histogram.aria', { mode: modeLabel })}
             />
-            <span className='pointer-events-none absolute bottom-1 right-2 text-[10px] text-neutral-500'>{MODE_LABEL[mode]}</span>
+            {hoverRange && (
+                <div
+                    className='pointer-events-none absolute inset-y-0 border-x border-sky-300/70 bg-sky-300/10'
+                    style={{ left: `${hoverRange.lo * 100}%`, width: `${(hoverRange.hi - hoverRange.lo) * 100}%` }}
+                />
+            )}
+            <span className='pointer-events-none absolute bottom-1 right-2 text-[10px] text-neutral-500'>{modeLabel}</span>
         </div>
     )
 }

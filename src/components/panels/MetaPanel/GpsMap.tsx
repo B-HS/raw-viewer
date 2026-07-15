@@ -2,6 +2,7 @@ import 'leaflet/dist/leaflet.css'
 import * as L from 'leaflet'
 import { useEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { GpsMeta } from '../../../types/GpsMeta'
 
 const markerHtml = (direction: number | null) =>
@@ -10,6 +11,7 @@ const markerHtml = (direction: number | null) =>
         : `<div style="transform:rotate(${direction}deg);width:14px;height:14px"><div style="margin:0 auto;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:14px solid #ef4444;filter:drop-shadow(0 0 2px rgba(0,0,0,.7))"></div></div>`
 
 export const GpsMap: FC<{ gps: GpsMeta }> = ({ gps }) => {
+    const { t } = useTranslation()
     const containerRef = useRef<HTMLDivElement | null>(null)
     const [failed, setFailed] = useState(false)
 
@@ -44,7 +46,7 @@ export const GpsMap: FC<{ gps: GpsMeta }> = ({ gps }) => {
             <div ref={containerRef} className='h-full w-full' />
             {failed && (
                 <div className='absolute inset-0 flex items-center justify-center bg-neutral-900/90 px-3 text-center text-[11px] text-neutral-400'>
-                    지도를 불러올 수 없습니다
+                    {t('meta.gps.mapFailed')}
                 </div>
             )}
         </div>

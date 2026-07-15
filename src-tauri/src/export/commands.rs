@@ -1,12 +1,14 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use tauri::ipc::{InvokeBody, Request};
+use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::edit::EditService;
 use crate::error::{AppError, AppResult};
-use crate::export::{dng, finish, ExportService};
+use crate::export::{dng, dng_xmp, finish, ExportService};
 use crate::pipeline::AppState;
-use crate::types_export::{ExportPhase, ExportProgressPayload, RasterExportRequest};
+use crate::scan;
+use crate::types_export::{DngExportResult, ExportPhase, ExportProgressPayload, RasterExportRequest};
 
 fn header_str(request: &Request<'_>, name: &str) -> AppResult<String> {
     request
@@ -43,6 +45,34 @@ pub fn export_tile(request: Request<'_>, export: State<'_, ExportService>) -> Ap
 }
 
 #[tauri::command]
+pub fn export_set_watermark(request: Request<'_>, export: State<'_, ExportService>) -> AppResult<()> {
+    let job_id = header_str(&request, "x-export-job")?;
+    let body = match request.body() {
+        InvokeBody::Raw(bytes) => bytes.as_slice(),
+        InvokeBody::Json(_) => return Err(AppError::Internal("export_set_watermark requires a raw body".to_owned())),
+    };
+    export.set_watermark(&job_id, body)
+}
+
+fn read_watermark_bytes(path: &Path) -> AppResult<Vec<u8>> {
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > 64 * 1024 * 1024 {
+        return Err(AppError::Internal("watermark file exceeds 64MB".to_owned()));
+    }
+    let bytes = std::fs::read(path)?;
+    image::load_from_memory(&bytes).map_err(|error| AppError::Internal(format!("invalid watermark image: {error}")))?;
+    Ok(bytes)
+}
+
+#[tauri::command]
+pub async fn read_watermark_png(path: PathBuf) -> AppResult<Response> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || read_watermark_bytes(&path))
+        .await
+        .map_err(|error| AppError::Internal(format!("watermark read task failed: {error}")))??;
+    Ok(Response::new(bytes))
+}
+
+#[tauri::command]
 pub async fn export_finish(job_id: String, app: AppHandle, state: State<'_, AppState>, export: State<'_, ExportService>) -> AppResult<PathBuf> {
     let job = export.take(&job_id).ok_or_else(|| AppError::Internal(format!("unknown export job: {job_id}")))?;
     let source = state
@@ -76,13 +106,23 @@ pub async fn export_cancel(job_id: String, export: State<'_, ExportService>) -> 
 }
 
 #[tauri::command]
-pub async fn export_dng(image_id: String, out_dir: PathBuf, state: State<'_, AppState>) -> AppResult<PathBuf> {
+pub async fn export_dng(image_id: String, out_dir: PathBuf, state: State<'_, AppState>, edits: State<'_, EditService>) -> AppResult<DngExportResult> {
     let source = state
         .services
         .registry
         .resolve(&image_id)
         .ok_or_else(|| AppError::Internal(format!("unknown image id: {image_id}")))?;
-    tauri::async_runtime::spawn_blocking(move || dng::run_convert(&dng::binary_path(), &source, &out_dir))
-        .await
-        .map_err(|error| AppError::Internal(format!("dng task failed: {error}")))?
+    let is_raw = scan::is_raw_ext(&source);
+    let edit_state = edits.get_or_load(&image_id, &source, is_raw)?.state;
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = dng::run_convert(&dng::binary_path(), &source, &out_dir)?;
+        let outcome = dng_xmp::inject_edit_state(&path, &edit_state);
+        Ok(DngExportResult {
+            path,
+            xmp_injected: outcome.injected,
+            warning: outcome.warning,
+        })
+    })
+    .await
+    .map_err(|error| AppError::Internal(format!("dng task failed: {error}")))?
 }

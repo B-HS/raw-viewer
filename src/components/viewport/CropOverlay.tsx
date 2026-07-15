@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { dispDims } from '../../gl/viewTransform'
 import { cropDisplayRatio, displayToSource, setCropRect, sourceToDisplay } from '../../store/crop'
 import { useEditStore } from '../../store/editStore'
@@ -28,6 +29,7 @@ const handlePosition = (handle: Exclude<Handle, 'move'>, rect: RectPx) => ({
 })
 
 export const CropOverlay: FC = () => {
+    const { t } = useTranslation()
     const rootRef = useRef<HTMLDivElement>(null)
     const dragRef = useRef<{ handle: Handle; sx: number; sy: number; rect: RectPx } | null>(null)
     const [size, setSize] = useState({ w: 0, h: 0 })
@@ -186,7 +188,7 @@ export const CropOverlay: FC = () => {
                     <div
                         key={handle}
                         role='button'
-                        aria-label={`크롭 핸들 ${handle}`}
+                        aria-label={t('panel.crop.handleAria', { handle })}
                         onPointerDown={onDown(handle)}
                         className='absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-neutral-900 bg-white'
                         style={{ left: position.left, top: position.top, cursor: `${handle}-resize` }}

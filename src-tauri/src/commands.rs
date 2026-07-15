@@ -1,19 +1,23 @@
 use std::path::{Path, PathBuf};
 
 use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
+use crate::cpurender::{render_and_store, CpuFrameStore};
 use crate::edit::EditService;
 use crate::error::{AppError, AppResult};
 use crate::organize::OrganizeService;
 use crate::pipeline::AppState;
+use crate::platform::OpenQueue;
 use crate::preset::{self, PresetService};
 use crate::scan::{self, Registry};
 use crate::types::{EditState, EditStateEnvelope, OpenResult, PendingOpenRequest, ScanBatch, ScanSummary};
+use crate::types_cpurender::{CpuFrameReadyPayload, EVENT_CPU_FRAME_READY};
 use crate::types_meta::{Flag, ImageMetadata, OrganizeEntry};
+use crate::types_performance::{L2Policy, PerfSettings};
 use crate::types_preset::PresetInfo;
 use crate::watch::WatchService;
-use crate::{meta, trashbin};
+use crate::{geocode, meta, trashbin};
 
 fn resolve_path(registry: &Registry, image_id: &str) -> AppResult<PathBuf> {
     registry.resolve(image_id).ok_or_else(|| AppError::Io(format!("unknown image id: {image_id}")))
@@ -32,13 +36,16 @@ fn resolve_targets(registry: &Registry, image_ids: &[String]) -> Vec<(String, Pa
 }
 
 #[tauri::command]
-pub async fn frontend_ready() -> AppResult<Vec<PendingOpenRequest>> {
+pub async fn frontend_ready(queue: State<'_, OpenQueue>) -> AppResult<Vec<PendingOpenRequest>> {
     tracing::info!("frontend ready");
-    let pending = std::env::var("RAW_VIEWER_OPEN")
+    let mut pending: Vec<PendingOpenRequest> = std::env::var("RAW_VIEWER_OPEN")
         .ok()
         .map(|path| PendingOpenRequest { path: PathBuf::from(path) })
         .into_iter()
         .collect();
+    for path in queue.ready_and_drain() {
+        pending.push(PendingOpenRequest { path });
+    }
     Ok(pending)
 }
 
@@ -170,6 +177,61 @@ pub async fn watch_directory(dir: PathBuf, watch: State<'_, WatchService>) -> Ap
 }
 
 #[tauri::command]
+pub async fn render_cpu_frame(
+    image_id: String,
+    max_edge: u32,
+    app: AppHandle,
+    state: State<'_, AppState>,
+    edits: State<'_, EditService>,
+    cpu_frames: State<'_, CpuFrameStore>,
+) -> AppResult<CpuFrameReadyPayload> {
+    let span = tracing::info_span!("render_cpu_frame", image_id = %image_id, max_edge);
+    let _guard = span.enter();
+    let payload = render_and_store(&state.services, &edits, &cpu_frames, &image_id, max_edge)?;
+    if let Err(error) = app.emit(EVENT_CPU_FRAME_READY, payload.clone()) {
+        tracing::warn!(%error, "emit cpu:frame-ready failed");
+    }
+    Ok(payload)
+}
+
+#[tauri::command]
+pub async fn set_performance_settings(preload_radius: u32, l2_policy: L2Policy, isolated_decode: bool, state: State<'_, AppState>) -> AppResult<()> {
+    state.pipeline.set_settings(PerfSettings {
+        preload_radius,
+        l2_policy,
+        isolated_decode,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_performance_settings(state: State<'_, AppState>) -> AppResult<PerfSettings> {
+    Ok(state.pipeline.settings())
+}
+
+#[tauri::command]
+pub async fn request_l2(image_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    state.pipeline.request_l2(image_id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_reverse_geocode(image_id: String, state: State<'_, AppState>) -> AppResult<Option<String>> {
+    let path = resolve_path(&state.services.registry, &image_id)?;
+    let span = tracing::info_span!("get_reverse_geocode", image_id = %image_id);
+    let _guard = span.enter();
+    let resolved = tauri::async_runtime::spawn_blocking(move || {
+        let exif = meta::exif::ExifData::read(&path);
+        let gps = meta::gps::from_exif(&exif)?;
+        geocode::reverse(gps.lat, gps.lng)
+    })
+    .await
+    .ok()
+    .flatten();
+    Ok(resolved)
+}
+
+#[tauri::command]
 pub async fn list_presets(presets: State<'_, PresetService>) -> AppResult<Vec<PresetInfo>> {
     presets.list()
 }
@@ -205,6 +267,16 @@ pub async fn apply_preset(
 #[tauri::command]
 pub async fn delete_preset(preset_id: String, presets: State<'_, PresetService>) -> AppResult<()> {
     presets.delete(&preset_id)
+}
+
+#[tauri::command]
+pub async fn export_preset(preset_id: String, path: PathBuf, presets: State<'_, PresetService>) -> AppResult<()> {
+    preset::io::export_preset(&presets, &preset_id, &path)
+}
+
+#[tauri::command]
+pub async fn import_preset(path: PathBuf, presets: State<'_, PresetService>) -> AppResult<PresetInfo> {
+    preset::io::import_preset(&presets, &path)
 }
 
 #[tauri::command]

@@ -104,3 +104,12 @@ pub struct ExportProgressPayload {
     pub done: u32,
     pub total: u32,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DngExportResult {
+    pub path: PathBuf,
+    pub xmp_injected: bool,
+    pub warning: Option<String>,
+}

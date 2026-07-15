@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, FC, MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { aetherUrl } from '../../ipc/pixels'
 import { labelColor } from '../../store/organize'
 import type { Flag } from '../../types/Flag'
@@ -13,6 +14,7 @@ type FilmstripCellProps = {
     flag: Flag | null
     label: string | null
     edited: boolean
+    paired: boolean
     rev: number | undefined
     style: CSSProperties
     onSelect: (event: MouseEvent) => void
@@ -27,11 +29,13 @@ export const FilmstripCell: FC<FilmstripCellProps> = ({
     flag,
     label,
     edited,
+    paired,
     rev,
     style,
     onSelect,
     onContextMenu,
 }) => {
+    const { t } = useTranslation()
     const [failed, setFailed] = useState(false)
 
     const src = `${aetherUrl(`pixels/${entry.imageId}/l0`)}${rev ? `?rev=${rev}` : ''}`
@@ -63,11 +67,14 @@ export const FilmstripCell: FC<FilmstripCellProps> = ({
                     )}
                     {entry.isRaw && (
                         <span className='pointer-events-none absolute left-0.5 top-0.5 rounded bg-black/70 px-1 text-[8px] font-semibold text-sky-300'>
-                            RAW
+                            {paired ? t('filmstrip.pairBadge') : 'RAW'}
                         </span>
                     )}
                     {edited && (
-                        <span className='pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400' title='편집됨' />
+                        <span
+                            className='pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400'
+                            title={t('filmstrip.editedTitle')}
+                        />
                     )}
                     {flag && (
                         <span

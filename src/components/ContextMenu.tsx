@@ -1,15 +1,26 @@
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import { copyFilesToClipboard, openWithExternal } from '../ipc/platform'
+import { smartCopyCurrent } from '../lib/smartCopy'
 import { confirmAndTrash } from '../lib/trash'
 import { useContextMenu } from '../store/contextMenu'
 import { useEditClipboard } from '../store/editClipboard'
 import { useEditStore } from '../store/editStore'
+import { useExportStore } from '../store/exportStore'
 import { LABELS, useOrganize } from '../store/organize'
 import { usePlaylist } from '../store/playlist'
+import { useSettings } from '../store/settings'
 import { useToast } from '../store/toast'
 
 const RATINGS = [0, 1, 2, 3, 4, 5]
+
+const appName = (path: string) => {
+    const base = path.split('/').pop() ?? path
+    return base.endsWith('.app') ? base.slice(0, -4) : base
+}
 
 type MenuItemProps = { onClick: () => void; shortcut?: string; danger?: boolean; disabled?: boolean; children: ReactNode }
 
@@ -26,15 +37,17 @@ const MenuItem: FC<MenuItemProps> = ({ onClick, shortcut, danger, disabled, chil
 
 export const ContextMenu: FC = () => {
     const menuRef = useRef<HTMLDivElement | null>(null)
+    const { t } = useTranslation()
 
     const open = useContextMenu((state) => state.open)
     const x = useContextMenu((state) => state.x)
     const y = useContextMenu((state) => state.y)
     const imageIds = useContextMenu((state) => state.imageIds)
-    const hasClip = useEditClipboard((state) => state.clip !== null)
+    const hasClip = useEditClipboard((state) => state.sourceImageId !== null)
+    const recentApps = useSettings((state) => state.recentApps)
 
     const [pos, setPos] = useState({ x, y })
-    const [sub, setSub] = useState<'rating' | 'label' | null>(null)
+    const [sub, setSub] = useState<'rating' | 'label' | 'openWith' | null>(null)
 
     const close = () => useContextMenu.getState().close()
     const primary = imageIds[0]
@@ -49,23 +62,38 @@ export const ContextMenu: FC = () => {
         if (entry)
             navigator.clipboard
                 .writeText(entry.path)
-                .then(() => useToast.getState().show('경로 복사됨'))
+                .then(() => useToast.getState().show(t('toast.pathCopied')))
                 .catch(() => undefined)
     }
     const reveal = () => {
         if (entry) revealItemInDir(entry.path).catch(() => undefined)
     }
-    const copyEdit = () => {
-        const state = useEditStore.getState().state
-        if (state) {
-            useEditClipboard.getState().copy(state)
-            useToast.getState().show('편집 설정 복사됨')
-        }
-    }
-    const pasteEdit = () => useEditClipboard.getState().paste()
+    const copyEdit = () => useEditClipboard.getState().copy()
+    const pasteEdit = () => useEditClipboard.getState().pasteTo(imageIds)
     const trash = () => {
         close()
         confirmAndTrash(imageIds)
+    }
+    const openOriginalWith = (appPath: string) => openWithExternal(primary, appPath).catch(() => undefined)
+    const openEditedWith = (appPath: string) => useExportStore.getState().runEditedHandoff(primary, entry?.fileName ?? primary, entry, appPath)
+    const pickApp = () =>
+        openDialog({
+            directory: false,
+            multiple: false,
+            defaultPath: '/Applications',
+            filters: [{ name: t('menu.application'), extensions: ['app'] }],
+        }).catch(() => null)
+    const pickAndOpenOriginal = async () => {
+        const selected = await pickApp()
+        if (typeof selected !== 'string') return
+        useSettings.getState().addRecentApp(selected)
+        openOriginalWith(selected)
+    }
+    const pickAndOpenEdited = async () => {
+        const selected = await pickApp()
+        if (typeof selected !== 'string') return
+        useSettings.getState().addRecentApp(selected)
+        openEditedWith(selected)
     }
 
     useEffect(() => {
@@ -98,35 +126,72 @@ export const ContextMenu: FC = () => {
                 onContextMenu={(event) => event.preventDefault()}
                 className='min-w-[220px] rounded-md border border-neutral-700 bg-neutral-900 py-1 text-xs text-neutral-200 shadow-xl'>
                 {imageIds.length > 1 && (
-                    <div className='px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>{imageIds.length}개 선택 적용</div>
+                    <div className='px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>
+                        {t('menu.applyToCount', { count: imageIds.length })}
+                    </div>
                 )}
+                <MenuItem onClick={() => run(() => smartCopyCurrent())} shortcut='⌘C'>
+                    {t('menu.copyImage')}
+                </MenuItem>
+                <MenuItem onClick={() => run(() => copyFilesToClipboard(imageIds).catch(() => undefined))} shortcut='⌘⌥C'>
+                    {t('menu.copyFiles')}
+                </MenuItem>
                 <MenuItem onClick={() => run(copyPath)} shortcut='⌘⇧⌥C'>
-                    경로 복사
+                    {t('menu.copyPath')}
                 </MenuItem>
                 <MenuItem onClick={() => run(reveal)} shortcut='⌘⇧R'>
-                    Finder에서 보기
+                    {t('menu.reveal')}
                 </MenuItem>
+                <div className='relative' onMouseEnter={() => setSub('openWith')} onMouseLeave={() => setSub(null)}>
+                    <div className='flex items-center justify-between px-3 py-1 hover:bg-neutral-800'>
+                        <span>{t('menu.openWith')}</span>
+                        <span className='text-[10px] text-neutral-500'>▸</span>
+                    </div>
+                    {sub === 'openWith' && (
+                        <div className='absolute left-full top-0 -ml-1 min-w-[200px] rounded-md border border-neutral-700 bg-neutral-900 py-1 shadow-xl'>
+                            <div className='px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>
+                                {t('menu.openWithOriginal')}
+                            </div>
+                            {recentApps.map((appPath) => (
+                                <MenuItem key={`o-${appPath}`} onClick={() => run(() => openOriginalWith(appPath))}>
+                                    {appName(appPath)}
+                                </MenuItem>
+                            ))}
+                            <MenuItem onClick={() => run(pickAndOpenOriginal)}>{t('menu.chooseApp')}</MenuItem>
+                            <div className='my-1 border-t border-neutral-800' />
+                            <div className='px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>
+                                {t('menu.openWithEdited')}
+                            </div>
+                            {recentApps.map((appPath) => (
+                                <MenuItem key={`e-${appPath}`} onClick={() => run(() => openEditedWith(appPath))}>
+                                    {appName(appPath)}
+                                </MenuItem>
+                            ))}
+                            <MenuItem onClick={() => run(pickAndOpenEdited)}>{t('menu.chooseApp')}</MenuItem>
+                        </div>
+                    )}
+                </div>
                 <div className='my-1 border-t border-neutral-800' />
                 <MenuItem onClick={() => run(copyEdit)} shortcut='⌘⇧C'>
-                    편집 설정 복사
+                    {t('menu.copyEdit')}
                 </MenuItem>
                 <MenuItem onClick={() => run(pasteEdit)} shortcut='⌘⇧V' disabled={!hasClip}>
-                    편집 설정 붙여넣기
+                    {t('menu.pasteEdit')}
                 </MenuItem>
                 <MenuItem onClick={() => run(() => useEditStore.getState().resetAll())} shortcut='⌘R'>
-                    편집 초기화
+                    {t('menu.resetEdit')}
                 </MenuItem>
                 <div className='my-1 border-t border-neutral-800' />
                 <div className='relative' onMouseEnter={() => setSub('rating')} onMouseLeave={() => setSub(null)}>
                     <div className='flex items-center justify-between px-3 py-1 hover:bg-neutral-800'>
-                        <span>별점</span>
+                        <span>{t('menu.rating')}</span>
                         <span className='text-[10px] text-neutral-500'>▸</span>
                     </div>
                     {sub === 'rating' && (
                         <div className='absolute left-full top-0 -ml-1 min-w-[120px] rounded-md border border-neutral-700 bg-neutral-900 py-1 shadow-xl'>
                             {RATINGS.map((value) => (
                                 <MenuItem key={value} onClick={() => run(() => useOrganize.getState().setRating(imageIds, value))}>
-                                    {value === 0 ? '없음' : '★'.repeat(value)}
+                                    {value === 0 ? t('menu.none') : '★'.repeat(value)}
                                 </MenuItem>
                             ))}
                         </div>
@@ -134,37 +199,37 @@ export const ContextMenu: FC = () => {
                 </div>
                 <div className='relative' onMouseEnter={() => setSub('label')} onMouseLeave={() => setSub(null)}>
                     <div className='flex items-center justify-between px-3 py-1 hover:bg-neutral-800'>
-                        <span>컬러 라벨</span>
+                        <span>{t('menu.label')}</span>
                         <span className='text-[10px] text-neutral-500'>▸</span>
                     </div>
                     {sub === 'label' && (
                         <div className='absolute left-full top-0 -ml-1 min-w-[140px] rounded-md border border-neutral-700 bg-neutral-900 py-1 shadow-xl'>
-                            <MenuItem onClick={() => run(() => useOrganize.getState().setLabel(imageIds, null))}>없음</MenuItem>
-                            {LABELS.map((entry) => (
+                            <MenuItem onClick={() => run(() => useOrganize.getState().setLabel(imageIds, null))}>{t('menu.none')}</MenuItem>
+                            {LABELS.map((label) => (
                                 <button
-                                    key={entry.name}
+                                    key={label.name}
                                     type='button'
-                                    onClick={() => run(() => useOrganize.getState().setLabel(imageIds, entry.name))}
+                                    onClick={() => run(() => useOrganize.getState().setLabel(imageIds, label.name))}
                                     className='flex w-full items-center gap-2 px-3 py-1 text-left hover:bg-neutral-800'>
-                                    <span className='h-3 w-3 rounded-full' style={{ backgroundColor: entry.color }} />
-                                    {entry.name}
+                                    <span className='h-3 w-3 rounded-full' style={{ backgroundColor: label.color }} />
+                                    {label.name}
                                 </button>
                             ))}
                         </div>
                     )}
                 </div>
                 <MenuItem onClick={() => run(() => useOrganize.getState().setFlag(imageIds, 'pick'))} shortcut='P'>
-                    ⚑ 플래그 지정
+                    {t('menu.flagPick')}
                 </MenuItem>
                 <MenuItem onClick={() => run(() => useOrganize.getState().setFlag(imageIds, 'reject'))} shortcut='X'>
-                    ⚐ 제외 표시
+                    {t('menu.flagReject')}
                 </MenuItem>
                 <MenuItem onClick={() => run(() => useOrganize.getState().setFlag(imageIds, null))} shortcut='U'>
-                    플래그 해제
+                    {t('menu.flagClear')}
                 </MenuItem>
                 <div className='my-1 border-t border-neutral-800' />
                 <MenuItem onClick={trash} shortcut='⌫' danger>
-                    휴지통으로 이동
+                    {t('menu.trash')}
                 </MenuItem>
             </div>
         </div>

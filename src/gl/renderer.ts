@@ -13,6 +13,7 @@ import {
     stageActive,
 } from './dirty'
 import { buildGeometryWarp } from './geometry'
+import { applyLensUniforms, buildLensPass, PASS2_UNIFORMS } from './lensUniforms'
 import { createHistogramService } from './histogram'
 import { createGlContext, createProgram, uniformLocations } from './glContext'
 import { effectsUniforms, hslUniforms, nrUniforms, sharpenUniforms, toneUniforms } from './passUniforms'
@@ -38,8 +39,10 @@ import { effectiveMaxTexture, extractTile, needsTiling, planTiles, TILE_OVERLAP,
 import { buildModelMatrix, computeFitScale, dispDims, viewScale } from './viewTransform'
 import { wbGainsFromState } from './wbModel'
 import type { ClippingMode, CompareSplit } from './engineApi'
+import type { LensPass } from './lensUniforms'
 import type { ViewState } from './viewTransform'
 import type { EditState } from '../types/EditState'
+import type { LensProfileMatch } from '../types/LensProfileMatch'
 
 type GpuImage = {
     imageId: string
@@ -95,9 +98,14 @@ export class Renderer {
     private current: string | null = null
 
     private editState: EditState = NEUTRAL_EDIT_STATE
+    private lensProfile: LensProfileMatch | null = null
+    private lensProfileImageId: string | null = null
+    private lensPass: LensPass | null = null
+    private lensSig = ''
     private rebuildFrom = 0
     private clipMode: ClippingMode = 'none'
     private compareSplit: CompareSplit = null
+    private sideBySide = false
     private cropEditMode = false
 
     private stages = new Map<number, Target>()
@@ -141,7 +149,7 @@ export class Renderer {
     private buildResources() {
         const gl = this.gl
         this.pass1 = this.compile(VERT_FULLSCREEN, FRAG_PASS1, ['uTex', 'uColorMatrix', 'uWbGain'])
-        this.pass2 = this.compile(VERT_FULLSCREEN, FRAG_PASS2, ['uTex', 'uWarp'])
+        this.pass2 = this.compile(VERT_FULLSCREEN, FRAG_PASS2, PASS2_UNIFORMS)
         this.pass3 = this.compile(VERT_FULLSCREEN, FRAG_PASS3, [
             'uTex',
             'uExposure',
@@ -271,6 +279,7 @@ export class Renderer {
         this.current = imageId
         this.processedFor = null
         this.baseFor = null
+        this.refreshLens()
     }
 
     setWindow(windowIds: string[]) {
@@ -296,6 +305,23 @@ export class Renderer {
             this.toneLut = this.createToneTexture(buildToneCurveLut(next.curves))
         }
         this.editState = next
+        this.refreshLens()
+    }
+
+    setLensProfile(imageId: string | null, profile: LensProfileMatch | null) {
+        this.lensProfileImageId = imageId
+        this.lensProfile = profile
+        this.refreshLens()
+    }
+
+    private refreshLens() {
+        const profile = this.lensProfileImageId === this.current ? this.lensProfile : null
+        const next = buildLensPass(this.editState.lens, profile)
+        const sig = next ? JSON.stringify(next) : ''
+        if (sig === this.lensSig) return
+        this.lensPass = next
+        this.lensSig = sig
+        if (STAGE_GEOMETRY < this.rebuildFrom) this.rebuildFrom = STAGE_GEOMETRY
     }
 
     setClipping(mode: ClippingMode) {
@@ -304,6 +330,10 @@ export class Renderer {
 
     setCompare(split: CompareSplit) {
         this.compareSplit = split
+    }
+
+    setSideBySide(on: boolean) {
+        this.sideBySide = on
     }
 
     setCropEditMode(on: boolean) {
@@ -546,6 +576,7 @@ export class Renderer {
             gl.bindTexture(gl.TEXTURE_2D, input)
             gl.uniform1i(this.pass2.u.uTex, 0)
             gl.uniformMatrix3fv(this.pass2.u.uWarp, false, buildGeometryWarp(this.editState.geometry))
+            applyLensUniforms(gl, this.pass2, this.lensPass, this.procW, this.procH)
             this.drawFullscreen()
             return target.tex
         }
@@ -669,7 +700,11 @@ export class Renderer {
 
     private activeStages() {
         const list: number[] = []
-        for (let stage = 0; stage < STAGE_COUNT; stage++) if (stageActive(stage, this.editState)) list.push(stage)
+        for (let stage = 0; stage < STAGE_COUNT; stage++) {
+            const active =
+                stage === STAGE_GEOMETRY ? stageActive(stage, this.editState) || this.lensPass !== null : stageActive(stage, this.editState)
+            if (active) list.push(stage)
+        }
         return list
     }
 
@@ -795,14 +830,18 @@ export class Renderer {
                 this.processedFor = image.imageId
                 this.baseFor = null
             }
-            if (this.compareSplit) {
+            if (this.compareSplit || this.sideBySide) {
                 if (this.baseFor !== image.imageId) this.buildBase(image)
                 compareBase = this.base?.tex ?? null
             }
             this.sampleHistogram()
         }
         if (!this.processed) return
-        this.drawOutput(image, this.processed, compareBase, metrics, view)
+        if (this.sideBySide && image.kind !== 'l0' && compareBase) {
+            this.drawSideBySide(image, this.processed, compareBase, metrics, view)
+        } else {
+            this.drawOutput(image, this.processed, compareBase, metrics, view)
+        }
     }
 
     private setProc(w: number, h: number, frac: number) {
@@ -858,6 +897,55 @@ export class Renderer {
         gl.uniform1i(this.pass8.u.uCropMode, cropMode)
         gl.uniform4f(this.pass8.u.uCrop, crop?.left ?? 0, crop?.top ?? 0, crop?.right ?? 1, crop?.bottom ?? 1)
         gl.uniform2f(this.pass8.u.uCanvas, this.canvas.width, this.canvas.height)
+        this.drawFullscreen()
+    }
+
+    private drawSideBySide(
+        image: GpuImage,
+        procTex: WebGLTexture,
+        baseTex: WebGLTexture,
+        metrics: NonNullable<ReturnType<Renderer['getMetrics']>>,
+        view: ViewState,
+    ) {
+        const gl = this.gl
+        const cw = this.canvas.width
+        const ch = this.canvas.height
+        const halfW = Math.floor(cw / 2)
+        const paneMetrics = { ...metrics, cw: halfW, fitScale: computeFitScale(halfW, ch, metrics.dispW, metrics.dispH) }
+        const model = buildModelMatrix(view, paneMetrics, image.width, image.height, image.flip)
+        this.lastModel = model
+        this.lastMetrics = { cw: halfW, ch }
+        const nearest = viewScale(view, paneMetrics) > paneMetrics.dpr + 0.001
+        const filter = nearest ? gl.NEAREST : gl.LINEAR
+        const crop = this.editState.crop
+        const cropMode = crop && crop.enabled ? (this.cropEditMode ? 2 : 1) : 0
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+        gl.useProgram(this.pass8.program)
+        gl.bindVertexArray(this.vao)
+        gl.uniformMatrix3fv(this.pass8.u.uModel, false, model)
+        gl.uniform1i(this.pass8.u.uSourceKind, 0)
+        gl.uniform1i(this.pass8.u.uDisplayP3, this.displaySpace === 'display-p3' ? 1 : 0)
+        gl.uniformMatrix3fv(this.pass8.u.uRec2020ToDisplay, false, this.rec2020ToDisplay)
+        gl.uniformMatrix3fv(this.pass8.u.uSrgbToDisplay, false, this.srgbToDisplay)
+        gl.uniform1i(this.pass8.u.uClipMode, CLIP_MODE[this.clipMode])
+        gl.uniform1i(this.pass8.u.uHasBase, 0)
+        gl.uniform3f(this.pass8.u.uSplit, 0, 0, 0)
+        gl.uniform1i(this.pass8.u.uCropMode, cropMode)
+        gl.uniform4f(this.pass8.u.uCrop, crop?.left ?? 0, crop?.top ?? 0, crop?.right ?? 1, crop?.bottom ?? 1)
+        gl.uniform2f(this.pass8.u.uCanvas, cw, ch)
+        gl.uniform1i(this.pass8.u.uTex, 0)
+        gl.uniform1i(this.pass8.u.uBaseTex, 0)
+        this.drawComparePane(baseTex, filter, 0, halfW, ch)
+        this.drawComparePane(procTex, filter, halfW, cw - halfW, ch)
+    }
+
+    private drawComparePane(tex: WebGLTexture, filter: number, vpX: number, vpW: number, ch: number) {
+        const gl = this.gl
+        gl.viewport(vpX, 0, vpW, ch)
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter)
         this.drawFullscreen()
     }
 

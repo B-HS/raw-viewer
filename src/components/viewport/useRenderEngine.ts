@@ -1,14 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import { createEngineApi } from '../../gl/engineApi'
 import { Renderer } from '../../gl/renderer'
-import { clampPan, DEFAULT_VIEW, toggleFit, zoomAboutCursor, zoomTo } from '../../gl/viewTransform'
+import { buildModelMatrix, clampPan, DEFAULT_VIEW, toggleFit, zoomAboutCursor, zoomTo } from '../../gl/viewTransform'
 import type { EngineApi } from '../../gl/engineApi'
 import type { ViewState } from '../../gl/viewTransform'
 import { onDecodeFailed, onLevelReady } from '../../ipc/events'
 import { fetchPixels } from '../../ipc/pixels'
 import { isEditableTarget, KEYMAP } from '../../shortcuts/keymap'
+import { useHistogram } from '../../store/histogramStore'
 import { LEVEL_RANK, neighbors, usePlaylist, WINDOW_RADIUS } from '../../store/playlist'
+import { useSamplerPins } from '../../store/samplerPins'
+import { useUiStore } from '../../store/uiStore'
+import { onZoomCommand } from '../../store/viewportCommand'
+import { useViewportProjection } from '../../store/viewportProjection'
 import type { LevelReadyPayload } from '../../types/LevelReadyPayload'
+import { canvasToUv } from './projection'
+import { hasToneCapture, runToneCapture } from './toneHighlight'
+
+export const shouldForceCpuRender = () => {
+    try {
+        return localStorage.getItem('rawviewer.forceCpuRender') === '1'
+    } catch {
+        return false
+    }
+}
 
 const cursorPoint = (event: { clientX: number; clientY: number }, canvas: HTMLCanvasElement, dpr: number) => {
     const rect = canvas.getBoundingClientRect()
@@ -22,20 +37,43 @@ export const useRenderEngine = () => {
     const rafRef = useRef<number | null>(null)
     const fetchesRef = useRef(new Map<string, AbortController>())
     const spaceRef = useRef(false)
-    const dragRef = useRef<{ x: number; y: number; panning: boolean; moved: boolean } | null>(null)
+    const dragRef = useRef<{ x: number; y: number; panning: boolean; moved: boolean; pin: boolean } | null>(null)
     const engineRef = useRef<EngineApi | null>(null)
     const [caps, setCaps] = useState<{ lowPrecision: boolean; displaySpace: string } | null>(null)
-    const [gpuError, setGpuError] = useState(false)
+    const [gpuError, setGpuError] = useState(shouldForceCpuRender)
     const [engine, setEngine] = useState<EngineApi | null>(null)
 
     const currentIndex = usePlaylist((state) => state.currentIndex)
     const entries = usePlaylist((state) => state.entries)
+
+    const currentProjection = () => {
+        const renderer = rendererRef.current
+        const canvas = canvasRef.current
+        if (!renderer || !canvas) return null
+        if (useUiStore.getState().sideBySide) return null
+        const metrics = renderer.getMetrics()
+        const state = usePlaylist.getState()
+        const current = state.entries[state.currentIndex]
+        const level = current ? state.best[current.imageId] : undefined
+        if (!metrics || !current || !level) return null
+        const model = buildModelMatrix(viewRef.current, metrics, level.width, level.height, level.flip)
+        return { model, clientW: canvas.clientWidth, clientH: canvas.clientHeight, imageId: current.imageId }
+    }
+
+    const publishProjection = () => {
+        const projection = currentProjection()
+        if (projection) useViewportProjection.getState().publish(projection.model, projection.clientW, projection.clientH, projection.imageId)
+        else useViewportProjection.getState().clear()
+    }
 
     const scheduleRender = () => {
         if (rafRef.current != null) return
         rafRef.current = requestAnimationFrame(() => {
             rafRef.current = null
             rendererRef.current?.render(viewRef.current)
+            publishProjection()
+            const canvas = canvasRef.current
+            if (canvas && hasToneCapture()) runToneCapture(canvas)
         })
     }
 
@@ -116,8 +154,9 @@ export const useRenderEngine = () => {
 
         const onPointerDown = (event: PointerEvent) => {
             if (event.button !== 0) return
-            dragRef.current = { x: event.clientX, y: event.clientY, panning: spaceRef.current, moved: false }
-            if (spaceRef.current) canvas.setPointerCapture(event.pointerId)
+            const pin = event.shiftKey && !spaceRef.current
+            dragRef.current = { x: event.clientX, y: event.clientY, panning: spaceRef.current, moved: false, pin }
+            if (spaceRef.current || pin) canvas.setPointerCapture(event.pointerId)
         }
 
         const onPointerMove = (event: PointerEvent) => {
@@ -142,6 +181,18 @@ export const useRenderEngine = () => {
             const drag = dragRef.current
             dragRef.current = null
             if (!drag) return
+            if (drag.pin) {
+                if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
+                if (drag.moved) return
+                const projection = currentProjection()
+                if (!projection) return
+                const rect = canvas.getBoundingClientRect()
+                const uv = canvasToUv(projection.model, projection.clientW, projection.clientH, event.clientX - rect.left, event.clientY - rect.top)
+                if (!uv) return
+                useSamplerPins.getState().add(projection.imageId, uv.u, uv.v)
+                scheduleRender()
+                return
+            }
             if (drag.panning) {
                 if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
                 return
@@ -217,8 +268,19 @@ export const useRenderEngine = () => {
         window.addEventListener('keydown', onKeyDown)
         window.addEventListener('keyup', onKeyUp)
 
+        const unsubZoom = onZoomCommand((command) => {
+            const metrics = renderer.getMetrics()
+            if (!metrics) return
+            if (command === 'fit') viewRef.current = { fit: true, zoom: viewRef.current.zoom, pan: { x: 0, y: 0 } }
+            else if (command === 'actual') viewRef.current = zoomTo(1)
+            else if (command === 'double') viewRef.current = zoomTo(2)
+            else viewRef.current = toggleFit(viewRef.current, metrics, { x: 0, y: 0 })
+            scheduleRender()
+        })
+
         return () => {
             observer.disconnect()
+            unsubZoom()
             canvas.removeEventListener('wheel', onWheel)
             canvas.removeEventListener('pointerdown', onPointerDown)
             canvas.removeEventListener('pointermove', onPointerMove)
@@ -282,6 +344,14 @@ export const useRenderEngine = () => {
         }
         scheduleRender()
     }, [currentIndex, entries])
+
+    useEffect(
+        () =>
+            useHistogram.subscribe((state, previous) => {
+                if (state.hoverRange !== previous.hoverRange) scheduleRender()
+            }),
+        [],
+    )
 
     return { canvasRef, caps, gpuError, engine }
 }

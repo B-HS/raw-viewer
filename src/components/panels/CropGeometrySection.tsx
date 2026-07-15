@@ -1,4 +1,5 @@
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from '../../store/crop'
 import { DEFAULT_EDIT_STATE } from '../../store/editDefaults'
 import { useEditStore } from '../../store/editStore'
@@ -11,9 +12,8 @@ type GeoNumericKey = Exclude<keyof GeometryState, 'rotate90' | 'flipH' | 'flipV'
 
 const signed = (value: number) => (value > 0 ? `+${value}` : `${value}`)
 
-const OVERLAY_LABEL = { thirds: '3분할', golden: '황금비', diag: '대각선', none: '없음' }
-
 export const CropGeometrySection: FC = () => {
+    const { t } = useTranslation()
     const geometry = useEditStore((state) => state.state?.geometry)
     const crop = useEditStore((state) => state.state?.crop)
     const cropEditMode = useUiStore((state) => state.cropEditMode)
@@ -38,56 +38,56 @@ export const CropGeometrySection: FC = () => {
     )
 
     const rotate = (delta: number) =>
-        edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), { label: '회전' })
+        edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), { label: t('history.rotate') })
 
     return (
-        <Section id='crop' title='크롭 · 기하'>
+        <Section id='crop' title={t('panel.crop.title')}>
             <button
                 type='button'
                 onClick={toggleCropMode}
                 className={`rounded py-1.5 text-xs font-medium ${cropEditMode ? 'bg-neutral-200 text-neutral-900' : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'}`}>
-                {cropEditMode ? '크롭 완료 (C)' : '크롭 (C)'}
+                {cropEditMode ? t('panel.crop.done') : t('panel.crop.enter')}
             </button>
             <div className='flex items-center gap-2'>
                 <select
                     value={crop?.aspect ?? 'original'}
                     onChange={(event) => applyCropAspect(event.target.value)}
-                    aria-label='크롭 비율'
+                    aria-label={t('panel.crop.ratioAria')}
                     className='flex-1 rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-200 outline-none'>
                     {CROP_ASPECTS.map((aspect) => (
                         <option key={aspect} value={aspect}>
-                            {aspect === 'original' ? '원본' : aspect === 'free' ? '자유' : aspect}
+                            {aspect === 'original' ? t('panel.crop.original') : aspect === 'free' ? t('panel.crop.free') : aspect}
                         </option>
                     ))}
                 </select>
                 <button
                     type='button'
                     onClick={swapCropAspect}
-                    aria-label='가로세로 전환'
+                    aria-label={t('panel.crop.swapAria')}
                     className='rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700'>
                     ⇄
                 </button>
                 <button
                     type='button'
                     onClick={() => useUiStore.getState().cycleCropOverlay()}
-                    aria-label='오버레이 순환'
+                    aria-label={t('panel.crop.overlayAria')}
                     className='rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700'>
-                    {OVERLAY_LABEL[cropOverlay]}
+                    {t(`panel.crop.overlay.${cropOverlay}`)}
                 </button>
             </div>
             <div className='flex items-center gap-2'>
-                <span className='text-xs text-neutral-400'>회전</span>
+                <span className='text-xs text-neutral-400'>{t('panel.crop.rotate')}</span>
                 <button
                     type='button'
                     onClick={() => rotate(-1)}
-                    aria-label='왼쪽 90도'
+                    aria-label={t('panel.crop.rotateLeftAria')}
                     className='rounded bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700'>
                     ↺
                 </button>
                 <button
                     type='button'
                     onClick={() => rotate(1)}
-                    aria-label='오른쪽 90도'
+                    aria-label={t('panel.crop.rotateRightAria')}
                     className='rounded bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700'>
                     ↻
                 </button>
@@ -95,28 +95,28 @@ export const CropGeometrySection: FC = () => {
                     <input
                         type='checkbox'
                         checked={geometry.flipH}
-                        onChange={(event) => edit((draft) => void (draft.geometry.flipH = event.target.checked), { label: '좌우 반전' })}
+                        onChange={(event) => edit((draft) => void (draft.geometry.flipH = event.target.checked), { label: t('history.flipH') })}
                     />
-                    좌우
+                    {t('panel.crop.flipH')}
                 </label>
                 <label className='flex items-center gap-1 text-xs text-neutral-300'>
                     <input
                         type='checkbox'
                         checked={geometry.flipV}
-                        onChange={(event) => edit((draft) => void (draft.geometry.flipV = event.target.checked), { label: '상하 반전' })}
+                        onChange={(event) => edit((draft) => void (draft.geometry.flipV = event.target.checked), { label: t('history.flipV') })}
                     />
-                    상하
+                    {t('panel.crop.flipV')}
                 </label>
             </div>
-            {geoSlider('straighten', '수평 보정', -45, 45, 0.1, (value) => `${signed(value)}°`)}
-            <p className='mt-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>변형</p>
-            {geoSlider('perspectiveV', '수직 원근', -100, 100, 1, signed)}
-            {geoSlider('perspectiveH', '수평 원근', -100, 100, 1, signed)}
-            {geoSlider('perspectiveRotate', '회전', -100, 100, 1, signed)}
-            {geoSlider('aspectAdjust', '종횡비', -100, 100, 1, signed)}
-            {geoSlider('scale', '배율', 50, 200, 1)}
-            {geoSlider('offsetX', 'X 오프셋', -100, 100, 1, signed)}
-            {geoSlider('offsetY', 'Y 오프셋', -100, 100, 1, signed)}
+            {geoSlider('straighten', t('panel.crop.straighten'), -45, 45, 0.1, (value) => `${signed(value)}°`)}
+            <p className='mt-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>{t('panel.crop.transform')}</p>
+            {geoSlider('perspectiveV', t('panel.crop.perspectiveV'), -100, 100, 1, signed)}
+            {geoSlider('perspectiveH', t('panel.crop.perspectiveH'), -100, 100, 1, signed)}
+            {geoSlider('perspectiveRotate', t('panel.crop.perspectiveRotate'), -100, 100, 1, signed)}
+            {geoSlider('aspectAdjust', t('panel.crop.aspectAdjust'), -100, 100, 1, signed)}
+            {geoSlider('scale', t('panel.crop.scale'), 50, 200, 1)}
+            {geoSlider('offsetX', t('panel.crop.offsetX'), -100, 100, 1, signed)}
+            {geoSlider('offsetY', t('panel.crop.offsetY'), -100, 100, 1, signed)}
         </Section>
     )
 }

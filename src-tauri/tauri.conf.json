@@ -27,7 +27,49 @@
         "active": true,
         "targets": ["app", "dmg"],
         "externalBin": ["binaries/dnglab"],
+        "resources": ["resources/licenses-rust.html", "resources/licenses-npm.json", "resources/lensfun/*.xml"],
         "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+        "fileAssociations": [
+            {
+                "ext": [
+                    "cr2",
+                    "cr3",
+                    "arw",
+                    "sr2",
+                    "srf",
+                    "nef",
+                    "nrw",
+                    "raf",
+                    "dng",
+                    "orf",
+                    "rw2",
+                    "pef",
+                    "raw",
+                    "rwl",
+                    "3fr",
+                    "fff",
+                    "iiq",
+                    "erf",
+                    "mrw",
+                    "dcr",
+                    "kdc",
+                    "mos",
+                    "gpr"
+                ],
+                "name": "RAW Image",
+                "description": "Camera RAW Image",
+                "role": "Editor",
+                "rank": "Alternate",
+                "mimeType": "image/x-dcraw"
+            },
+            {
+                "ext": ["jpg", "jpeg", "png", "webp", "tif", "tiff", "bmp", "gif", "avif", "heic", "heif"],
+                "name": "Image",
+                "description": "Image File",
+                "role": "Viewer",
+                "rank": "Alternate"
+            }
+        ],
         "macOS": {
             "minimumSystemVersion": "13.0"
         }

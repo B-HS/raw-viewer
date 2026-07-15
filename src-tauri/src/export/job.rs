@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use half::f16;
+use image::RgbaImage;
 
 use crate::error::{AppError, AppResult};
 use crate::types_export::RasterExportRequest;
@@ -16,6 +17,7 @@ pub struct ExportJob {
     pub canvas: Vec<f16>,
     pub tiles_received: u32,
     pub cancel: Arc<AtomicBool>,
+    pub watermark: Option<RgbaImage>,
 }
 
 impl ExportJob {
@@ -41,6 +43,7 @@ impl ExportJob {
             canvas: vec![f16::ZERO; components],
             tiles_received: 0,
             cancel: Arc::new(AtomicBool::new(false)),
+            watermark: None,
         })
     }
 
@@ -102,6 +105,14 @@ impl ExportService {
             return Err(AppError::Internal("export cancelled".to_owned()));
         }
         job.ingest(x, y, tile_width, tile_height, rgba_le)
+    }
+
+    pub fn set_watermark(&self, job_id: &str, png: &[u8]) -> AppResult<()> {
+        let image = crate::export::watermark::decode(png)?;
+        let mut guard = self.jobs.lock().unwrap_or_else(PoisonError::into_inner);
+        let job = guard.get_mut(job_id).ok_or_else(|| AppError::Internal(format!("unknown export job: {job_id}")))?;
+        job.watermark = Some(image);
+        Ok(())
     }
 
     pub fn take(&self, job_id: &str) -> Option<ExportJob> {

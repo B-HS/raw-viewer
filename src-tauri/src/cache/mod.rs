@@ -27,8 +27,11 @@ pub struct DiskCache {
     root: PathBuf,
 }
 
+pub const CACHE_SCHEMA_VERSION: u32 = 2;
+
 pub fn derive_key(path_bytes: &[u8], mtime_nanos: u128, size: u64) -> String {
     let mut hasher = blake3::Hasher::new();
+    hasher.update(&CACHE_SCHEMA_VERSION.to_le_bytes());
     hasher.update(path_bytes);
     hasher.update(&mtime_nanos.to_le_bytes());
     hasher.update(&size.to_le_bytes());

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { HSL_BANDS } from '../../store/editDefaults'
 import { useEditStore } from '../../store/editStore'
+import { useUiStore } from '../../store/uiStore'
 import type { HslAdjust } from '../../types/HslAdjust'
 import type { HslBand } from '../../types/HslBand'
 import { Section } from './Section'
@@ -18,29 +20,26 @@ const BAND_COLOR: Record<HslBand, string> = {
     magenta: '#c76bd0',
 }
 
-const BAND_LABEL: Record<HslBand, string> = {
-    red: '빨강',
-    orange: '주황',
-    yellow: '노랑',
-    green: '초록',
-    aqua: '청록',
-    blue: '파랑',
-    purple: '보라',
-    magenta: '자홍',
-}
-
 const signed = (value: number) => (value > 0 ? `+${value}` : `${value}`)
 
 const ZERO: HslAdjust = { hue: 0, sat: 0, lum: 0 }
 
 export const HslSection: FC = () => {
+    const { t } = useTranslation()
     const [band, setBand] = useState<HslBand>('red')
     const hsl = useEditStore((state) => state.state?.color.hsl)
     const bw = useEditStore((state) => state.state?.color.bw)
     const edit = useEditStore((state) => state.edit)
+    const tatActive = useUiStore((state) => state.tatActive)
+    const tatBand = useUiStore((state) => state.tatBand)
+
+    useEffect(() => {
+        if (tatBand) setBand(tatBand)
+    }, [tatBand])
 
     if (!hsl || bw === undefined) return null
 
+    const bandLabel = (item: HslBand) => t(`panel.hsl.band.${item}`)
     const adjust = hsl[band] ?? ZERO
 
     const setChannel = (channel: keyof HslAdjust, label: string) => (value: number) =>
@@ -50,7 +49,7 @@ export const HslSection: FC = () => {
                 current[channel] = value
                 draft.color.hsl[band] = current
             },
-            { coalesceKey: `hsl.${band}.${channel}`, label: `${BAND_LABEL[band]} ${label}` },
+            { coalesceKey: `hsl.${band}.${channel}`, label: t('history.bandChannel', { band: bandLabel(band), channel: label }) },
         )
 
     const channelSlider = (channel: keyof HslAdjust, label: string) => (
@@ -71,16 +70,26 @@ export const HslSection: FC = () => {
     return (
         <Section
             id='hsl'
-            title='HSL / 컬러'
+            title={t('panel.hsl.title')}
             right={
-                <label className='flex items-center gap-1 text-[10px] text-neutral-400'>
-                    <input
-                        type='checkbox'
-                        checked={bw}
-                        onChange={(event) => edit((draft) => void (draft.color.bw = event.target.checked), { label: '흑백 변환' })}
-                    />
-                    흑백
-                </label>
+                <div className='flex items-center gap-2'>
+                    <button
+                        type='button'
+                        onClick={() => useUiStore.getState().toggleTat()}
+                        aria-pressed={tatActive}
+                        title={t('panel.hsl.tatHint')}
+                        className={`rounded px-1.5 py-0.5 text-[10px] ${tatActive ? 'bg-white text-black' : 'bg-neutral-800 text-neutral-300 hover:text-neutral-100'}`}>
+                        {t('panel.hsl.tat')}
+                    </button>
+                    <label className='flex items-center gap-1 text-[10px] text-neutral-400'>
+                        <input
+                            type='checkbox'
+                            checked={bw}
+                            onChange={(event) => edit((draft) => void (draft.color.bw = event.target.checked), { label: t('history.bwConvert') })}
+                        />
+                        {t('panel.hsl.bw')}
+                    </label>
+                </div>
             }>
             <div className='flex justify-between gap-1'>
                 {HSL_BANDS.map((item) => (
@@ -88,24 +97,25 @@ export const HslSection: FC = () => {
                         key={item}
                         type='button'
                         onClick={() => setBand(item)}
-                        aria-label={BAND_LABEL[item]}
+                        aria-label={bandLabel(item)}
                         aria-pressed={band === item}
                         className={`h-6 flex-1 rounded ${band === item ? 'ring-2 ring-white' : 'ring-1 ring-neutral-700'}`}
                         style={{ backgroundColor: BAND_COLOR[item] }}
                     />
                 ))}
             </div>
-            <p className='text-xs font-medium text-neutral-300'>{BAND_LABEL[band]}</p>
+            <p className='text-xs font-medium text-neutral-300'>{bandLabel(band)}</p>
+            {tatActive && <p className='text-[10px] text-sky-300'>{t('panel.hsl.tatActive')}</p>}
             {bw ? (
                 <>
-                    <p className='text-[10px] text-neutral-500'>흑백 믹서: 밴드별 휘도만 조정합니다</p>
-                    {channelSlider('lum', '휘도')}
+                    <p className='text-[10px] text-neutral-500'>{t('panel.hsl.bwMixerHint')}</p>
+                    {channelSlider('lum', t('panel.hsl.lum'))}
                 </>
             ) : (
                 <>
-                    {channelSlider('hue', '색상')}
-                    {channelSlider('sat', '채도')}
-                    {channelSlider('lum', '휘도')}
+                    {channelSlider('hue', t('panel.hsl.hue'))}
+                    {channelSlider('sat', t('panel.hsl.sat'))}
+                    {channelSlider('lum', t('panel.hsl.lum'))}
                 </>
             )}
         </Section>

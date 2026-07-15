@@ -1,4 +1,5 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
+import type { CpuFrameReadyPayload } from '../types/CpuFrameReadyPayload'
 import type { EditState } from '../types/EditState'
 import type { EditStateEnvelope } from '../types/EditStateEnvelope'
 import type { OpenResult } from '../types/OpenResult'
@@ -26,6 +27,8 @@ export const setEditStateCommand = (imageId: string, state: EditState, editVersi
 export const resetEditState = (imageId: string) => invoke<EditStateEnvelope>('reset_edit_state', { imageId })
 
 export const flushEdits = () => invoke<void>('flush_edits')
+
+export const renderCpuFrame = (imageId: string, maxEdge: number) => invoke<CpuFrameReadyPayload>('render_cpu_frame', { imageId, maxEdge })
 
 export const isConflictError = (error: unknown) =>
     typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'conflict'

@@ -1,5 +1,6 @@
 use std::env;
 use std::path::PathBuf;
+use std::process::Command;
 
 const LIBRAW_SOURCES: &[&str] = &[
     "src/decoders/canon_600.cpp",
@@ -79,8 +80,54 @@ const LIBRAW_SOURCES: &[&str] = &[
     "src/x3f/x3f_utils_patched.cpp",
 ];
 
+fn libomp_prefix() -> Option<PathBuf> {
+    println!("cargo:rerun-if-env-changed=LIBOMP_PREFIX");
+    if let Some(explicit) = env::var_os("LIBOMP_PREFIX") {
+        let path = PathBuf::from(explicit);
+        if path.join("include").join("omp.h").is_file() {
+            return Some(path);
+        }
+    }
+    if let Ok(output) = Command::new("brew").args(["--prefix", "libomp"]).output() {
+        if output.status.success() {
+            let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+            if path.join("include").join("omp.h").is_file() {
+                return Some(path);
+            }
+        }
+    }
+    ["/opt/homebrew/opt/libomp", "/usr/local/opt/libomp"]
+        .into_iter()
+        .map(PathBuf::from)
+        .find(|path| path.join("include").join("omp.h").is_file())
+}
+
+fn enable_openmp(build: &mut cc::Build) {
+    let Some(prefix) = libomp_prefix() else {
+        println!("cargo:warning=libomp not found (set LIBOMP_PREFIX or run `brew install libomp`); building LibRaw WITHOUT OpenMP - X-Trans/demosaic stays single-threaded");
+        return;
+    };
+    let lib = prefix.join("lib");
+    build
+        .flag("-Xpreprocessor")
+        .flag("-fopenmp")
+        .include(prefix.join("include"))
+        .define("LIBRAW_FORCE_OPENMP", None);
+    println!("cargo:rustc-cfg=openmp");
+    println!("cargo:rustc-link-search=native={}", lib.display());
+    if lib.join("libomp.a").is_file() {
+        println!("cargo:rustc-link-lib=static=omp");
+        println!("cargo:warning=LibRaw OpenMP enabled (static libomp.a from {})", prefix.display());
+    } else {
+        // SPEC-GAP: static libomp.a absent at {prefix}/lib so linking dynamic libomp.dylib; the .app is then NOT self-contained - libomp.dylib must ship in the bundle (tauri.conf.json bundle.resources) and the load path fixed (install_name_tool -change {abs dylib} @rpath/libomp.dylib on the binary + a @loader_path rpath), else launch fails on machines without Homebrew libomp.
+        println!("cargo:rustc-link-lib=dylib=omp");
+        println!("cargo:warning=LibRaw OpenMP enabled with DYNAMIC libomp.dylib (no static archive found) - it MUST be bundled in the .app; see build.rs SPEC-GAP");
+    }
+}
+
 fn main() {
     tauri_build::build();
+    println!("cargo:rustc-check-cfg=cfg(openmp)");
 
     if env::var_os("CARGO_FEATURE_LIBRAW").is_none() {
         return;
@@ -97,8 +144,9 @@ fn main() {
         .flag_if_supported("-w")
         .include(&vendor)
         .define("USE_ZLIB", "1")
-        .define("USE_X3FTOOLS", "1")
-        .define("LIBRAW_NOTHREADS", None::<&str>);
+        .define("USE_X3FTOOLS", "1");
+
+    enable_openmp(&mut build);
 
     for source in LIBRAW_SOURCES {
         build.file(vendor.join(source));

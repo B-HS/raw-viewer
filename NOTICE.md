@@ -11,11 +11,14 @@ raw-viewer 본체는 **MIT 라이선스**로 배포된다. 아래는 번들되�
 - **조건:** ① 소스 무수정, ② 특정 파일을 수정하는 경우 그 파일만 CDDL‑1.0으로 공개, ③ 저작권 표시 유지.
 - **GPL demosaic‑pack(AMaZE·AFD·VCD·LMMSE 등)은 링크하지 않는다** (R4). 베이스 LibRaw 내장 알고리즘(AHD/DCB/DHT, X‑Trans용 Markesteijn)만 사용한다. 시스템 패키지(Homebrew/apt)의 libraw 대신 벤더 소스를 직접 빌드해 GPL pack 혼입을 차단한다.
 
-## Lensfun 렌즈 데이터베이스 — 아직 번들되지 않음
+## Lensfun 렌즈 데이터베이스 — 번들됨 (v0.3.95)
 
 - **라이선스: CC‑BY‑SA‑3.0** (XML 데이터베이스).
-- Lensfun **C 라이브러리(LGPL‑3)는 링크하지 않는다.** XML DB만 읽고 보정 수식은 자체 구현한다. (PRD §FR‑8)
-- 번들 시 다음을 추가한다: 앱 "정보 > 라이선스" 화면과 본 NOTICE에 **저작자 표시** — `Lens profiles from the Lensfun project (CC BY-SA 3.0)`. DB를 수정해 배포하면 **동일 조건(ShareAlike)** 으로 공개한다.
+- **저작자 표시:** **Lens profiles from the Lensfun project (CC BY-SA 3.0).** 앱 "정보 > 라이선스" 화면과 본 NOTICE에 표기한다.
+- Lensfun **C 라이브러리(LGPL‑3)는 링크하지 않는다.** XML DB만 읽고(quick‑xml) 보정 수식(왜곡/TCA/비네팅)은 `src-tauri/src/lens/`에서 자체 구현한다. (PRD §FR‑8, 절대 규칙 R4)
+- **번들 데이터:** lensfun 공식 저장소(https://github.com/lensfun/lensfun) 태그 **v0.3.95**의 `data/db/*.xml`(53개 프로파일)을 `src-tauri/resources/lensfun/`에 무수정으로 번들한다. `tauri.conf.json`의 `bundle.resources`에 `resources/lensfun/*.xml`로 등록.
+- **재현·업데이트:** 버전·sha256을 `src-tauri/lensfun.pin`에 고정하고 `scripts/sync-lensfun.sh`로 재현·업데이트한다(pin + 스크립트이 재현 가능한 소스). 아카이브 sha256 검증 포함. `resources/lensfun/`는 `.gitignore` 처리(생성물).
+- **조건(ShareAlike):** DB를 **수정해 배포하면 동일 조건(CC‑BY‑SA‑3.0)** 으로 공개한다. 현재는 무수정 번들이라 추가 의무 없음.
 
 ## OpenStreetMap 타일 — 아직 번들되지 않음
 

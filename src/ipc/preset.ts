@@ -11,3 +11,7 @@ export const applyPreset = (presetId: string, targets: string[]) => invoke<void>
 export const deletePreset = (presetId: string) => invoke<void>('delete_preset', { presetId })
 
 export const copySettings = (from: string, to: string[], mask: string[]) => invoke<void>('copy_settings', { from, to, mask })
+
+export const exportPreset = (presetId: string, path: string) => invoke<void>('export_preset', { presetId, path })
+
+export const importPreset = (path: string) => invoke<PresetInfo>('import_preset', { path })

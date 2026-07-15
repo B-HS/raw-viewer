@@ -1,11 +1,43 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::AppResult;
+use crate::types_platform::OpenRequestPayload;
 
 #[cfg(target_os = "macos")]
 pub mod macos;
+
+#[cfg(target_os = "macos")]
+pub mod commands;
+pub mod open_queue;
+pub mod recents;
+
+pub use open_queue::OpenQueue;
+pub use recents::RecentsService;
+
+pub fn handle_open(app: &AppHandle, path: PathBuf) {
+    match app.state::<OpenQueue>().accept(path) {
+        Some(ready) => emit_open(app, ready),
+        None => focus_window(app),
+    }
+}
+
+fn emit_open(app: &AppHandle, path: PathBuf) {
+    focus_window(app);
+    if let Err(error) = app.emit("file:open-request", OpenRequestPayload { path }) {
+        tracing::warn!(%error, "emit file:open-request failed");
+    }
+}
+
+fn focus_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecentItem {
