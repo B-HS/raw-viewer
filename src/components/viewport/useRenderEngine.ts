@@ -4,12 +4,14 @@ import { Renderer } from '../../gl/renderer'
 import { buildModelMatrix, clampPan, DEFAULT_VIEW, toggleFit, zoomAboutCursor, zoomTo } from '../../gl/viewTransform'
 import type { EngineApi } from '../../gl/engineApi'
 import type { ViewState } from '../../gl/viewTransform'
+import { getDisplayLut } from '../../ipc/display'
 import { onDecodeFailed, onLevelReady } from '../../ipc/events'
 import { fetchPixels } from '../../ipc/pixels'
 import { isEditableTarget, KEYMAP } from '../../shortcuts/keymap'
 import { useHistogram } from '../../store/histogramStore'
 import { LEVEL_RANK, neighbors, usePlaylist, WINDOW_RADIUS } from '../../store/playlist'
 import { useSamplerPins } from '../../store/samplerPins'
+import { useSettings } from '../../store/settings'
 import { useUiStore } from '../../store/uiStore'
 import { onZoomCommand } from '../../store/viewportCommand'
 import { useViewportProjection } from '../../store/viewportProjection'
@@ -132,6 +134,20 @@ export const useRenderEngine = () => {
         setCaps({ lowPrecision: renderer.lowPrecision, displaySpace: renderer.displaySpace })
         renderer.resize()
         scheduleRender()
+
+        renderer.setUseMonitorProfile(useSettings.getState().useMonitorProfile)
+        getDisplayLut()
+            .then((lut) => {
+                if (!lut || rendererRef.current !== renderer) return
+                renderer.setDisplayLut(lut.size, lut.data)
+                scheduleRender()
+            })
+            .catch(() => undefined)
+        const unsubMonitor = useSettings.subscribe((state, previous) => {
+            if (state.useMonitorProfile === previous.useMonitorProfile) return
+            renderer.setUseMonitorProfile(state.useMonitorProfile)
+            scheduleRender()
+        })
 
         const observer = new ResizeObserver(() => {
             renderer.resize()
@@ -281,6 +297,7 @@ export const useRenderEngine = () => {
         return () => {
             observer.disconnect()
             unsubZoom()
+            unsubMonitor()
             canvas.removeEventListener('wheel', onWheel)
             canvas.removeEventListener('pointerdown', onPointerDown)
             canvas.removeEventListener('pointermove', onPointerMove)

@@ -89,15 +89,17 @@ enum DecodeOutcome {
 }
 
 #[derive(Default)]
-struct NavState {
+struct WindowNav {
     last: Option<Instant>,
+    desired: HashSet<String>,
 }
 
-struct IdleState {
-    generation: u64,
+struct IdleEntry {
     deadline: Instant,
     fired: bool,
-    window: Option<(String, Vec<String>, Vec<String>)>,
+    current: String,
+    prev: Vec<String>,
+    next: Vec<String>,
 }
 
 #[derive(Default)]
@@ -139,8 +141,8 @@ struct Shared {
     meta: Mutex<HashMap<(String, ProxyLevel), LevelMeta>>,
     active: Mutex<HashMap<String, CancelFlag>>,
     pending: PendingSet,
-    nav: Mutex<NavState>,
-    idle: (Mutex<IdleState>, Condvar),
+    nav: Mutex<HashMap<String, WindowNav>>,
+    idle: (Mutex<HashMap<String, IdleEntry>>, Condvar),
     shutdown: AtomicBool,
     settings: RwLock<PerfSettings>,
     crash_count: AtomicU32,
@@ -159,16 +161,8 @@ impl Pipeline {
             meta: Mutex::new(HashMap::new()),
             active: Mutex::new(HashMap::new()),
             pending: PendingSet::default(),
-            nav: Mutex::new(NavState::default()),
-            idle: (
-                Mutex::new(IdleState {
-                    generation: 0,
-                    deadline: Instant::now(),
-                    fired: true,
-                    window: None,
-                }),
-                Condvar::new(),
-            ),
+            nav: Mutex::new(HashMap::new()),
+            idle: (Mutex::new(HashMap::new()), Condvar::new()),
             shutdown: AtomicBool::new(false),
             settings: RwLock::new(PerfSettings::default()),
             crash_count: AtomicU32::new(0),
@@ -186,8 +180,12 @@ impl Pipeline {
         Self { shared }
     }
 
-    pub fn navigate(&self, current: String, prev: Vec<String>, next: Vec<String>) {
-        self.shared.navigate(current, prev, next);
+    pub fn navigate(&self, label: &str, current: String, prev: Vec<String>, next: Vec<String>) {
+        self.shared.navigate(label, current, prev, next);
+    }
+
+    pub fn forget_window(&self, label: &str) {
+        self.shared.forget_window(label);
     }
 
     pub fn set_settings(&self, settings: PerfSettings) {
@@ -215,6 +213,16 @@ fn worker_count() -> usize {
     // SPEC-GAP: contract asks for physical_cores-1; std has no physical-core count without an extra crate, so available_parallelism (logical) is used as a proxy. Exact on Apple Silicon (no SMT).
     let logical = std::thread::available_parallelism().map(|value| value.get()).unwrap_or(4);
     logical.saturating_sub(1).max(2)
+}
+
+fn union_desired(nav: &HashMap<String, WindowNav>) -> HashSet<String> {
+    let mut union: HashSet<String> = HashSet::new();
+    for window_nav in nav.values() {
+        for id in &window_nav.desired {
+            union.insert(id.clone());
+        }
+    }
+    union
 }
 
 fn neighbor_jobs(prev: &[String], next: &[String], out: &mut Vec<(u32, String, ProxyLevel)>) {
@@ -256,27 +264,29 @@ fn should_suppress_idle_l2(policy: L2Policy) -> bool {
 }
 
 impl Shared {
-    fn navigate(&self, current: String, mut prev: Vec<String>, mut next: Vec<String>) {
+    fn navigate(&self, label: &str, current: String, mut prev: Vec<String>, mut next: Vec<String>) {
         let settings = *self.settings.read().unwrap_or_else(PoisonError::into_inner);
         let radius = settings.preload_radius as usize;
         prev.truncate(radius);
         next.truncate(radius);
 
+        let mut desired: HashSet<String> = HashSet::new();
+        desired.insert(current.clone());
+        for id in prev.iter().chain(next.iter()) {
+            desired.insert(id.clone());
+        }
+
         let now = Instant::now();
-        let rapid = {
+        let (rapid, union) = {
             let mut nav = self.nav.lock().unwrap_or_else(PoisonError::into_inner);
-            let rapid = nav.last.is_some_and(|last| now.duration_since(last) < RAPID_WINDOW);
-            nav.last = Some(now);
-            rapid
+            let entry = nav.entry(label.to_owned()).or_default();
+            let rapid = entry.last.is_some_and(|last| now.duration_since(last) < RAPID_WINDOW);
+            entry.last = Some(now);
+            entry.desired = desired;
+            (rapid, union_desired(&nav))
         };
         self.services.store.set_current(Some(current.clone()));
-
-        let mut window: HashSet<String> = HashSet::new();
-        window.insert(current.clone());
-        for id in prev.iter().chain(next.iter()) {
-            window.insert(id.clone());
-        }
-        self.cancel_outside(&window);
+        self.cancel_outside(&union);
 
         for (priority, id, level) in plan_jobs(&current, &prev, &next, rapid) {
             if id == current {
@@ -288,17 +298,33 @@ impl Shared {
         if should_auto_l2_on_navigate(settings.l2_policy, rapid) {
             self.enqueue_current(&current, ProxyLevel::L2, PRIO_CURRENT_L2);
         }
-        self.arm_idle(current, prev, next);
+        self.arm_idle(label, current, prev, next);
     }
 
-    fn arm_idle(&self, current: String, prev: Vec<String>, next: Vec<String>) {
+    fn forget_window(&self, label: &str) {
+        let union = {
+            let mut nav = self.nav.lock().unwrap_or_else(PoisonError::into_inner);
+            nav.remove(label);
+            union_desired(&nav)
+        };
+        self.idle.0.lock().unwrap_or_else(PoisonError::into_inner).remove(label);
+        self.cancel_outside(&union);
+    }
+
+    fn arm_idle(&self, label: &str, current: String, prev: Vec<String>, next: Vec<String>) {
         let (lock, cvar) = &self.idle;
         {
             let mut idle = lock.lock().unwrap_or_else(PoisonError::into_inner);
-            idle.generation += 1;
-            idle.deadline = Instant::now() + IDLE_DELAY;
-            idle.fired = false;
-            idle.window = Some((current, prev, next));
+            idle.insert(
+                label.to_owned(),
+                IdleEntry {
+                    deadline: Instant::now() + IDLE_DELAY,
+                    fired: false,
+                    current,
+                    prev,
+                    next,
+                },
+            );
         }
         cvar.notify_all();
     }
@@ -530,12 +556,24 @@ fn run_timer(shared: Arc<Shared>) {
         }
         let mut idle = lock.lock().unwrap_or_else(PoisonError::into_inner);
         let now = Instant::now();
-        if !idle.fired && idle.window.is_some() && now >= idle.deadline {
-            idle.fired = true;
-            let window = idle.window.clone();
+        let mut due: Vec<(String, Vec<String>, Vec<String>)> = Vec::new();
+        let mut next_wake: Option<Duration> = None;
+        for entry in idle.values_mut() {
+            if entry.fired {
+                continue;
+            }
+            if now >= entry.deadline {
+                entry.fired = true;
+                due.push((entry.current.clone(), entry.prev.clone(), entry.next.clone()));
+            } else {
+                let remaining = entry.deadline.saturating_duration_since(now);
+                next_wake = Some(next_wake.map_or(remaining, |value| value.min(remaining)));
+            }
+        }
+        if !due.is_empty() {
             drop(idle);
-            if let Some((current, prev, next)) = window {
-                let policy = shared.settings.read().unwrap_or_else(PoisonError::into_inner).l2_policy;
+            let policy = shared.settings.read().unwrap_or_else(PoisonError::into_inner).l2_policy;
+            for (current, prev, next) in due {
                 for (priority, id, level) in plan_idle(&current, &prev, &next) {
                     if id == current && level == ProxyLevel::L2 && should_suppress_idle_l2(policy) {
                         continue;
@@ -549,12 +587,8 @@ fn run_timer(shared: Arc<Shared>) {
             }
             continue;
         }
-        if !idle.fired && idle.window.is_some() {
-            let wait = idle.deadline.saturating_duration_since(now);
-            let _ = cvar.wait_timeout(idle, wait);
-        } else {
-            let _ = cvar.wait_timeout(idle, TIMER_POLL);
-        }
+        let wait = next_wake.unwrap_or(TIMER_POLL);
+        let _ = cvar.wait_timeout(idle, wait);
     }
 }
 
@@ -741,6 +775,29 @@ mod tests {
 
     fn flag() -> CancelFlag {
         Arc::new(AtomicBool::new(false))
+    }
+
+    fn desired(ids: &[&str]) -> WindowNav {
+        WindowNav {
+            last: None,
+            desired: ids.iter().map(|value| (*value).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn union_desired_merges_windows_and_shrinks_on_removal() {
+        let mut nav: HashMap<String, WindowNav> = HashMap::new();
+        nav.insert("main".to_owned(), desired(&["a", "b"]));
+        nav.insert("window-1".to_owned(), desired(&["b", "c"]));
+        let union = union_desired(&nav);
+        assert!(union.contains("a") && union.contains("b") && union.contains("c"));
+        assert_eq!(union.len(), 3);
+        nav.remove("window-1");
+        let shrunk = union_desired(&nav);
+        assert!(shrunk.contains("a") && shrunk.contains("b"));
+        assert!(!shrunk.contains("c"));
+        nav.remove("main");
+        assert!(union_desired(&nav).is_empty());
     }
 
     #[test]

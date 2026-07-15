@@ -3,6 +3,7 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { openInNewWindow } from '../ipc/commands'
 import { copyFilesToClipboard, openWithExternal } from '../ipc/platform'
 import { smartCopyCurrent } from '../lib/smartCopy'
 import { confirmAndTrash } from '../lib/trash'
@@ -67,6 +68,9 @@ export const ContextMenu: FC = () => {
     }
     const reveal = () => {
         if (entry) revealItemInDir(entry.path).catch(() => undefined)
+    }
+    const openInNew = () => {
+        if (entry) openInNewWindow(entry.path).catch(() => undefined)
     }
     const copyEdit = () => useEditClipboard.getState().copy()
     const pasteEdit = () => useEditClipboard.getState().pasteTo(imageIds)
@@ -142,6 +146,7 @@ export const ContextMenu: FC = () => {
                 <MenuItem onClick={() => run(reveal)} shortcut='⌘⇧R'>
                     {t('menu.reveal')}
                 </MenuItem>
+                <MenuItem onClick={() => run(openInNew)}>{t('menu.openInNewWindow')}</MenuItem>
                 <div className='relative' onMouseEnter={() => setSub('openWith')} onMouseLeave={() => setSub(null)}>
                     <div className='flex items-center justify-between px-3 py-1 hover:bg-neutral-800'>
                         <span>{t('menu.openWith')}</span>

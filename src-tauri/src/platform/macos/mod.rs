@@ -169,7 +169,18 @@ impl Platform for MacOsPlatform {
     }
 
     fn display_icc_profile(&self) -> AppResult<Option<Vec<u8>>> {
-        Err(AppError::NotSupportedOnPlatform)
+        on_main(&self.app, move |mtm| {
+            let Some(screen) = NSScreen::mainScreen(mtm) else {
+                return Ok(None);
+            };
+            let Some(space) = screen.colorSpace() else {
+                return Ok(None);
+            };
+            match space.ICCProfileData() {
+                Some(data) => Ok(Some(data.to_vec())),
+                None => Ok(None),
+            }
+        })
     }
 
     fn create_bookmark(&self, _path: &Path) -> AppResult<Vec<u8>> {

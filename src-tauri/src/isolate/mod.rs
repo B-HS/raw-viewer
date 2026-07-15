@@ -276,6 +276,7 @@ mod tests {
 
     #[cfg(feature = "libraw")]
     #[test]
+    #[ignore = "slow isolated-decode roundtrip (real LibRaw decode); run in acceptance via `cargo test --release isolate::tests -- --ignored`"]
     fn child_write_then_parent_read_roundtrips() -> Result<(), crate::decode::DecodeError> {
         use std::sync::atomic::AtomicBool;
         use std::sync::Arc;
@@ -305,6 +306,7 @@ mod tests {
 
     #[cfg(feature = "libraw")]
     #[test]
+    #[ignore = "slow isolated-decode subprocess roundtrip (spawns child process + real LibRaw decode); run in acceptance via `cargo test --release isolate::tests -- --ignored`"]
     fn subprocess_roundtrip_matches_in_process() -> Result<(), crate::decode::DecodeError> {
         use std::sync::atomic::AtomicBool;
         use std::sync::Arc;

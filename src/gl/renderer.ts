@@ -93,6 +93,10 @@ export class Renderer {
     private baseLutStandard!: WebGLTexture
     private toneLut!: WebGLTexture
     private toneLutIdentity!: WebGLTexture
+    private displayLut!: WebGLTexture
+    private lutSize = 0
+    private lutData: Float32Array | null = null
+    private useMonitorProfile = false
 
     private images = new Map<string, GpuImage>()
     private current: string | null = null
@@ -196,6 +200,9 @@ export class Renderer {
             'uSrgbToDisplay',
             'uClipMode',
             'uHasBase',
+            'uUseLut',
+            'uLut',
+            'uLutSize',
             'uSplit',
             'uCropMode',
             'uCrop',
@@ -222,6 +229,24 @@ export class Renderer {
         this.baseLutStandard = this.createCurveTexture(buildBaseCurveLut(256, 'standard'))
         this.toneLut = this.createToneTexture(buildToneCurveLut(NEUTRAL_EDIT_STATE.curves))
         this.toneLutIdentity = this.createToneTexture(buildToneCurveLut(NEUTRAL_EDIT_STATE.curves))
+        this.displayLut = this.createLutTexture(this.lutData, this.lutSize)
+    }
+
+    private createLutTexture(data: Float32Array | null, size: number) {
+        const gl = this.gl
+        const texture = gl.createTexture()
+        if (!texture) throw new Error('gl lut alloc failed')
+        gl.bindTexture(gl.TEXTURE_2D, texture)
+        if (data && size > 1) {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, size * size, size, 0, gl.RGB, gl.FLOAT, data)
+        } else {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array([0, 0, 0]))
+        }
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        return texture
     }
 
     private createCurveTexture(data: Uint8Array) {
@@ -886,6 +911,11 @@ export class Renderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter)
         gl.uniform1i(this.pass8.u.uBaseTex, 1)
+        gl.activeTexture(gl.TEXTURE2)
+        gl.bindTexture(gl.TEXTURE_2D, this.displayLut)
+        gl.uniform1i(this.pass8.u.uLut, 2)
+        gl.uniform1i(this.pass8.u.uUseLut, this.useMonitorProfile && this.lutSize > 0 && image.kind !== 'l0' ? 1 : 0)
+        gl.uniform1f(this.pass8.u.uLutSize, Math.max(this.lutSize, 2))
         gl.uniformMatrix3fv(this.pass8.u.uModel, false, model)
         gl.uniform1i(this.pass8.u.uSourceKind, image.kind === 'l0' ? 1 : 0)
         gl.uniform1i(this.pass8.u.uDisplayP3, this.displaySpace === 'display-p3' ? 1 : 0)
@@ -935,6 +965,11 @@ export class Renderer {
         gl.uniform2f(this.pass8.u.uCanvas, cw, ch)
         gl.uniform1i(this.pass8.u.uTex, 0)
         gl.uniform1i(this.pass8.u.uBaseTex, 0)
+        gl.activeTexture(gl.TEXTURE2)
+        gl.bindTexture(gl.TEXTURE_2D, this.displayLut)
+        gl.uniform1i(this.pass8.u.uLut, 2)
+        gl.uniform1i(this.pass8.u.uUseLut, this.useMonitorProfile && this.lutSize > 0 ? 1 : 0)
+        gl.uniform1f(this.pass8.u.uLutSize, Math.max(this.lutSize, 2))
         this.drawComparePane(baseTex, filter, 0, halfW, ch)
         this.drawComparePane(procTex, filter, halfW, cw - halfW, ch)
     }
@@ -1001,6 +1036,21 @@ export class Renderer {
         return { r: r / count, g: g / count, b: bl / count }
     }
 
+    setDisplayLut(size: number, data: Float32Array | null) {
+        this.gl.deleteTexture(this.displayLut)
+        this.lutData = data && size > 1 ? data : null
+        this.lutSize = this.lutData ? size : 0
+        this.displayLut = this.createLutTexture(this.lutData, this.lutSize)
+    }
+
+    setUseMonitorProfile(on: boolean) {
+        this.useMonitorProfile = on
+    }
+
+    hasDisplayLut() {
+        return this.lutSize > 0
+    }
+
     reinit() {
         this.images.clear()
         this.current = null
@@ -1028,6 +1078,7 @@ export class Renderer {
         gl.deleteTexture(this.baseLutStandard)
         gl.deleteTexture(this.toneLut)
         gl.deleteTexture(this.toneLutIdentity)
+        gl.deleteTexture(this.displayLut)
         gl.deleteBuffer(this.quadBuffer)
         gl.deleteVertexArray(this.vao)
         for (const info of [
