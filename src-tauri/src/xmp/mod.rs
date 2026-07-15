@@ -112,6 +112,32 @@ pub fn to_xmp_string(image_path: &Path, state: &EditState, organize: &OrganizeFi
     ))
 }
 
+pub fn to_preset_xmp_string(state: &EditState) -> AppResult<String> {
+    let encoded = encode_state(state)?;
+    let crs = crs_attributes(state);
+    Ok(format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="AetherLens">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+    xmlns:aether="http://ns.aetherlens.app/1.0/"
+    crs:Version="15.0"
+    crs:ProcessVersion="11.0"
+    crs:HasSettings="True"
+{crs}    aether:version="2"
+    aether:engine="rec2020-linear"
+    aether:state="{encoded}">
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+"#,
+        crs = crs,
+        encoded = encoded,
+    ))
+}
+
 fn organize_attributes(organize: &OrganizeFields) -> String {
     let mut lines = String::new();
     if organize.rating > 0 {

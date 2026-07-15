@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import { i18n } from '../i18n'
 import { useToast } from './toast'
+import { useLens } from './lens'
 import { LEVEL_RANK, usePlaylist } from './playlist'
 import { useEditStore } from './editStore'
 import { getEditState, navigate } from '../ipc/commands'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { exportBegin, exportCancel, exportDng, exportFinish, exportTile } from '../ipc/export'
+import { openWithEdited } from '../ipc/platform'
 import { onLevelReady } from '../ipc/events'
 import { fetchPixels } from '../ipc/pixels'
 import { createExportEngine } from '../gl/exportRenderer'
@@ -190,6 +192,7 @@ type ExportStoreState = {
     start: () => Promise<void>
     cancel: () => void
     runDng: (imageId: string, name: string, entry: ImageEntry | undefined) => Promise<void>
+    runEditedHandoff: (imageId: string, name: string, entry: ImageEntry | undefined, appPath: string) => Promise<void>
     dismissDng: () => void
     dngToTiff: () => void
 }
@@ -278,7 +281,8 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                         continue
                     }
                     if (resolved.level !== 'l2') set({ warning: i18n.t('export.warnL1') })
-                    const job = engine.prepare(resolved.source, envelope.state)
+                    const lensProfile = await useLens.getState().resolve(imageId)
+                    const job = engine.prepare(resolved.source, envelope.state, lensProfile)
                     if (job.downscaled) set({ warning: i18n.t('export.warnDownscaled') })
                     const outputDir = resolveOutputDir(get().settings, entry)
                     const request = buildRequest(
@@ -319,12 +323,65 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
     runDng: async (imageId, name, entry) => {
         const outDir = resolveOutputDir(get().settings, entry)
         try {
-            const path = await exportDng(imageId, outDir)
-            useToast.getState().show(i18n.t('toast.dngDone'))
-            revealItemInDir(path).catch(() => undefined)
+            const result = await exportDng(imageId, outDir)
+            useToast.getState().show(result.xmpInjected ? i18n.t('toast.dngDone') : i18n.t('toast.dngNoXmp'))
+            revealItemInDir(result.path).catch(() => undefined)
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             set({ dngPrompt: { imageId, name, message } })
+        }
+    },
+    runEditedHandoff: async (imageId, name, entry, appPath) => {
+        if (!entry) return
+        let engine: ExportEngine
+        try {
+            engine = createExportEngine()
+        } catch {
+            useToast.getState().show(i18n.t('export.warnGpu'))
+            return
+        }
+        useToast.getState().show(i18n.t('toast.editedRendering', { name }))
+        try {
+            await useEditStore.getState().flushPending()
+            const envelope = await getEditState(imageId)
+            const resolved = await ensureAethSource(imageId)
+            if (!resolved) {
+                useToast.getState().show(i18n.t('export.warnNoDecode'))
+                return
+            }
+            const lensProfile = await useLens.getState().resolve(imageId)
+            const job = engine.prepare(resolved.source, envelope.state, lensProfile)
+            const settings: ExportSettings = {
+                format: 'tiff',
+                quality: 100,
+                colorSpace: 'srgb',
+                bits: 16,
+                resizeMode: 'none',
+                resizeValue: 0,
+                metadata: 'all',
+                filenameTemplate: '{name}-Edit',
+                output: 'source',
+                customDir: '',
+                conflict: 'overwrite',
+            }
+            const request = buildRequest(settings, imageId, job.width, job.height, 1, dirname(entry.path), envelope.state.meta.appliedPreset)
+            const jobId = await exportBegin(request)
+            const completed = await job.stream(
+                (tile) => exportTile(jobId, tile),
+                () => false,
+            )
+            job.release()
+            if (!completed) {
+                await exportCancel(jobId).catch(() => undefined)
+                return
+            }
+            const path = await exportFinish(jobId)
+            await openWithEdited(path, appPath)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            useToast.getState().show(i18n.t('toast.editedFailed', { message }))
+        } finally {
+            engine.dispose()
         }
     },
     dismissDng: () => set({ dngPrompt: null }),

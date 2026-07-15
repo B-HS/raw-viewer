@@ -21,3 +21,5 @@ export const getDisplayColorSpace = () => invoke<'display-p3' | 'srgb'>('get_dis
 export const revealInFileManager = (imageId: string) => invoke<void>('reveal_in_file_manager', { imageId })
 
 export const openWithExternal = (imageId: string, appPath: string) => invoke<void>('open_with_external', { imageId, appPath })
+
+export const openWithEdited = (path: string, appPath: string) => invoke<void>('open_with_edited', { path, appPath })

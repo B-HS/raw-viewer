@@ -98,13 +98,21 @@ export const PresetPanel: FC = () => {
         <aside className='flex h-full w-80 flex-col border-l border-neutral-800 bg-neutral-900 text-neutral-200'>
             <div className='flex items-center justify-between border-b border-neutral-800 px-3 py-2'>
                 <span className='text-xs font-semibold uppercase tracking-wide text-neutral-400'>{t('preset.title')}</span>
-                <button
-                    type='button'
-                    disabled={!hasImage}
-                    onClick={() => setSaving((value) => !value)}
-                    className='rounded px-2 py-0.5 text-[10px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 disabled:opacity-40'>
-                    {t('preset.saveCurrent')}
-                </button>
+                <div className='flex items-center gap-1'>
+                    <button
+                        type='button'
+                        onClick={() => usePresetStore.getState().importFromFile()}
+                        className='rounded px-2 py-0.5 text-[10px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100'>
+                        {t('preset.import')}
+                    </button>
+                    <button
+                        type='button'
+                        disabled={!hasImage}
+                        onClick={() => setSaving((value) => !value)}
+                        className='rounded px-2 py-0.5 text-[10px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 disabled:opacity-40'>
+                        {t('preset.saveCurrent')}
+                    </button>
+                </div>
             </div>
 
             {saving && hasImage && <SaveForm onClose={() => setSaving(false)} />}
@@ -130,6 +138,14 @@ export const PresetPanel: FC = () => {
                                         <span className='text-neutral-500'>{preset.source === 'lr-import' ? '◈' : '⬢'}</span>
                                         <span className='min-w-0 flex-1 truncate'>{preset.name}</span>
                                         {slotOf(preset) && <span className='shrink-0 text-[10px] text-neutral-600'>⌥{slotOf(preset)}</span>}
+                                    </button>
+                                    <button
+                                        type='button'
+                                        aria-label={t('preset.export')}
+                                        title={t('preset.export')}
+                                        onClick={() => usePresetStore.getState().exportToFile(preset.id, preset.name)}
+                                        className='shrink-0 rounded px-1.5 py-0.5 text-[10px] text-neutral-600 opacity-0 hover:bg-neutral-800 hover:text-neutral-300 group-hover:opacity-100'>
+                                        ↥
                                     </button>
                                     {!preset.builtin && (
                                         <button

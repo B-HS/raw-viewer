@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { REC2020_LUMA } from '../../gl/colorSpaces'
 import { useEditStore } from '../../store/editStore'
 import { useHistogram } from '../../store/histogramStore'
+import { useLens } from '../../store/lens'
 import { usePlaylist } from '../../store/playlist'
 import { useUiStore } from '../../store/uiStore'
 import { CropOverlay } from './CropOverlay'
@@ -30,6 +31,7 @@ export const Viewport: FC = () => {
         if (engine) {
             const state = useEditStore.getState().state
             if (state) engine.setEditState(state)
+            useLens.getState().syncEngine()
         }
         return () => {
             useUiStore.getState().attachEngine(null)

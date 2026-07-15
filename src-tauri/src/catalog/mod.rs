@@ -12,6 +12,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("002_organize", include_str!("migrations/002_organize.sql")),
     ("003_presets", include_str!("migrations/003_presets.sql")),
     ("004_recents", include_str!("migrations/004_recents.sql")),
+    ("005_lens_overrides", include_str!("migrations/005_lens_overrides.sql")),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -335,6 +336,24 @@ impl Catalog {
         conn.execute("DELETE FROM recents", []).map_err(db_err)?;
         Ok(())
     }
+
+    pub fn set_lens_override(&self, lens_key: &str, profile_id: &str, updated_at: i64) -> AppResult<()> {
+        let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
+        conn.execute(
+            "INSERT INTO lens_overrides (lens_key, profile_id, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(lens_key) DO UPDATE SET profile_id = excluded.profile_id, updated_at = excluded.updated_at",
+            params![lens_key, profile_id, updated_at],
+        )
+        .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn load_lens_override(&self, lens_key: &str) -> AppResult<Option<String>> {
+        let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
+        conn.query_row("SELECT profile_id FROM lens_overrides WHERE lens_key = ?1", params![lens_key], |row| row.get(0))
+            .optional()
+            .map_err(db_err)
+    }
 }
 
 fn row_to_preset(row: &rusqlite::Row) -> rusqlite::Result<PresetRecord> {
@@ -458,6 +477,16 @@ mod tests {
         let _ = catalog.set_flag(path, None, 13);
         let cleared = catalog.load_organize(path).ok().flatten();
         assert!(matches!(cleared, Some(ref value) if value.rating == 4 && value.flag.is_none() && value.label.as_deref() == Some("Red")));
+    }
+
+    #[test]
+    fn lens_override_upserts_and_loads() {
+        let catalog = catalog();
+        assert_eq!(catalog.load_lens_override("canon|ef 16-35").ok(), Some(None));
+        let _ = catalog.set_lens_override("canon|ef 16-35", "profile-a", 10);
+        assert_eq!(catalog.load_lens_override("canon|ef 16-35").ok().flatten().as_deref(), Some("profile-a"));
+        let _ = catalog.set_lens_override("canon|ef 16-35", "profile-b", 11);
+        assert_eq!(catalog.load_lens_override("canon|ef 16-35").ok().flatten().as_deref(), Some("profile-b"));
     }
 
     #[test]

@@ -92,8 +92,20 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 검증: cargo test 184 + bun run build + prettier 통과
 - [ ] **차단 버그(통합 중 발견)**: Bayer RAW(5D3) L1/L2 뷰포트 렌더 깨짐 — iPhone linear DNG는 정상, 마진 포함 raw 치수(5796×3870) 표기로 보아 **processed 치수 vs payload 치수 불일치(row stride)** 유력. 3b 이전부터 존재(Bayer 파일 시각 검증 이번이 처음). 디버그 에이전트 진행 중. **해결·재검증 후 dev 커밋/푸시.**
 
-### 3c 잔여 (미착수)
-스마트 복사/클립보드(FR-15, platform macOS 구현) · RAW+JPEG 페어링(FR-1.6) · Dock(FR-18) · 파일연결/싱글인스턴스(FR-19) · 렌즈보정(FR-8) · ExifTool(FR-16.4) · 설정·커맨드팔레트·i18n·접근성(FR-20) · 라이선스 화면(cargo-about) · 프리셋 xmp import/export · DNG XMP tag700 주입 · Export batch UI 고도화
+### 3c (계약: docs/phase3c-contract.md) — **완료, dev 반영(13ecc05)**
+- [x] PL: objc2 실구현(NSPasteboard PNG+TIFF 스마트복사·파일/텍스트·Finder·open-with·recents)·Dock 메뉴(델리게이트 무교체 class_addMethod 주입, ● 점 표시)·파일연결(rank=Alternate)·Opened 콜드스타트 큐·싱글인스턴스·RAW+JPEG 페어링(get_pairs)·recents(004) — 테스트 206
+- [x] T: ExifTool(감지+subprocess 3s deep metadata)·라이선스 화면(cargo-about → resources/licenses-rust.html, NOTICE 합성)·캐시 통계/삭제
+- [x] FE: 설정 화면(언어/테마/뷰포트 배경/성능/캐시, plugin-store)·커맨드 팔레트(퍼지)·i18n ko/en 전수 치환·스마트 복사(⌘C, 4096 상한)·페어 배지·reduced-motion
+- [x] 통합: cargo test 206 + bun run build + 실기동(패닉 0). 시각 확인은 화면 잠금으로 보류(사용자 재석 시)
+- 3c SPEC-GAP: Dock setState 체크마크 미시도(점 표시 고정), open-with 편집본 TIFF는 3d로, 클립보드 TIFF 무압축(메인스레드 히치 가능), fileAssociations 이미지 그룹 mimeType `image/*` 제거(부적합 와일드카드)
+
+### 3d (계약: docs/phase3d-contract.md) — 진행 중 (feat/phase-3d-lens)
+- [ ] LN: Lensfun XML DB(pin+sync 스크립트, CC-BY-SA 고지)·quick-xml 파싱·매칭/보간·override(005) — 서브에이전트
+- [ ] DX: DNG XMP tag700 주입(dnglab 산출물 IFD 재작성+검증)·프리셋 xmp import/export·open_with_edited — 서브에이전트
+- [ ] FL: gl pass② 렌즈 보정(poly3/poly5/ptlens·TCA·pa 비네팅)·LensSection·프리셋 IO UI·편집본으로 열기 — 서브에이전트 (후속)
+
+### Phase 3 이후 잔여
+Export batch 고도화 · 워터마크(FR-14.1 P1) · 필름스트립 높이 드래그 · 히스토리 패널 · §8.2 수용 기준 전수 점검 · 성능 목표 실측(release 빌드, M1 기준은 사용자 하드웨어로 근사)
 
 ## Phase 4 (미착수)
 PRD §11 체크리스트를 그대로 따른다.

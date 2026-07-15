@@ -3,10 +3,12 @@ use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::edit::EditService;
 use crate::error::{AppError, AppResult};
-use crate::export::{dng, finish, ExportService};
+use crate::export::{dng, dng_xmp, finish, ExportService};
 use crate::pipeline::AppState;
-use crate::types_export::{ExportPhase, ExportProgressPayload, RasterExportRequest};
+use crate::scan;
+use crate::types_export::{DngExportResult, ExportPhase, ExportProgressPayload, RasterExportRequest};
 
 fn header_str(request: &Request<'_>, name: &str) -> AppResult<String> {
     request
@@ -76,13 +78,23 @@ pub async fn export_cancel(job_id: String, export: State<'_, ExportService>) -> 
 }
 
 #[tauri::command]
-pub async fn export_dng(image_id: String, out_dir: PathBuf, state: State<'_, AppState>) -> AppResult<PathBuf> {
+pub async fn export_dng(image_id: String, out_dir: PathBuf, state: State<'_, AppState>, edits: State<'_, EditService>) -> AppResult<DngExportResult> {
     let source = state
         .services
         .registry
         .resolve(&image_id)
         .ok_or_else(|| AppError::Internal(format!("unknown image id: {image_id}")))?;
-    tauri::async_runtime::spawn_blocking(move || dng::run_convert(&dng::binary_path(), &source, &out_dir))
-        .await
-        .map_err(|error| AppError::Internal(format!("dng task failed: {error}")))?
+    let is_raw = scan::is_raw_ext(&source);
+    let edit_state = edits.get_or_load(&image_id, &source, is_raw)?.state;
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = dng::run_convert(&dng::binary_path(), &source, &out_dir)?;
+        let outcome = dng_xmp::inject_edit_state(&path, &edit_state);
+        Ok(DngExportResult {
+            path,
+            xmp_injected: outcome.injected,
+            warning: outcome.warning,
+        })
+    })
+    .await
+    .map_err(|error| AppError::Internal(format!("dng task failed: {error}")))?
 }

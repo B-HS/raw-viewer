@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import type { DngExportResult } from '../types/DngExportResult'
 import type { ExportProgressPayload } from '../types/ExportProgressPayload'
 import type { RasterExportRequest } from '../types/RasterExportRequest'
 
@@ -22,7 +23,7 @@ export const exportFinish = (jobId: string) => invoke<string>('export_finish', {
 
 export const exportCancel = (jobId: string) => invoke<void>('export_cancel', { jobId })
 
-export const exportDng = (imageId: string, outDir: string) => invoke<string>('export_dng', { imageId, outDir })
+export const exportDng = (imageId: string, outDir: string) => invoke<DngExportResult>('export_dng', { imageId, outDir })
 
 export const onExportProgress = (handler: (payload: ExportProgressPayload) => void) =>
     listen<ExportProgressPayload>('export:progress', (event) => handler(event.payload))

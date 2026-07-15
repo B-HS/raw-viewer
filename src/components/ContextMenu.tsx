@@ -1,18 +1,26 @@
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { copyFilesToClipboard } from '../ipc/platform'
+import { copyFilesToClipboard, openWithExternal } from '../ipc/platform'
 import { smartCopyCurrent } from '../lib/smartCopy'
 import { confirmAndTrash } from '../lib/trash'
 import { useContextMenu } from '../store/contextMenu'
 import { useEditClipboard } from '../store/editClipboard'
 import { useEditStore } from '../store/editStore'
+import { useExportStore } from '../store/exportStore'
 import { LABELS, useOrganize } from '../store/organize'
 import { usePlaylist } from '../store/playlist'
+import { useSettings } from '../store/settings'
 import { useToast } from '../store/toast'
 
 const RATINGS = [0, 1, 2, 3, 4, 5]
+
+const appName = (path: string) => {
+    const base = path.split('/').pop() ?? path
+    return base.endsWith('.app') ? base.slice(0, -4) : base
+}
 
 type MenuItemProps = { onClick: () => void; shortcut?: string; danger?: boolean; disabled?: boolean; children: ReactNode }
 
@@ -36,9 +44,10 @@ export const ContextMenu: FC = () => {
     const y = useContextMenu((state) => state.y)
     const imageIds = useContextMenu((state) => state.imageIds)
     const hasClip = useEditClipboard((state) => state.sourceImageId !== null)
+    const recentApps = useSettings((state) => state.recentApps)
 
     const [pos, setPos] = useState({ x, y })
-    const [sub, setSub] = useState<'rating' | 'label' | null>(null)
+    const [sub, setSub] = useState<'rating' | 'label' | 'openWith' | null>(null)
 
     const close = () => useContextMenu.getState().close()
     const primary = imageIds[0]
@@ -64,6 +73,27 @@ export const ContextMenu: FC = () => {
     const trash = () => {
         close()
         confirmAndTrash(imageIds)
+    }
+    const openOriginalWith = (appPath: string) => openWithExternal(primary, appPath).catch(() => undefined)
+    const openEditedWith = (appPath: string) => useExportStore.getState().runEditedHandoff(primary, entry?.fileName ?? primary, entry, appPath)
+    const pickApp = () =>
+        openDialog({
+            directory: false,
+            multiple: false,
+            defaultPath: '/Applications',
+            filters: [{ name: t('menu.application'), extensions: ['app'] }],
+        }).catch(() => null)
+    const pickAndOpenOriginal = async () => {
+        const selected = await pickApp()
+        if (typeof selected !== 'string') return
+        useSettings.getState().addRecentApp(selected)
+        openOriginalWith(selected)
+    }
+    const pickAndOpenEdited = async () => {
+        const selected = await pickApp()
+        if (typeof selected !== 'string') return
+        useSettings.getState().addRecentApp(selected)
+        openEditedWith(selected)
     }
 
     useEffect(() => {
@@ -112,6 +142,35 @@ export const ContextMenu: FC = () => {
                 <MenuItem onClick={() => run(reveal)} shortcut='⌘⇧R'>
                     {t('menu.reveal')}
                 </MenuItem>
+                <div className='relative' onMouseEnter={() => setSub('openWith')} onMouseLeave={() => setSub(null)}>
+                    <div className='flex items-center justify-between px-3 py-1 hover:bg-neutral-800'>
+                        <span>{t('menu.openWith')}</span>
+                        <span className='text-[10px] text-neutral-500'>▸</span>
+                    </div>
+                    {sub === 'openWith' && (
+                        <div className='absolute left-full top-0 -ml-1 min-w-[200px] rounded-md border border-neutral-700 bg-neutral-900 py-1 shadow-xl'>
+                            <div className='px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>
+                                {t('menu.openWithOriginal')}
+                            </div>
+                            {recentApps.map((appPath) => (
+                                <MenuItem key={`o-${appPath}`} onClick={() => run(() => openOriginalWith(appPath))}>
+                                    {appName(appPath)}
+                                </MenuItem>
+                            ))}
+                            <MenuItem onClick={() => run(pickAndOpenOriginal)}>{t('menu.chooseApp')}</MenuItem>
+                            <div className='my-1 border-t border-neutral-800' />
+                            <div className='px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>
+                                {t('menu.openWithEdited')}
+                            </div>
+                            {recentApps.map((appPath) => (
+                                <MenuItem key={`e-${appPath}`} onClick={() => run(() => openEditedWith(appPath))}>
+                                    {appName(appPath)}
+                                </MenuItem>
+                            ))}
+                            <MenuItem onClick={() => run(pickAndOpenEdited)}>{t('menu.chooseApp')}</MenuItem>
+                        </div>
+                    )}
+                </div>
                 <div className='my-1 border-t border-neutral-800' />
                 <MenuItem onClick={() => run(copyEdit)} shortcut='⌘⇧C'>
                     {t('menu.copyEdit')}

@@ -4,6 +4,7 @@ import { getEditState } from '../ipc/commands'
 import { copyImageToClipboard } from '../ipc/platform'
 import { useEditStore } from '../store/editStore'
 import { ensureAethSource } from '../store/exportStore'
+import { useLens } from '../store/lens'
 import { usePlaylist } from '../store/playlist'
 import { useToast } from '../store/toast'
 
@@ -24,7 +25,8 @@ export const smartCopyCurrent = async () => {
             useToast.getState().show(i18n.t('toast.copyFailed'))
             return
         }
-        const blob = await renderClipboardPng(resolved.source, envelope.state)
+        const lensProfile = await useLens.getState().resolve(current.imageId)
+        const blob = await renderClipboardPng(resolved.source, envelope.state, lensProfile)
         const bytes = new Uint8Array(await blob.arrayBuffer())
         await copyImageToClipboard(bytes)
         useToast.getState().show(i18n.t('toast.copied'))

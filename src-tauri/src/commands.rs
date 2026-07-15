@@ -212,6 +212,16 @@ pub async fn delete_preset(preset_id: String, presets: State<'_, PresetService>)
 }
 
 #[tauri::command]
+pub async fn export_preset(preset_id: String, path: PathBuf, presets: State<'_, PresetService>) -> AppResult<()> {
+    preset::io::export_preset(&presets, &preset_id, &path)
+}
+
+#[tauri::command]
+pub async fn import_preset(path: PathBuf, presets: State<'_, PresetService>) -> AppResult<PresetInfo> {
+    preset::io::import_preset(&presets, &path)
+}
+
+#[tauri::command]
 pub async fn copy_settings(
     from: String,
     to: Vec<String>,

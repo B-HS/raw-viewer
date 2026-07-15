@@ -65,15 +65,103 @@ precision highp float;
 in vec2 vUv;
 uniform sampler2D uTex;
 uniform mat3 uWarp;
+uniform vec2 uTexSize;
+uniform vec2 uLensNorm;
+uniform int uLensActive;
+uniform int uLensHasProfile;
+uniform int uDistModel;
+uniform vec3 uDistCoeffs;
+uniform float uDistStrength;
+uniform int uLensHasTca;
+uniform int uTcaModel;
+uniform vec3 uTcaR;
+uniform vec3 uTcaB;
+uniform float uTcaStrength;
+uniform int uLensHasVig;
+uniform vec3 uVigCoeffs;
+uniform float uVigStrength;
+uniform float uManualDist;
+uniform float uManualVig;
 out vec4 o;
+float cmrw(float x) {
+    x = abs(x);
+    float x2 = x * x;
+    float x3 = x2 * x;
+    if (x < 1.0) return 1.5 * x3 - 2.5 * x2 + 1.0;
+    if (x < 2.0) return -0.5 * x3 + 2.5 * x2 - 4.0 * x + 2.0;
+    return 0.0;
+}
+vec3 sampleBicubic(vec2 uv) {
+    vec2 coord = uv * uTexSize - 0.5;
+    vec2 base = floor(coord);
+    vec2 f = coord - base;
+    ivec2 hi = ivec2(uTexSize) - 1;
+    vec3 sum = vec3(0.0);
+    float wsum = 0.0;
+    for (int j = -1; j <= 2; j++) {
+        float wy = cmrw(float(j) - f.y);
+        for (int i = -1; i <= 2; i++) {
+            float w = cmrw(float(i) - f.x) * wy;
+            ivec2 t = clamp(ivec2(base) + ivec2(i, j), ivec2(0), hi);
+            sum += texelFetch(uTex, t, 0).rgb * w;
+            wsum += w;
+        }
+    }
+    return sum / wsum;
+}
+float distRatio(float ru) {
+    float ru2 = ru * ru;
+    if (uDistModel == 1) return 1.0 + uDistCoeffs.x * ru2 + uDistCoeffs.y * ru2 * ru2;
+    if (uDistModel == 2) {
+        float a = uDistCoeffs.x;
+        float b = uDistCoeffs.y;
+        float c = uDistCoeffs.z;
+        return a * ru2 * ru + b * ru2 + c * ru + (1.0 - a - b - c);
+    }
+    float k1 = uDistCoeffs.x;
+    return (1.0 - k1) + k1 * ru2;
+}
+float tcaScale(vec3 t, float ru) {
+    if (uTcaModel == 1) return t.z * ru * ru + t.y * ru + t.x;
+    return t.x;
+}
 void main() {
     vec3 p = uWarp * vec3(vUv - 0.5, 1.0);
-    vec2 uv = p.xy / p.z + 0.5;
-    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
+    vec2 gUv = p.xy / p.z + 0.5;
+    if (any(lessThan(gUv, vec2(0.0))) || any(greaterThan(gUv, vec2(1.0)))) {
         o = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    o = vec4(texture(uTex, uv).rgb, 1.0);
+    if (uLensActive == 0) {
+        o = vec4(texture(uTex, gUv).rgb, 1.0);
+        return;
+    }
+    vec2 d = gUv - 0.5;
+    vec2 n = d * uLensNorm;
+    float ru = length(n);
+    vec3 color;
+    if (uLensHasProfile == 1) {
+        float dr = mix(1.0, distRatio(ru), uDistStrength);
+        vec2 baseSrc = 0.5 + d * dr;
+        color = sampleBicubic(baseSrc);
+        if (uLensHasTca == 1) {
+            float sr = mix(1.0, tcaScale(uTcaR, ru), uTcaStrength);
+            float sb = mix(1.0, tcaScale(uTcaB, ru), uTcaStrength);
+            color.r = sampleBicubic(0.5 + (baseSrc - 0.5) * sr).r;
+            color.b = sampleBicubic(0.5 + (baseSrc - 0.5) * sb).b;
+        }
+        if (uLensHasVig == 1) {
+            vec2 ns = (baseSrc - 0.5) * uLensNorm;
+            float rs2 = dot(ns, ns);
+            float gainPoly = 1.0 + uVigCoeffs.x * rs2 + uVigCoeffs.y * rs2 * rs2 + uVigCoeffs.z * rs2 * rs2 * rs2;
+            color /= max(mix(1.0, gainPoly, uVigStrength), 0.05);
+        }
+    } else {
+        float dr = 1.0 + uManualDist * 0.3 * ru * ru;
+        color = sampleBicubic(0.5 + d * dr);
+        color *= max(1.0 + uManualVig * 0.6 * ru * ru, 0.05);
+    }
+    o = vec4(max(color, vec3(0.0)), 1.0);
 }
 `
 
