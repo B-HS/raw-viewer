@@ -7,7 +7,11 @@ import { useHistogram } from '../../store/histogramStore'
 import { useLens } from '../../store/lens'
 import { usePlaylist } from '../../store/playlist'
 import { useUiStore } from '../../store/uiStore'
+import { CpuFallbackView } from './CpuFallbackView'
 import { CropOverlay } from './CropOverlay'
+import { HistogramHoverOverlay } from './HistogramHoverOverlay'
+import { SamplerPinsOverlay } from './SamplerPinsOverlay'
+import { TatOverlay } from './TatOverlay'
 import { useRenderEngine } from './useRenderEngine'
 
 export const Viewport: FC = () => {
@@ -21,6 +25,7 @@ export const Viewport: FC = () => {
     const compare = useUiStore((state) => state.compare)
     const sideBySide = useUiStore((state) => state.sideBySide)
     const eyedropper = useUiStore((state) => state.eyedropper)
+    const tatActive = useUiStore((state) => state.tatActive)
 
     const current = entries[currentIndex]
     const level = current ? best[current.imageId] : undefined
@@ -76,6 +81,13 @@ export const Viewport: FC = () => {
         useUiStore.getState().setComparePosition(position)
     }
 
+    if (gpuError)
+        return (
+            <div className='relative h-full w-full overflow-hidden bg-viewport'>
+                <CpuFallbackView />
+            </div>
+        )
+
     return (
         <div className='relative h-full w-full overflow-hidden bg-viewport'>
             <canvas ref={canvasRef} className='absolute inset-0 block h-full w-full' />
@@ -115,6 +127,10 @@ export const Viewport: FC = () => {
 
             {eyedropper && <div className='absolute inset-0' style={{ cursor: 'crosshair' }} onClick={sampleWhiteBalance} />}
 
+            <HistogramHoverOverlay />
+            <SamplerPinsOverlay />
+            {tatActive && engine && !sideBySide && <TatOverlay />}
+
             {cropEditMode && <CropOverlay />}
 
             <div className='pointer-events-none absolute left-3 top-3 flex flex-col gap-2'>
@@ -124,16 +140,7 @@ export const Viewport: FC = () => {
                 {noProfile && <span className='rounded bg-amber-500/80 px-2 py-1 text-xs font-medium text-black'>{t('viewport.noProfile')}</span>}
             </div>
 
-            {gpuError && (
-                <div className='absolute inset-0 flex items-center justify-center'>
-                    <div className='rounded-lg bg-black/70 px-6 py-4 text-center text-sm text-neutral-200'>
-                        <p className='text-lg'>⚠</p>
-                        <p className='mt-1'>{t('viewport.gpuUnavailable')}</p>
-                    </div>
-                </div>
-            )}
-
-            {!gpuError && error && current && (
+            {error && current && (
                 <div className='absolute inset-0 flex items-center justify-center p-6'>
                     <div className='w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900/90 px-6 py-5 text-center text-neutral-200'>
                         <p className='text-2xl'>⚠</p>
@@ -153,7 +160,7 @@ export const Viewport: FC = () => {
                 </div>
             )}
 
-            {!gpuError && !error && (
+            {!error && (
                 <div className='pointer-events-none absolute bottom-3 right-3 flex items-center gap-2 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-200'>
                     <span>{level ? t(`viewport.level.${level.level}`) : t('viewport.decoding')}</span>
                     {(!level || level.level !== 'l2') && (

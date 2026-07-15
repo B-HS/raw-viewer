@@ -5,6 +5,7 @@ use tauri::http::header::{ACCESS_CONTROL_ALLOW_ORIGIN, CACHE_CONTROL, CONTENT_TY
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 
+use crate::cpurender::CpuFrameStore;
 use crate::pipeline::AppState;
 use crate::types::ProxyLevel;
 
@@ -16,6 +17,7 @@ const IMAGE_JPEG: &str = "image/jpeg";
 enum RouteKind {
     Ping,
     Pixels(String, ProxyLevel),
+    CpuFrame(String),
     NotFound,
 }
 
@@ -28,7 +30,7 @@ pub fn handle<R: Runtime>(context: UriSchemeContext<'_, R>, request: Request<Vec
     });
 }
 
-fn parse_pixels_path(path: &str) -> Option<(String, ProxyLevel)> {
+fn parse_pixels_segments(path: &str) -> Option<(&str, &str)> {
     let mut parts = path.split('/');
     if parts.next()? != "pixels" {
         return None;
@@ -38,6 +40,11 @@ fn parse_pixels_path(path: &str) -> Option<(String, ProxyLevel)> {
     if image_id.is_empty() || parts.next().is_some() {
         return None;
     }
+    Some((image_id, level))
+}
+
+fn parse_pixels_path(path: &str) -> Option<(String, ProxyLevel)> {
+    let (image_id, level) = parse_pixels_segments(path)?;
     let level = match level {
         "l0" => ProxyLevel::L0,
         "l1" => ProxyLevel::L1,
@@ -47,13 +54,26 @@ fn parse_pixels_path(path: &str) -> Option<(String, ProxyLevel)> {
     Some((image_id.to_owned(), level))
 }
 
+fn parse_cpu_path(path: &str) -> Option<String> {
+    let (image_id, level) = parse_pixels_segments(path)?;
+    if level != "cpu" {
+        return None;
+    }
+    Some(image_id.to_owned())
+}
+
 fn classify(path: &str) -> RouteKind {
     match path.split('/').next().unwrap_or_default() {
         "ping" => RouteKind::Ping,
-        "pixels" => match parse_pixels_path(path) {
-            Some((image_id, level)) => RouteKind::Pixels(image_id, level),
-            None => RouteKind::NotFound,
-        },
+        "pixels" => {
+            if let Some((image_id, level)) = parse_pixels_path(path) {
+                RouteKind::Pixels(image_id, level)
+            } else if let Some(image_id) = parse_cpu_path(path) {
+                RouteKind::CpuFrame(image_id)
+            } else {
+                RouteKind::NotFound
+            }
+        }
         _ => RouteKind::NotFound,
     }
 }
@@ -62,8 +82,27 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> Response<Cow<'static, [u
     match classify(path) {
         RouteKind::Ping => ping_response(),
         RouteKind::Pixels(image_id, level) => serve_pixels(app, &image_id, level),
+        RouteKind::CpuFrame(image_id) => serve_cpu_frame(app, &image_id),
         RouteKind::NotFound => not_found(),
     }
+}
+
+fn serve_cpu_frame<R: Runtime>(app: &AppHandle<R>, image_id: &str) -> Response<Cow<'static, [u8]>> {
+    let store = app.state::<CpuFrameStore>();
+    match store.get(image_id) {
+        Some(body) => cpu_frame_response(&body),
+        None => not_found(),
+    }
+}
+
+fn cpu_frame_response(body: &Arc<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, OCTET_STREAM)
+        .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(CACHE_CONTROL, "no-cache")
+        .body(Cow::Owned(body.as_ref().clone()))
+        .unwrap_or_else(|_| Response::new(Cow::Borrowed(b"".as_slice())))
 }
 
 fn serve_pixels<R: Runtime>(app: &AppHandle<R>, image_id: &str, level: ProxyLevel) -> Response<Cow<'static, [u8]>> {
@@ -147,6 +186,28 @@ mod tests {
         assert_eq!(classify("pixels/abc/l9"), RouteKind::NotFound);
         assert_eq!(classify("pixels//l0"), RouteKind::NotFound);
         assert_eq!(classify("pixels/abc/l0/0_0"), RouteKind::NotFound);
+    }
+
+    #[test]
+    fn classify_cpu_frame_route() {
+        assert_eq!(classify("pixels/abc/cpu"), RouteKind::CpuFrame("abc".to_owned()));
+        assert_eq!(classify("pixels/deadbeef/cpu"), RouteKind::CpuFrame("deadbeef".to_owned()));
+        assert_eq!(classify("pixels//cpu"), RouteKind::NotFound);
+        assert_eq!(classify("pixels/abc/cpu/extra"), RouteKind::NotFound);
+    }
+
+    #[test]
+    fn cpu_frame_response_is_octet_stream_with_cors() {
+        let body = Arc::new(vec![1u8, 2, 3, 4]);
+        let response = cpu_frame_response(&body);
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get(CONTENT_TYPE).and_then(|value| value.to_str().ok()), Some(OCTET_STREAM));
+        assert_eq!(response.headers().get(CACHE_CONTROL).and_then(|value| value.to_str().ok()), Some("no-cache"));
+        assert_eq!(
+            response.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).and_then(|value| value.to_str().ok()),
+            Some("*"),
+        );
+        assert_eq!(response.body().as_ref(), &[1u8, 2, 3, 4]);
     }
 
     #[test]

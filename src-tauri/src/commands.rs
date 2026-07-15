@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
+use crate::cpurender::{render_and_store, CpuFrameStore};
 use crate::edit::EditService;
 use crate::error::{AppError, AppResult};
 use crate::organize::OrganizeService;
@@ -11,6 +12,7 @@ use crate::platform::OpenQueue;
 use crate::preset::{self, PresetService};
 use crate::scan::{self, Registry};
 use crate::types::{EditState, EditStateEnvelope, OpenResult, PendingOpenRequest, ScanBatch, ScanSummary};
+use crate::types_cpurender::{CpuFrameReadyPayload, EVENT_CPU_FRAME_READY};
 use crate::types_meta::{Flag, ImageMetadata, OrganizeEntry};
 use crate::types_preset::PresetInfo;
 use crate::watch::WatchService;
@@ -171,6 +173,24 @@ pub async fn move_to_trash(image_ids: Vec<String>, state: State<'_, AppState>) -
 pub async fn watch_directory(dir: PathBuf, watch: State<'_, WatchService>) -> AppResult<()> {
     let root = std::fs::canonicalize(&dir).unwrap_or(dir);
     watch.watch(&root)
+}
+
+#[tauri::command]
+pub async fn render_cpu_frame(
+    image_id: String,
+    max_edge: u32,
+    app: AppHandle,
+    state: State<'_, AppState>,
+    edits: State<'_, EditService>,
+    cpu_frames: State<'_, CpuFrameStore>,
+) -> AppResult<CpuFrameReadyPayload> {
+    let span = tracing::info_span!("render_cpu_frame", image_id = %image_id, max_edge);
+    let _guard = span.enter();
+    let payload = render_and_store(&state.services, &edits, &cpu_frames, &image_id, max_edge)?;
+    if let Err(error) = app.emit(EVENT_CPU_FRAME_READY, payload.clone()) {
+        tracing::warn!(%error, "emit cpu:frame-ready failed");
+    }
+    Ok(payload)
 }
 
 #[tauri::command]

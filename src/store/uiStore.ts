@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ClippingMode, CompareSplit, EngineApi } from '../gl/engineApi'
+import type { HslBand } from '../types/HslBand'
 import type { EditSection } from './editDefaults'
 
 export type CropOverlayStyle = 'thirds' | 'golden' | 'diag' | 'none'
@@ -16,6 +17,8 @@ type UiState = {
     cropEditMode: boolean
     cropOverlay: CropOverlayStyle
     eyedropper: boolean
+    tatActive: boolean
+    tatBand: HslBand | null
     attachEngine: (engine: EngineApi | null) => void
     togglePanel: () => void
     setActiveSection: (section: EditSection) => void
@@ -28,6 +31,8 @@ type UiState = {
     setCropEditMode: (on: boolean) => void
     cycleCropOverlay: () => void
     setEyedropper: (on: boolean) => void
+    toggleTat: () => void
+    setTatBand: (band: HslBand | null) => void
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -40,6 +45,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     cropEditMode: false,
     cropOverlay: 'thirds',
     eyedropper: false,
+    tatActive: false,
+    tatBand: null,
     attachEngine: (engine) => {
         set({ engine })
         if (!engine) return
@@ -103,4 +110,6 @@ export const useUiStore = create<UiState>((set, get) => ({
             return { cropOverlay: CROP_OVERLAY_ORDER[(index + 1) % CROP_OVERLAY_ORDER.length] }
         }),
     setEyedropper: (on) => set({ eyedropper: on }),
+    toggleTat: () => set((state) => (state.tatActive ? { tatActive: false, tatBand: null } : { tatActive: true, eyedropper: false })),
+    setTatBand: (band) => set({ tatBand: band }),
 }))

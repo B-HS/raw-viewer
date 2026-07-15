@@ -65,8 +65,15 @@ export const Histogram: FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const data = useHistogram((state) => state.data)
     const mode = useHistogram((state) => state.mode)
+    const hoverRange = useHistogram((state) => state.hoverRange)
     const clipping = useUiStore((state) => state.clipping)
     const modeLabel = t(`histogram.${mode}`)
+
+    const onHover = (event: React.MouseEvent) => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        const frac = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+        useHistogram.getState().setHoverRange({ lo: Math.max(0, frac - 0.05), hi: Math.min(1, frac + 0.05) })
+    }
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -108,9 +115,17 @@ export const Histogram: FC = () => {
             <canvas
                 ref={canvasRef}
                 onClick={() => useHistogram.getState().cycleMode()}
+                onMouseMove={onHover}
+                onMouseLeave={() => useHistogram.getState().setHoverRange(null)}
                 className='block h-24 w-full cursor-pointer'
                 aria-label={t('histogram.aria', { mode: modeLabel })}
             />
+            {hoverRange && (
+                <div
+                    className='pointer-events-none absolute inset-y-0 border-x border-sky-300/70 bg-sky-300/10'
+                    style={{ left: `${hoverRange.lo * 100}%`, width: `${(hoverRange.hi - hoverRange.lo) * 100}%` }}
+                />
+            )}
             <span className='pointer-events-none absolute bottom-1 right-2 text-[10px] text-neutral-500'>{modeLabel}</span>
         </div>
     )
