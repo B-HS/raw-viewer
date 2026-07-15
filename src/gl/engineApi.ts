@@ -13,6 +13,7 @@ export type EngineApi = {
     setLensProfile: (imageId: string | null, profile: LensProfileMatch | null) => void
     setClipping: (mode: ClippingMode) => void
     setCompare: (split: CompareSplit) => void
+    setSideBySide: (on: boolean) => void
     setCropEditMode: (on: boolean) => void
     onHistogram: (cb: (hist: { r: Uint32Array; g: Uint32Array; b: Uint32Array; luma: Uint32Array }) => void) => () => void
     samplePixel: (canvasX: number, canvasY: number) => { r: number; g: number; b: number } | null
@@ -35,6 +36,10 @@ export const createEngineApi = (renderer: Renderer, requestRender: () => void): 
     },
     setCompare: (split) => {
         renderer.setCompare(split)
+        requestRender()
+    },
+    setSideBySide: (on) => {
+        renderer.setSideBySide(on)
         requestRender()
     },
     setCropEditMode: (on) => {

@@ -14,11 +14,17 @@ export type SettingsValues = {
     preloadRadius: number
     l2Policy: L2Policy
     recentApps: string[]
+    filmstripHeight: number
 }
 
 const RECENT_APPS_MAX = 6
 
+const FILMSTRIP_MIN = 60
+const FILMSTRIP_MAX = 200
+
 const STORE_PATH = 'settings.json'
+
+const clampFilmstripHeight = (value: number) => Math.max(FILMSTRIP_MIN, Math.min(FILMSTRIP_MAX, Math.round(value)))
 
 const DEFAULTS: SettingsValues = {
     language: 'system',
@@ -27,6 +33,7 @@ const DEFAULTS: SettingsValues = {
     preloadRadius: 3,
     l2Policy: 'idle',
     recentApps: [],
+    filmstripHeight: 96,
 }
 
 let storeRef: Awaited<ReturnType<typeof load>> | null = null
@@ -68,6 +75,8 @@ type SettingsStore = SettingsValues & {
     setPreloadRadius: (radius: number) => void
     setL2Policy: (policy: L2Policy) => void
     addRecentApp: (path: string) => void
+    setFilmstripHeight: (height: number) => void
+    commitFilmstripHeight: () => void
 }
 
 export const useSettings = create<SettingsStore>((set, get) => ({
@@ -83,6 +92,7 @@ export const useSettings = create<SettingsStore>((set, get) => ({
             const preloadRadius = await store.get('preloadRadius')
             const l2Policy = await store.get('l2Policy')
             const recentApps = await store.get('recentApps')
+            const filmstripHeight = await store.get('filmstripHeight')
             values = {
                 language: isLanguage(language) ? language : DEFAULTS.language,
                 theme: isTheme(theme) ? theme : DEFAULTS.theme,
@@ -90,6 +100,7 @@ export const useSettings = create<SettingsStore>((set, get) => ({
                 preloadRadius: typeof preloadRadius === 'number' ? Math.max(0, Math.min(10, Math.round(preloadRadius))) : DEFAULTS.preloadRadius,
                 l2Policy: isL2Policy(l2Policy) ? l2Policy : DEFAULTS.l2Policy,
                 recentApps: Array.isArray(recentApps) ? recentApps.filter((item): item is string => typeof item === 'string') : DEFAULTS.recentApps,
+                filmstripHeight: typeof filmstripHeight === 'number' ? clampFilmstripHeight(filmstripHeight) : DEFAULTS.filmstripHeight,
             }
         } catch {}
         set({ ...values, hydrated: true })
@@ -129,4 +140,6 @@ export const useSettings = create<SettingsStore>((set, get) => ({
         set({ recentApps })
         persist('recentApps', recentApps)
     },
+    setFilmstripHeight: (height) => set({ filmstripHeight: clampFilmstripHeight(height) }),
+    commitFilmstripHeight: () => persist('filmstripHeight', get().filmstripHeight),
 }))

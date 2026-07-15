@@ -11,6 +11,7 @@ import { SettingsDialog } from './components/settings/SettingsDialog'
 import { ContextMenu } from './components/ContextMenu'
 import { ExportDialog } from './components/ExportDialog'
 import { Filmstrip } from './components/filmstrip/Filmstrip'
+import { FilmstripResizer } from './components/filmstrip/FilmstripResizer'
 import { FilterBar } from './components/filmstrip/FilterBar'
 import { PerfOverlay } from './components/PerfOverlay'
 import { EditPanel } from './components/panels/EditPanel'
@@ -36,6 +37,7 @@ import { useHistoryStore } from './store/historyStore'
 import { useLayout } from './store/layout'
 import { useLens } from './store/lens'
 import { usePresetStore } from './store/presetStore'
+import { useSettings } from './store/settings'
 import type { RightPanel } from './store/layout'
 import { useMeta } from './store/meta'
 import { useOverlays } from './store/overlays'
@@ -133,6 +135,7 @@ export const App = () => {
     const selectionCount = usePlaylist((state) => state.selection.length)
     const rightPanel = useLayout((state) => state.rightPanel)
     const filmstripVisible = useLayout((state) => state.filmstripVisible)
+    const filmstripHeight = useSettings((state) => state.filmstripHeight)
     const toastMessage = useToast((state) => state.message)
     const currentName = usePlaylist((state) => state.entries[state.currentIndex]?.fileName ?? '')
     const currentPosition = usePlaylist((state) => state.currentIndex)
@@ -453,9 +456,10 @@ export const App = () => {
             } else if (event.code === KEYMAP.inspect.clip) {
                 event.preventDefault()
                 ui.toggleClipping(event.shiftKey ? 'highlight' : event.altKey ? 'shadow' : 'both')
-            } else if (event.code === KEYMAP.compare.split && (event.shiftKey || event.altKey)) {
+            } else if (event.code === KEYMAP.compare.split) {
                 event.preventDefault()
-                ui.toggleCompare(event.altKey ? 'y' : 'x')
+                if (event.shiftKey || event.altKey) ui.toggleCompare(event.altKey ? 'y' : 'x')
+                else ui.toggleSideBySide()
             } else if (event.code === KEYMAP.inspect.before && !event.repeat) {
                 event.preventDefault()
                 ui.engine?.setEditState(null)
@@ -616,8 +620,9 @@ export const App = () => {
             </div>
             {filmstripVisible && (
                 <div className='flex shrink-0 flex-col'>
+                    <FilmstripResizer />
                     <FilterBar />
-                    <div className='h-24'>
+                    <div style={{ height: filmstripHeight }}>
                         <Filmstrip />
                     </div>
                 </div>

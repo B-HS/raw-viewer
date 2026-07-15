@@ -6,11 +6,13 @@ import { LEVEL_RANK, usePlaylist } from './playlist'
 import { useEditStore } from './editStore'
 import { getEditState, navigate } from '../ipc/commands'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
-import { exportBegin, exportCancel, exportDng, exportFinish, exportTile } from '../ipc/export'
+import { exportBegin, exportCancel, exportDng, exportFinish, exportSetWatermark, exportTile } from '../ipc/export'
 import { openWithEdited } from '../ipc/platform'
 import { onLevelReady } from '../ipc/events'
 import { fetchPixels } from '../ipc/pixels'
 import { createExportEngine } from '../gl/exportRenderer'
+import { loadWatermarkImage, renderWatermarkPng } from '../lib/watermark'
+import type { WatermarkSettings } from '../lib/watermark'
 import type { ExportEngine, ExportSource } from '../gl/exportRenderer'
 import type { ConflictPolicy } from '../types/ConflictPolicy'
 import type { ExportColorSpace } from '../types/ExportColorSpace'
@@ -35,11 +37,23 @@ export type ExportSettings = {
     output: ExportOutputMode
     customDir: string
     conflict: ConflictPolicy
+    watermark: WatermarkSettings
 }
 
 const SETTINGS_KEY = 'raw-viewer:export-settings'
 const GPS_NOTICE_KEY = 'raw-viewer:export-gps-notice'
 const LEVEL_TIMEOUT_MS = 12000
+
+const DEFAULT_WATERMARK: WatermarkSettings = {
+    enabled: false,
+    mode: 'text',
+    text: '©',
+    sizePercent: 5,
+    opacity: 80,
+    position: 'bottom-right',
+    marginPercent: 3,
+    imagePath: '',
+}
 
 const DEFAULT_SETTINGS: ExportSettings = {
     format: 'jpeg',
@@ -53,15 +67,33 @@ const DEFAULT_SETTINGS: ExportSettings = {
     output: 'source',
     customDir: '',
     conflict: 'rename',
+    watermark: DEFAULT_WATERMARK,
 }
 
 const loadSettings = () => {
     try {
         const raw = localStorage.getItem(SETTINGS_KEY)
-        return raw ? { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<ExportSettings>) } : DEFAULT_SETTINGS
+        if (!raw) return DEFAULT_SETTINGS
+        const parsed = JSON.parse(raw) as Partial<ExportSettings>
+        return { ...DEFAULT_SETTINGS, ...parsed, watermark: { ...DEFAULT_WATERMARK, ...(parsed.watermark ?? {}) } }
     } catch {
         return DEFAULT_SETTINGS
     }
+}
+
+const outputDims = (settings: ExportSettings, width: number, height: number): [number, number] => {
+    if (width < 1 || height < 1) return [Math.max(1, width), Math.max(1, height)]
+    if (settings.resizeMode === 'long-edge') {
+        if (settings.resizeValue < 1) return [width, height]
+        const scale = Math.min(settings.resizeValue / Math.max(width, height), 1)
+        return [Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale))]
+    }
+    if (settings.resizeMode === 'percent') {
+        const scale = settings.resizeValue / 100
+        if (scale <= 0) return [width, height]
+        return [Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale))]
+    }
+    return [width, height]
 }
 
 const persistSettings = (settings: ExportSettings) => {
@@ -166,7 +198,7 @@ export const ensureAethSource = async (imageId: string) => {
     return { source, level: chosen.level }
 }
 
-type ExportFailure = { name: string; message: string }
+type ExportFailure = { imageId: string; name: string; message: string }
 
 type DngPrompt = { imageId: string; name: string; message: string }
 
@@ -190,6 +222,7 @@ type ExportStoreState = {
     update: (patch: Partial<ExportSettings>) => void
     acknowledgeGps: () => void
     start: () => Promise<void>
+    retryFailed: () => void
     cancel: () => void
     runDng: (imageId: string, name: string, entry: ImageEntry | undefined) => Promise<void>
     runEditedHandoff: (imageId: string, name: string, entry: ImageEntry | undefined, appPath: string) => Promise<void>
@@ -275,7 +308,7 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                     const resolved = await ensureAethSource(imageId)
                     if (!resolved) {
                         set((state) => ({
-                            failures: [...state.failures, { name, message: i18n.t('export.warnNoDecode') }],
+                            failures: [...state.failures, { imageId, name, message: i18n.t('export.warnNoDecode') }],
                             done: state.done + 1,
                         }))
                         continue
@@ -304,11 +337,18 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                         await exportCancel(jobId).catch(() => undefined)
                         break
                     }
+                    const watermark = get().settings.watermark
+                    if (watermark.enabled) {
+                        const [outputWidth, outputHeight] = outputDims(get().settings, job.width, job.height)
+                        const overlayImage = watermark.mode === 'image' ? await loadWatermarkImage(watermark.imagePath) : null
+                        const overlay = await renderWatermarkPng(outputWidth, outputHeight, watermark, overlayImage)
+                        if (overlay) await exportSetWatermark(jobId, overlay)
+                    }
                     const path = await exportFinish(jobId)
                     set((state) => ({ done: state.done + 1, lastOutputPath: path }))
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error)
-                    set((state) => ({ failures: [...state.failures, { name, message }], done: state.done + 1 }))
+                    set((state) => ({ failures: [...state.failures, { imageId, name, message }], done: state.done + 1 }))
                 }
             }
         } finally {
@@ -319,6 +359,12 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
             if (!cancelled && failed === 0 && get().lastOutputPath) useToast.getState().show(i18n.t('toast.exportDone'))
             else if (cancelled) useToast.getState().show(i18n.t('toast.exportCancelled'))
         }
+    },
+    retryFailed: () => {
+        const failedIds = get().failures.map((failure) => failure.imageId)
+        if (failedIds.length === 0) return
+        set({ targets: failedIds })
+        get().start()
     },
     runDng: async (imageId, name, entry) => {
         const outDir = resolveOutputDir(get().settings, entry)
@@ -363,6 +409,7 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                 output: 'source',
                 customDir: '',
                 conflict: 'overwrite',
+                watermark: DEFAULT_WATERMARK,
             }
             const request = buildRequest(settings, imageId, job.width, job.height, 1, dirname(entry.path), envelope.state.meta.appliedPreset)
             const jobId = await exportBegin(request)

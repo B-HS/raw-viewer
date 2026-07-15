@@ -8,7 +8,7 @@ use image::{ImageBuffer, Rgb};
 use crate::error::{AppError, AppResult};
 use crate::export::filename::{self, parse_exif_datetime, TokenValues};
 use crate::export::job::ExportJob;
-use crate::export::{color, encode, exif, icc};
+use crate::export::{color, encode, exif, icc, watermark};
 use crate::types_export::{ExportColorSpace, RasterExportRequest, RasterFormat, ResizeMode, ResizeSpec};
 use crate::types_meta::ImageMetadata;
 
@@ -111,6 +111,7 @@ pub fn run(
     request: &RasterExportRequest,
     source: &Path,
     meta: &ImageMetadata,
+    watermark_overlay: Option<&image::RgbaImage>,
     emit: impl Fn(u32, u32),
 ) -> AppResult<PathBuf> {
     let (out_width, out_height) = output_dims(request.resize, request.source_width, request.source_height);
@@ -127,7 +128,11 @@ pub fn run(
     let linear = resized_linear(canvas, request.source_width, request.source_height, out_width, out_height)?;
     emit(2, 4);
 
-    let pixels = transform_to_bytes(&linear, request.color_space, request.format, request.bits);
+    let mut pixels = transform_to_bytes(&linear, request.color_space, request.format, request.bits);
+    if let Some(overlay) = watermark_overlay {
+        let sixteen = matches!(encode::color_type(request.format, request.bits), image::ExtendedColorType::Rgb16);
+        watermark::composite(&mut pixels, out_width, out_height, sixteen, overlay)?;
+    }
     let profile = icc::profile_bytes(request.color_space);
     let encoded = encode::encode(request.format, out_width, out_height, request.bits, request.quality, &pixels, profile)?;
     emit(3, 4);
@@ -148,7 +153,7 @@ pub fn finish_job(job: &ExportJob, source: &Path, emit: impl Fn(u32, u32)) -> Ap
         return Err(AppError::Internal("export cancelled".to_owned()));
     }
     let meta = crate::meta::build_metadata(source);
-    run(&job.canvas, &job.request, source, &meta, emit)
+    run(&job.canvas, &job.request, source, &meta, job.watermark.as_ref(), emit)
 }
 
 #[cfg(test)]
@@ -279,7 +284,7 @@ mod tests {
         let canvas = vec![f16::from_f32(0.5); 2 * 2 * 3];
         let source = Path::new("/tmp/IMG_9.dng");
         let req = request(&dir, RasterFormat::Png, spec(ResizeMode::None, 0.0));
-        let Ok(path) = run(&canvas, &req, source, &minimal_meta(), |_, _| {}) else {
+        let Ok(path) = run(&canvas, &req, source, &minimal_meta(), None, |_, _| {}) else {
             panic!("run failed");
         };
         assert!(path.exists(), "output not written");
@@ -301,7 +306,7 @@ mod tests {
         let source = Path::new("/tmp/IMG_9.dng");
         let mut req = request(&dir, RasterFormat::Png, spec(ResizeMode::None, 0.0));
         req.conflict = ConflictPolicy::Skip;
-        let Ok(path) = run(&canvas, &req, source, &minimal_meta(), |_, _| {}) else {
+        let Ok(path) = run(&canvas, &req, source, &minimal_meta(), None, |_, _| {}) else {
             panic!("run failed");
         };
         let Ok(contents) = std::fs::read(&existing) else {
@@ -310,5 +315,24 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(path, existing);
         assert_eq!(contents, b"stale", "skip must not overwrite");
+    }
+
+    #[test]
+    fn run_composites_opaque_watermark() {
+        let dir = std::env::temp_dir().join(format!("rawviewer-wm-{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&dir);
+        let canvas = vec![f16::from_f32(0.5); 2 * 2 * 3];
+        let source = Path::new("/tmp/IMG_W.dng");
+        let req = request(&dir, RasterFormat::Png, spec(ResizeMode::None, 0.0));
+        let overlay = image::RgbaImage::from_pixel(2, 2, image::Rgba([255, 0, 0, 255]));
+        let Ok(path) = run(&canvas, &req, source, &minimal_meta(), Some(&overlay), |_, _| {}) else {
+            panic!("run failed");
+        };
+        let Ok(decoded) = image::open(&path) else {
+            panic!("decode output failed");
+        };
+        let _ = std::fs::remove_dir_all(&dir);
+        let pixel = decoded.to_rgb8();
+        assert_eq!(pixel.get_pixel(0, 0).0, [255, 0, 0], "watermark not composited");
     }
 }
