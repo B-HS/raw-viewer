@@ -3,16 +3,17 @@ pub mod store;
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, PoisonError};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Condvar, Mutex, PoisonError, RwLock};
 use std::time::{Duration, Instant};
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 use crate::cache::DiskCache;
 use crate::events::{self, RevCounters};
 use crate::scan::Registry;
 use crate::types::{DecodeFailedPayload, LevelReadyPayload, ProxyLevel};
+use crate::types_performance::{DecodeCrashLoopPayload, L2Policy, PerfSettings, EVENT_DECODE_CRASH_LOOP};
 
 use self::queue::{CancelFlag, Job, JobQueue};
 use self::store::{parse_aeth_header, PixelStore, DEFAULT_BUDGET_BYTES};
@@ -84,6 +85,7 @@ struct Decoded {
 enum DecodeOutcome {
     Cancelled,
     Failed(String),
+    Panicked(String),
 }
 
 #[derive(Default)]
@@ -140,6 +142,8 @@ struct Shared {
     nav: Mutex<NavState>,
     idle: (Mutex<IdleState>, Condvar),
     shutdown: AtomicBool,
+    settings: RwLock<PerfSettings>,
+    crash_count: AtomicU32,
 }
 
 pub struct Pipeline {
@@ -166,6 +170,8 @@ impl Pipeline {
                 Condvar::new(),
             ),
             shutdown: AtomicBool::new(false),
+            settings: RwLock::new(PerfSettings::default()),
+            crash_count: AtomicU32::new(0),
         });
         for _ in 0..worker_count() {
             let worker_shared = Arc::clone(&shared);
@@ -182,6 +188,18 @@ impl Pipeline {
 
     pub fn navigate(&self, current: String, prev: Vec<String>, next: Vec<String>) {
         self.shared.navigate(current, prev, next);
+    }
+
+    pub fn set_settings(&self, settings: PerfSettings) {
+        *self.shared.settings.write().unwrap_or_else(PoisonError::into_inner) = settings;
+    }
+
+    pub fn settings(&self) -> PerfSettings {
+        *self.shared.settings.read().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub fn request_l2(&self, image_id: String) {
+        self.shared.enqueue_current(&image_id, ProxyLevel::L2, PRIO_CURRENT_L2);
     }
 }
 
@@ -229,8 +247,21 @@ pub fn plan_idle(current: &str, prev: &[String], next: &[String]) -> Vec<(u32, S
     jobs
 }
 
+fn should_auto_l2_on_navigate(policy: L2Policy, rapid: bool) -> bool {
+    matches!(policy, L2Policy::Always) && !rapid
+}
+
+fn should_suppress_idle_l2(policy: L2Policy) -> bool {
+    matches!(policy, L2Policy::Zoom)
+}
+
 impl Shared {
-    fn navigate(&self, current: String, prev: Vec<String>, next: Vec<String>) {
+    fn navigate(&self, current: String, mut prev: Vec<String>, mut next: Vec<String>) {
+        let settings = *self.settings.read().unwrap_or_else(PoisonError::into_inner);
+        let radius = settings.preload_radius as usize;
+        prev.truncate(radius);
+        next.truncate(radius);
+
         let now = Instant::now();
         let rapid = {
             let mut nav = self.nav.lock().unwrap_or_else(PoisonError::into_inner);
@@ -253,6 +284,9 @@ impl Shared {
             } else {
                 self.enqueue_neighbor(&id, level, priority);
             }
+        }
+        if should_auto_l2_on_navigate(settings.l2_policy, rapid) {
+            self.enqueue_current(&current, ProxyLevel::L2, PRIO_CURRENT_L2);
         }
         self.arm_idle(current, prev, next);
     }
@@ -372,9 +406,27 @@ impl Shared {
         if job.cancel.load(Ordering::Relaxed) {
             return;
         }
-        match decode_level(&path, job.level, &job.cancel) {
+        let isolated = self.settings.read().unwrap_or_else(PoisonError::into_inner).isolated_decode;
+        match decode_level(&path, job.level, &job.cancel, isolated) {
             Ok(decoded) => self.finalize(&path, &job, decoded, false),
             Err(DecodeOutcome::Cancelled) => {}
+            Err(DecodeOutcome::Panicked(message)) => {
+                let count = self.crash_count.fetch_add(1, Ordering::Relaxed) + 1;
+                tracing::warn!(image_id = %job.image_id, level = ?job.level, count, %message, "image:decode-failed (panic)");
+                if count >= 2 {
+                    if let Err(error) = self.app.emit(EVENT_DECODE_CRASH_LOOP, DecodeCrashLoopPayload { count }) {
+                        tracing::warn!(%error, "emit decode:crash-loop failed");
+                    }
+                }
+                events::emit_decode_failed(
+                    &self.app,
+                    DecodeFailedPayload {
+                        image_id: job.image_id.clone(),
+                        level: job.level,
+                        message,
+                    },
+                );
+            }
             Err(DecodeOutcome::Failed(message)) => {
                 tracing::warn!(image_id = %job.image_id, level = ?job.level, %message, "image:decode-failed");
                 events::emit_decode_failed(
@@ -483,7 +535,11 @@ fn run_timer(shared: Arc<Shared>) {
             let window = idle.window.clone();
             drop(idle);
             if let Some((current, prev, next)) = window {
+                let policy = shared.settings.read().unwrap_or_else(PoisonError::into_inner).l2_policy;
                 for (priority, id, level) in plan_idle(&current, &prev, &next) {
+                    if id == current && level == ProxyLevel::L2 && should_suppress_idle_l2(policy) {
+                        continue;
+                    }
                     if id == current {
                         shared.enqueue_current(&id, level, priority);
                     } else {
@@ -503,10 +559,19 @@ fn run_timer(shared: Arc<Shared>) {
 }
 
 #[cfg(feature = "libraw")]
-fn decode_level(path: &Path, level: ProxyLevel, cancel: &CancelFlag) -> Result<Decoded, DecodeOutcome> {
+fn decode_level(path: &Path, level: ProxyLevel, cancel: &CancelFlag, isolated: bool) -> Result<Decoded, DecodeOutcome> {
     use crate::decode::{self, DecodeError, DecodedRaw};
+    use crate::isolate::IsolatedDecoded;
 
     fn map_error(error: DecodeError) -> DecodeOutcome {
+        match error {
+            DecodeError::Cancelled => DecodeOutcome::Cancelled,
+            DecodeError::Panic => DecodeOutcome::Panicked(error.to_string()),
+            other => DecodeOutcome::Failed(other.to_string()),
+        }
+    }
+
+    fn map_isolated_error(error: DecodeError) -> DecodeOutcome {
         match error {
             DecodeError::Cancelled => DecodeOutcome::Cancelled,
             other => DecodeOutcome::Failed(other.to_string()),
@@ -527,6 +592,17 @@ fn decode_level(path: &Path, level: ProxyLevel, cancel: &CancelFlag) -> Result<D
         }
     }
 
+    fn from_isolated(decoded: IsolatedDecoded) -> Decoded {
+        Decoded {
+            body: decoded.body,
+            width: decoded.width,
+            height: decoded.height,
+            flip: decoded.flip,
+            has_color_profile: decoded.has_color_profile,
+            color_matrix: decoded.color_matrix,
+        }
+    }
+
     match level {
         ProxyLevel::L0 => {
             let thumb = decode::extract_thumb(path).map_err(map_error)?;
@@ -539,13 +615,20 @@ fn decode_level(path: &Path, level: ProxyLevel, cancel: &CancelFlag) -> Result<D
                 color_matrix: None,
             })
         }
-        ProxyLevel::L1 => Ok(build_aeth(decode::decode_half(path, cancel).map_err(map_error)?)),
-        ProxyLevel::L2 => Ok(build_aeth(decode::decode_full(path, cancel).map_err(map_error)?)),
+        ProxyLevel::L1 | ProxyLevel::L2 => {
+            if isolated {
+                Ok(from_isolated(crate::isolate::decode_via_subprocess(path, level, cancel).map_err(map_isolated_error)?))
+            } else if level == ProxyLevel::L1 {
+                Ok(build_aeth(decode::decode_half(path, cancel).map_err(map_error)?))
+            } else {
+                Ok(build_aeth(decode::decode_full(path, cancel).map_err(map_error)?))
+            }
+        }
     }
 }
 
 #[cfg(not(feature = "libraw"))]
-fn decode_level(_path: &Path, _level: ProxyLevel, _cancel: &CancelFlag) -> Result<Decoded, DecodeOutcome> {
+fn decode_level(_path: &Path, _level: ProxyLevel, _cancel: &CancelFlag, _isolated: bool) -> Result<Decoded, DecodeOutcome> {
     Err(DecodeOutcome::Failed("libraw feature disabled".to_owned()))
 }
 
@@ -616,6 +699,31 @@ mod tests {
     #[test]
     fn worker_count_is_at_least_two() {
         assert!(worker_count() >= 2);
+    }
+
+    #[test]
+    fn default_settings_preserve_current_l2_behavior() {
+        let settings = PerfSettings::default();
+        assert_eq!(settings.preload_radius, 3);
+        assert_eq!(settings.l2_policy, L2Policy::Idle);
+        assert!(!settings.isolated_decode);
+        assert!(!should_auto_l2_on_navigate(settings.l2_policy, false));
+        assert!(!should_suppress_idle_l2(settings.l2_policy));
+    }
+
+    #[test]
+    fn always_policy_adds_navigate_l2_unless_rapid() {
+        assert!(should_auto_l2_on_navigate(L2Policy::Always, false));
+        assert!(!should_auto_l2_on_navigate(L2Policy::Always, true));
+        assert!(!should_auto_l2_on_navigate(L2Policy::Idle, false));
+        assert!(!should_auto_l2_on_navigate(L2Policy::Zoom, false));
+    }
+
+    #[test]
+    fn zoom_policy_suppresses_idle_l2_only() {
+        assert!(should_suppress_idle_l2(L2Policy::Zoom));
+        assert!(!should_suppress_idle_l2(L2Policy::Idle));
+        assert!(!should_suppress_idle_l2(L2Policy::Always));
     }
 
     #[test]

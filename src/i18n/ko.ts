@@ -355,6 +355,7 @@ export const ko = {
             googleMaps: 'Google Maps',
             appleMaps: 'Apple 지도',
             mapFailed: '지도를 불러올 수 없습니다',
+            osmAttribution: '© OpenStreetMap contributors (Nominatim)',
         },
         aether: {
             edited: '편집 여부',
@@ -473,13 +474,19 @@ export const ko = {
         themeDark: '다크',
         themeLight: '라이트',
         viewportBackground: '뷰포트 배경',
+        map: '지도',
+        showAddress: '주소 표시 (Nominatim)',
+        showAddressNote:
+            '켜면 GPS 좌표를 OpenStreetMap Nominatim 서비스로 전송해 주소를 조회합니다. 요청은 초당 1회로 제한되며 결과는 로컬에 캐시됩니다. 기본값은 꺼짐입니다.',
         performance: '성능',
         preloadRadius: '프리로드 범위',
         l2Policy: 'L2 자동 디코딩',
         l2Always: '항상',
         l2Idle: '유휴 시에만',
         l2Zoom: '100% 줌에서만',
-        performanceNote: '성능 설정은 저장되며 이후 업데이트에서 엔진에 반영됩니다.',
+        isolatedDecode: '격리 디코딩',
+        isolatedDecodeNote: 'RAW를 별도 프로세스에서 디코딩해 손상된 파일이 앱을 중단시키지 않도록 합니다. 다소 느려질 수 있습니다.',
+        performanceNote: '설정은 저장되어 즉시 디코딩 엔진에 반영됩니다.',
         cache: '캐시',
         cacheUsage: '사용량',
         cacheTotal: '전체',
@@ -558,6 +565,11 @@ export const ko = {
     trash: {
         title: '휴지통으로 이동',
         confirm: '{{count}}개 파일을 휴지통으로 이동합니다.',
+    },
+    crashLoop: {
+        message: '이미지 디코딩이 반복해서 실패했습니다. 설정에서 "격리 디코딩"을 켜면 문제 있는 파일에서도 계속 작업할 수 있습니다.',
+        openSettings: '설정 열기',
+        dismiss: '무시',
     },
     toast: {
         copying: '복사 중...',

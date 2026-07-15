@@ -9,6 +9,8 @@ pub mod error;
 pub mod events;
 pub mod exiftool;
 pub mod export;
+pub mod geocode;
+pub mod isolate;
 pub mod lens;
 pub mod meta;
 pub mod organize;
@@ -23,6 +25,7 @@ pub mod types_export;
 pub mod types_lens;
 pub mod types_meta;
 pub mod types_cpurender;
+pub mod types_performance;
 pub mod types_platform;
 pub mod types_preset;
 pub mod watch;
@@ -150,6 +153,10 @@ pub fn run() {
             commands::move_to_trash,
             commands::watch_directory,
             commands::render_cpu_frame,
+            commands::set_performance_settings,
+            commands::get_performance_settings,
+            commands::request_l2,
+            commands::get_reverse_geocode,
             export::commands::export_begin,
             export::commands::export_tile,
             export::commands::export_set_watermark,

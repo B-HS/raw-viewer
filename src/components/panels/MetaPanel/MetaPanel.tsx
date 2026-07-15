@@ -2,9 +2,11 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { useEffect, useState } from 'react'
 import type { ComponentType, FC } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getReverseGeocode } from '../../../ipc/geocode'
 import { useEditStore } from '../../../store/editStore'
 import { useMeta } from '../../../store/meta'
 import { useOrganize } from '../../../store/organize'
+import { useSettings } from '../../../store/settings'
 import { useToast } from '../../../store/toast'
 import type { GpsMeta } from '../../../types/GpsMeta'
 import type { SensorType } from '../../../types/SensorType'
@@ -45,9 +47,12 @@ export const MetaPanel: FC = () => {
     const loading = useMeta((state) => state.loading)
     const error = useMeta((state) => state.error)
     const metaImageId = useMeta((state) => state.imageId)
+    const gpsCollapsed = useMeta((state) => state.collapsed['gps'] ?? false)
     const organize = useOrganize((state) => (metaImageId ? state.entries[metaImageId] : undefined))
     const edited = useOrganize((state) => (metaImageId ? (state.edited[metaImageId] ?? false) : false))
     const editMeta = useEditStore((state) => (state.imageId === metaImageId ? (state.state?.meta ?? null) : null))
+    const showAddress = useSettings((state) => state.showAddress)
+    const [address, setAddress] = useState<string | null>(null)
 
     const gps = metadata?.gps ?? null
 
@@ -62,6 +67,18 @@ export const MetaPanel: FC = () => {
             alive = false
         }
     }, [gps != null])
+
+    useEffect(() => {
+        setAddress(null)
+        if (!showAddress || !gps || gpsCollapsed || !metaImageId) return
+        let alive = true
+        getReverseGeocode(metaImageId)
+            .then((name) => alive && setAddress(name))
+            .catch(() => alive && setAddress(null))
+        return () => {
+            alive = false
+        }
+    }, [metaImageId, showAddress, gpsCollapsed, gps != null])
 
     return (
         <aside className='flex h-full w-80 flex-col border-l border-neutral-800 bg-neutral-900 text-neutral-200'>
@@ -231,6 +248,12 @@ export const MetaPanel: FC = () => {
                                 [t('meta.gps.method'), gps.processingMethod],
                                 [t('meta.gps.dop'), gps.dop != null ? gps.dop.toFixed(1) : null],
                             ])}>
+                            {showAddress && address && (
+                                <div className='px-3 pb-1'>
+                                    <div className='text-xs leading-snug text-neutral-200'>{address}</div>
+                                    <div className='mt-0.5 text-[9px] text-neutral-500'>{t('meta.gps.osmAttribution')}</div>
+                                </div>
+                            )}
                             {MapComponent && <MapComponent gps={gps} />}
                             <div className='flex flex-wrap gap-1 px-3 pb-1'>
                                 <button
