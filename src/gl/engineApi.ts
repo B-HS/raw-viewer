@@ -1,12 +1,9 @@
 import { tempTintFromGains, wbGainsFromState } from './wbModel'
 import type { Renderer } from './renderer'
+import type { ClippingMode, CompareSplit } from './viewTypes'
 import type { EditState } from '../types/EditState'
 import type { LensProfileMatch } from '../types/LensProfileMatch'
 import type { WbState } from '../types/WbState'
-
-export type ClippingMode = 'none' | 'both' | 'highlight' | 'shadow'
-
-export type CompareSplit = { axis: 'x' | 'y'; position: number } | null
 
 export type EngineApi = {
     setEditState: (state: EditState | null) => void
