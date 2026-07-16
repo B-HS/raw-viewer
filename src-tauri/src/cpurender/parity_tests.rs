@@ -60,8 +60,8 @@ fn wb_gains_match_ts_within_tolerance() {
     assert!(!data.cases.is_empty());
     for case in data.cases {
         let gains = luts::wb_gains(case.temp, case.tint, case.temp_shift);
-        for channel in 0..3 {
-            let diff = (gains[channel] - case.gains[channel]).abs();
+        for (channel, gain) in gains.iter().enumerate() {
+            let diff = (gain - case.gains[channel]).abs();
             assert!(
                 diff < 1e-3,
                 "wb gains temp={} tint={} shift={:?} channel {channel}: ts={} rust={} diff={diff}",
@@ -111,14 +111,14 @@ fn colorspace_constants_and_application_match_ts() {
     }
     for case in &data.apply_rec2020_to_srgb {
         let out = color::apply_matrix(&color::REC2020_TO_SRGB, case.input[0], case.input[1], case.input[2]);
-        for channel in 0..3 {
-            assert!((out[channel] - case.out[channel]).abs() < 1e-3, "srgb apply {:?} channel {channel}: ts={} rust={}", case.input, case.out[channel], out[channel]);
+        for (channel, value) in out.iter().enumerate() {
+            assert!((value - case.out[channel]).abs() < 1e-3, "srgb apply {:?} channel {channel}: ts={} rust={value}", case.input, case.out[channel]);
         }
     }
     for case in &data.apply_rec2020_to_p3 {
         let out = color::apply_matrix(&color::REC2020_TO_P3, case.input[0], case.input[1], case.input[2]);
-        for channel in 0..3 {
-            assert!((out[channel] - case.out[channel]).abs() < 1e-3, "p3 apply {:?} channel {channel}: ts={} rust={}", case.input, case.out[channel], out[channel]);
+        for (channel, value) in out.iter().enumerate() {
+            assert!((value - case.out[channel]).abs() < 1e-3, "p3 apply {:?} channel {channel}: ts={} rust={value}", case.input, case.out[channel]);
         }
     }
 }

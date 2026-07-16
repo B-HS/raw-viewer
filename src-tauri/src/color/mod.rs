@@ -108,10 +108,10 @@ mod tests {
         assert!(inv.is_some());
         if let Some(inv) = inv {
             let product = matmul3(&CAM_XYZ_5D3, &inv);
-            for r in 0..3 {
-                for c in 0..3 {
+            for (r, row) in product.iter().enumerate() {
+                for (c, value) in row.iter().enumerate() {
                     let expected = if r == c { 1.0 } else { 0.0 };
-                    assert!((product[r][c] - expected).abs() < 1e-3, "identity mismatch at {r},{c}: {}", product[r][c]);
+                    assert!((value - expected).abs() < 1e-3, "identity mismatch at {r},{c}: {value}");
                 }
             }
         }

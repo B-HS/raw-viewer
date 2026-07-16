@@ -149,7 +149,7 @@ fn probe_tiff(data: &[u8]) -> AppResult<TiffProbe> {
 }
 
 fn align_even(buffer: &mut Vec<u8>) {
-    if buffer.len() % 2 != 0 {
+    if !buffer.len().is_multiple_of(2) {
         buffer.push(0);
     }
 }

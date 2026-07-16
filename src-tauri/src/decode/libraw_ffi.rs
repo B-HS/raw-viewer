@@ -137,8 +137,8 @@ pub fn probe_metadata(path: &Path) -> Option<super::ProbeMetadata> {
         let mut black_levels = Vec::new();
         let cblack = &color.cblack;
         if cblack[0..4].iter().any(|&value| value != 0) {
-            for channel in 0..4 {
-                black_levels.push(color.black.wrapping_add(cblack[channel]));
+            for &channel_black in &cblack[0..4] {
+                black_levels.push(color.black.wrapping_add(channel_black));
             }
         } else {
             black_levels.push(color.black);
@@ -162,7 +162,7 @@ pub fn probe_metadata(path: &Path) -> Option<super::ProbeMetadata> {
         };
 
         let focal_35mm = positive_f32(lens.makernotes.FocalLengthIn35mmFormat)
-            .or_else(|| if lens.FocalLengthIn35mmFormat > 0 { Some(lens.FocalLengthIn35mmFormat as f32) } else { None });
+            .or(if lens.FocalLengthIn35mmFormat > 0 { Some(lens.FocalLengthIn35mmFormat as f32) } else { None });
         let max_aperture = positive_f32(lens.makernotes.MaxAp).or_else(|| positive_f32(lens.EXIF_MaxAp));
 
         Ok(super::ProbeMetadata {

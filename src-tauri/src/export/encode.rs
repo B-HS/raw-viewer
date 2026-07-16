@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn tiff_embeds_icc() {
         let icc = crate::export::icc::profile_bytes(crate::types_export::ExportColorSpace::AdobeRgb);
-        let Ok(bytes) = encode(RasterFormat::Tiff, 4, 4, 16, 90, &vec![0u8; 4 * 4 * 3 * 2], icc) else {
+        let Ok(bytes) = encode(RasterFormat::Tiff, 4, 4, 16, 90, &[0u8; 4 * 4 * 3 * 2], icc) else {
             panic!("tiff encode failed");
         };
         let Ok(decoder) = image::codecs::tiff::TiffDecoder::new(Cursor::new(bytes)) else {
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn png16_encodes_native_endian_input() {
-        let Ok(bytes) = encode(RasterFormat::Png, 2, 2, 16, 90, &vec![0u8; 2 * 2 * 3 * 2], None) else {
+        let Ok(bytes) = encode(RasterFormat::Png, 2, 2, 16, 90, &[0u8; 2 * 2 * 3 * 2], None) else {
             panic!("png16 encode failed");
         };
         let Ok(decoder) = image::codecs::png::PngDecoder::new(Cursor::new(&bytes)) else {

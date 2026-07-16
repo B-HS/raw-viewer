@@ -187,7 +187,7 @@ mod tests {
             panic!("take failed");
         };
         assert_eq!(job.tiles_received, 1);
-        let base = (1 * 4 + 2) * 3;
+        let base = (4 + 2) * 3;
         assert!((job.canvas[base].to_f32() - 0.1).abs() < 1e-2);
         assert!((job.canvas[base + 3].to_f32() - 0.4).abs() < 1e-2);
         assert_eq!(job.canvas[0].to_f32(), 0.0);

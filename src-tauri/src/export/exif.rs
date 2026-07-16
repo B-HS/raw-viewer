@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn writes_camera_exif_into_jpeg_and_omits_gps() {
         let path = temp_path("jpg");
-        let Ok(bytes) = crate::export::encode::encode(RasterFormat::Jpeg, 8, 8, 8, 90, &vec![120u8; 8 * 8 * 3], None) else {
+        let Ok(bytes) = crate::export::encode::encode(RasterFormat::Jpeg, 8, 8, 8, 90, &[120u8; 8 * 8 * 3], None) else {
             panic!("jpeg encode failed");
         };
         if std::fs::write(&path, &bytes).is_err() {
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn none_mode_writes_only_orientation() {
         let path = temp_path("jpg");
-        let Ok(bytes) = crate::export::encode::encode(RasterFormat::Jpeg, 8, 8, 8, 90, &vec![120u8; 8 * 8 * 3], None) else {
+        let Ok(bytes) = crate::export::encode::encode(RasterFormat::Jpeg, 8, 8, 8, 90, &[120u8; 8 * 8 * 3], None) else {
             panic!("jpeg encode failed");
         };
         if std::fs::write(&path, &bytes).is_err() {

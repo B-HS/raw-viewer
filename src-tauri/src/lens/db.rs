@@ -118,7 +118,7 @@ impl LensIndex {
     }
 
     #[cfg(test)]
-    pub fn from_str(contents: &str) -> Self {
+    pub fn from_xml(contents: &str) -> Self {
         let mut index = LensIndex {
             loaded: true,
             ..LensIndex::default()
@@ -190,7 +190,7 @@ impl LensIndex {
                     b"mount" => {
                         if ctx == Ctx::MountDef {
                             if let Some(name) = mount_name.take() {
-                                self.mounts.entry(name).or_default().extend(mount_compat.drain(..));
+                                self.mounts.entry(name).or_default().append(&mut mount_compat);
                             }
                             mount_compat.clear();
                             ctx = Ctx::Root;
