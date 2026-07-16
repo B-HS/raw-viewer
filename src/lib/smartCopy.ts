@@ -1,5 +1,5 @@
 import { renderClipboardPng } from '../gl/clipboardRender'
-import { i18n } from '../i18n'
+import { i18n } from '../i18n/i18n'
 import { getEditState } from '../ipc/commands'
 import { copyImageToClipboard } from '../ipc/platform'
 import { useEditStore } from '../store/editStore'

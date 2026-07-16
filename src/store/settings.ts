@@ -1,9 +1,9 @@
 import { load } from '@tauri-apps/plugin-store'
 import { create } from 'zustand'
-import { applyLanguage } from '../i18n'
+import { applyLanguage } from '../i18n/i18n'
 import { setPerformanceSettings } from '../ipc/performance'
 import { sanitizeOverrides } from '../shortcuts/keymap'
-import type { AppLanguage } from '../i18n'
+import type { AppLanguage } from '../i18n/i18n'
 import type { Binding } from '../shortcuts/keymap'
 
 export type AppTheme = 'system' | 'dark' | 'light'

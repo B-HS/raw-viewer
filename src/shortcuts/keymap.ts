@@ -1,5 +1,3 @@
-import { useSettings } from '../store/settings'
-
 export const KEYMAP = {
     zoom: {
         toggleFit: 'KeyZ',
@@ -93,7 +91,7 @@ export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
     { id: 'export.dng', section: 'export', label: 'shortcut.exportDng', binding: { code: 'KeyD', meta: true, shift: true } },
 ] as const
 
-const ACTION_BY_ID = new Map(SHORTCUT_ACTIONS.map((action) => [action.id, action]))
+export const ACTION_BY_ID = new Map(SHORTCUT_ACTIONS.map((action) => [action.id, action]))
 
 export const DEFAULT_BINDINGS: Record<string, Binding> = Object.fromEntries(SHORTCUT_ACTIONS.map((action) => [action.id, action.binding]))
 
@@ -108,17 +106,6 @@ export const sanitizeOverrides = (value: unknown): Record<string, Binding> => {
     }
     return result
 }
-
-export const resolveBinding = (id: string): Binding => useSettings.getState().shortcutOverrides[id] ?? DEFAULT_BINDINGS[id]
-
-const bindingMatches = (event: KeyboardEvent, binding: Binding, ignore?: ShortcutIgnore[]) =>
-    event.code === binding.code &&
-    event.metaKey === !!binding.meta &&
-    event.ctrlKey === !!binding.ctrl &&
-    (ignore?.includes('shift') ? true : event.shiftKey === !!binding.shift) &&
-    (ignore?.includes('alt') ? true : event.altKey === !!binding.alt)
-
-export const matchAction = (event: KeyboardEvent, id: string) => bindingMatches(event, resolveBinding(id), ACTION_BY_ID.get(id)?.ignore)
 
 const MODIFIER_CODES = new Set([
     'MetaLeft',

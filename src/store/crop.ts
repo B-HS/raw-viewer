@@ -1,5 +1,5 @@
 import { dispDims } from '../gl/viewTransform'
-import { i18n } from '../i18n'
+import { i18n } from '../i18n/i18n'
 import { useEditStore } from './editStore'
 import { usePlaylist } from './playlist'
 import { useUiStore } from './uiStore'

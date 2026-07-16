@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { i18n } from '../i18n'
+import { i18n } from '../i18n/i18n'
 import { useToast } from './toast'
 import { useLens } from './lens'
 import { LEVEL_RANK, usePlaylist } from './playlist'
@@ -70,12 +70,24 @@ const DEFAULT_SETTINGS: ExportSettings = {
     watermark: DEFAULT_WATERMARK,
 }
 
+const sanitizeSection = <T extends Record<string, unknown>>(defaults: T, value: unknown): T => {
+    if (typeof value !== 'object' || value === null) return defaults
+    const record = value as Record<string, unknown>
+    const result = { ...defaults }
+    for (const key of Object.keys(defaults) as (keyof T)[]) {
+        const candidate = record[key as string]
+        if (typeof candidate === typeof defaults[key] && typeof candidate !== 'object') result[key] = candidate as T[typeof key]
+    }
+    return result
+}
+
 const loadSettings = () => {
     try {
         const raw = localStorage.getItem(SETTINGS_KEY)
         if (!raw) return DEFAULT_SETTINGS
-        const parsed = JSON.parse(raw) as Partial<ExportSettings>
-        return { ...DEFAULT_SETTINGS, ...parsed, watermark: { ...DEFAULT_WATERMARK, ...(parsed.watermark ?? {}) } }
+        const parsed: unknown = JSON.parse(raw)
+        const record = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+        return { ...sanitizeSection(DEFAULT_SETTINGS, parsed), watermark: sanitizeSection(DEFAULT_WATERMARK, record.watermark) }
     } catch {
         return DEFAULT_SETTINGS
     }

@@ -1,6 +1,6 @@
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { create } from 'zustand'
-import { i18n } from '../i18n'
+import { i18n } from '../i18n/i18n'
 import { useEditStore } from './editStore'
 import { usePlaylist } from './playlist'
 import { useToast } from './toast'

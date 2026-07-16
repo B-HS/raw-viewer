@@ -32,27 +32,6 @@ export const Viewport: FC = () => {
     const error = current ? errors[current.imageId] : undefined
     const noProfile = level?.hasColorProfile === false
 
-    useEffect(() => {
-        useUiStore.getState().attachEngine(engine)
-        if (engine) {
-            const state = useEditStore.getState().state
-            if (state) engine.setEditState(state)
-            useLens.getState().syncEngine()
-        }
-        return () => {
-            useUiStore.getState().attachEngine(null)
-        }
-    }, [engine])
-
-    useEffect(() => {
-        if (!engine) return
-        const unsubscribe = engine.onHistogram((hist) => useHistogram.getState().setData(hist))
-        return () => {
-            unsubscribe()
-            useHistogram.getState().setData(null)
-        }
-    }, [engine])
-
     const sampleWhiteBalance = (event: React.MouseEvent) => {
         if (!engine || !useEditStore.getState().isRaw) {
             useUiStore.getState().setEyedropper(false)
@@ -80,6 +59,27 @@ export const Viewport: FC = () => {
         const position = compare.axis === 'x' ? (event.clientX - rect.left) / rect.width : (event.clientY - rect.top) / rect.height
         useUiStore.getState().setComparePosition(position)
     }
+
+    useEffect(() => {
+        useUiStore.getState().attachEngine(engine)
+        if (engine) {
+            const state = useEditStore.getState().state
+            if (state) engine.setEditState(state)
+            useLens.getState().syncEngine()
+        }
+        return () => {
+            useUiStore.getState().attachEngine(null)
+        }
+    }, [engine])
+
+    useEffect(() => {
+        if (!engine) return
+        const unsubscribe = engine.onHistogram((hist) => useHistogram.getState().setData(hist))
+        return () => {
+            unsubscribe()
+            useHistogram.getState().setData(null)
+        }
+    }, [engine])
 
     if (gpuError)
         return (

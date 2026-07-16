@@ -12,8 +12,10 @@ import { flipDegrees } from './projection'
 const EDIT_DEBOUNCE_MS = 300
 const MIN_MAX_EDGE = 1024
 const MAX_MAX_EDGE = 4096
+const DEFAULT_MAX_EDGE = 2048
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 16
+const WHEEL_ZOOM_SENSITIVITY = 0.01
 
 type Frame = { w: number; h: number; flip: number }
 type View = { zoom: number; panX: number; panY: number }
@@ -39,7 +41,7 @@ export const CpuFallbackView: FC = () => {
     const maxEdge = () => {
         const dpr = window.devicePixelRatio || 1
         const long = Math.max(container.w, container.h)
-        if (long <= 0) return 2048
+        if (long <= 0) return DEFAULT_MAX_EDGE
         return Math.max(MIN_MAX_EDGE, Math.min(MAX_MAX_EDGE, Math.round(long * dpr)))
     }
 
@@ -72,6 +74,31 @@ export const CpuFallbackView: FC = () => {
     }
     const drawRef = useRef(draw)
     drawRef.current = draw
+
+    const onPointerDown = (event: React.PointerEvent) => {
+        if (event.button !== 0) return
+        dragRef.current = { x: event.clientX, y: event.clientY }
+        event.currentTarget.setPointerCapture(event.pointerId)
+    }
+    const onPointerMove = (event: React.PointerEvent) => {
+        const drag = dragRef.current
+        if (!drag) return
+        const dx = event.clientX - drag.x
+        const dy = event.clientY - drag.y
+        drag.x = event.clientX
+        drag.y = event.clientY
+        setView((current) => ({ ...current, panX: current.panX + dx, panY: current.panY + dy }))
+    }
+    const onPointerUp = (event: React.PointerEvent) => {
+        dragRef.current = null
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+
+    const flip = frame?.flip ?? 0
+    const disp = frame ? dispDims(frame.w, frame.h, flip) : { dispW: 1, dispH: 1 }
+    const fitScale = container.w > 0 && disp.dispW > 0 ? Math.min(container.w / disp.dispW, container.h / disp.dispH) : 1
+    const scale = fitScale * view.zoom
+    const transform = `translate(-50%, -50%) translate(${view.panX}px, ${view.panY}px) rotate(${flipDegrees(flip)}deg) scale(${scale})`
 
     useEffect(() => {
         const element = containerRef.current
@@ -122,36 +149,14 @@ export const CpuFallbackView: FC = () => {
         if (!element) return
         const onWheel = (event: WheelEvent) => {
             event.preventDefault()
-            setView((current) => ({ ...current, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current.zoom * Math.exp(-event.deltaY * 0.01))) }))
+            setView((current) => ({
+                ...current,
+                zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current.zoom * Math.exp(-event.deltaY * WHEEL_ZOOM_SENSITIVITY))),
+            }))
         }
         element.addEventListener('wheel', onWheel, { passive: false })
         return () => element.removeEventListener('wheel', onWheel)
     }, [])
-
-    const onPointerDown = (event: React.PointerEvent) => {
-        if (event.button !== 0) return
-        dragRef.current = { x: event.clientX, y: event.clientY }
-        event.currentTarget.setPointerCapture(event.pointerId)
-    }
-    const onPointerMove = (event: React.PointerEvent) => {
-        const drag = dragRef.current
-        if (!drag) return
-        const dx = event.clientX - drag.x
-        const dy = event.clientY - drag.y
-        drag.x = event.clientX
-        drag.y = event.clientY
-        setView((current) => ({ ...current, panX: current.panX + dx, panY: current.panY + dy }))
-    }
-    const onPointerUp = (event: React.PointerEvent) => {
-        dragRef.current = null
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-
-    const flip = frame?.flip ?? 0
-    const disp = frame ? dispDims(frame.w, frame.h, flip) : { dispW: 1, dispH: 1 }
-    const fitScale = container.w > 0 && disp.dispW > 0 ? Math.min(container.w / disp.dispW, container.h / disp.dispH) : 1
-    const scale = fitScale * view.zoom
-    const transform = `translate(-50%, -50%) translate(${view.panX}px, ${view.panY}px) rotate(${flipDegrees(flip)}deg) scale(${scale})`
 
     return (
         <div ref={containerRef} className='absolute inset-0 touch-none overflow-hidden bg-viewport'>
