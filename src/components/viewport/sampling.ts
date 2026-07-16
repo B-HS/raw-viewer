@@ -31,7 +31,7 @@ const angularDistance = (a: number, b: number) => {
     return Math.min(d, 360 - d)
 }
 
-export const nearestBand = (degrees: number): HslBand => {
+export const nearestBand = (degrees: number) => {
     let best = HSL_BANDS[0]
     let bestDist = Infinity
     for (const band of HSL_BANDS) {

@@ -15,7 +15,7 @@ export const LABELS: LabelDef[] = [
 
 export const labelColor = (label: string | null) => LABELS.find((entry) => entry.name === label)?.color ?? null
 
-const emptyEntry = (imageId: string): OrganizeEntry => ({ imageId, rating: 0, flag: null, label: null })
+const emptyEntry = (imageId: string) => ({ imageId, rating: 0, flag: null, label: null })
 
 type OrganizePatch = Partial<Pick<OrganizeEntry, 'rating' | 'flag' | 'label'>>
 

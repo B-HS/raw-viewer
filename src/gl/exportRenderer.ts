@@ -83,7 +83,7 @@ const orientModelMatrix = (renderW: number, renderH: number, ow: number, oh: num
     return new Float32Array([cos * hx * ox, sin * hx * oy, 0, -sin * hy * ox, cos * hy * oy, 0, 0, 0, 1])
 }
 
-export const createExportEngine = (): ExportEngine => {
+export const createExportEngine = () => {
     const canvas = document.createElement('canvas')
     canvas.width = 1
     canvas.height = 1
@@ -104,7 +104,7 @@ export const createExportEngine = (): ExportEngine => {
     const readType = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) === gl.HALF_FLOAT ? gl.HALF_FLOAT : gl.FLOAT
     const identityCol = toColumnMajor(IDENTITY3)
 
-    const compile = (vertex: string, fragment: string, names: string[]): ProgramInfo => {
+    const compile = (vertex: string, fragment: string, names: string[]) => {
         const program = createProgram(gl, vertex, fragment)
         return { program, u: uniformLocations(gl, program, names) }
     }
@@ -168,7 +168,7 @@ export const createExportEngine = (): ExportEngine => {
         return texture
     }
 
-    const createTarget = (width: number, height: number): Target => {
+    const createTarget = (width: number, height: number) => {
         const tex = createColorTexture(width, height, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, null)
         const fbo = gl.createFramebuffer()
         if (!fbo) throw new Error('gl fbo alloc failed')
@@ -383,7 +383,7 @@ export const createExportEngine = (): ExportEngine => {
         return { finalTex: last, targets }
     }
 
-    const prepare = (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null): ExportJob => {
+    const prepare = (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null) => {
         const longEdge = Math.max(source.width, source.height)
         const scale = longEdge > maxTexture ? maxTexture / longEdge : 1
         const renderW = Math.max(1, Math.round(source.width * scale))

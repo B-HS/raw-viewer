@@ -97,7 +97,7 @@ export const DEFAULT_BINDINGS: Record<string, Binding> = Object.fromEntries(SHOR
 
 const isBinding = (value: unknown): value is Binding => typeof value === 'object' && value !== null && typeof (value as Binding).code === 'string'
 
-export const sanitizeOverrides = (value: unknown): Record<string, Binding> => {
+export const sanitizeOverrides = (value: unknown) => {
     if (typeof value !== 'object' || value === null) return {}
     const result: Record<string, Binding> = {}
     for (const [id, binding] of Object.entries(value as Record<string, unknown>)) {
@@ -121,7 +121,7 @@ const MODIFIER_CODES = new Set([
     'CapsLock',
 ])
 
-export const eventToBinding = (event: KeyboardEvent): Binding | null => {
+export const eventToBinding = (event: KeyboardEvent) => {
     if (MODIFIER_CODES.has(event.code)) return null
     return { code: event.code, meta: event.metaKey, shift: event.shiftKey, alt: event.altKey, ctrl: event.ctrlKey }
 }
@@ -131,7 +131,7 @@ export const serializeBinding = (binding: Binding) =>
 
 export const bindingsEqual = (a: Binding, b: Binding) => serializeBinding(a) === serializeBinding(b)
 
-export const activeConflicts = (overrides: Record<string, Binding>): Set<string> => {
+export const activeConflicts = (overrides: Record<string, Binding>) => {
     const byBinding = new Map<string, string[]>()
     for (const action of SHORTCUT_ACTIONS) {
         const key = serializeBinding(overrides[action.id] ?? action.binding)

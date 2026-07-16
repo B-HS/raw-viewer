@@ -12,7 +12,7 @@ const RIGHT_PANELS: readonly RightPanel[] = ['edit', 'meta', 'preset', 'history'
 
 const isRightPanel = (value: unknown): value is RightPanel => (RIGHT_PANELS as readonly unknown[]).includes(value)
 
-const sanitizePersisted = (value: unknown): Persisted => {
+const sanitizePersisted = (value: unknown) => {
     if (typeof value !== 'object' || value === null) return DEFAULTS
     const record = value as Record<string, unknown>
     return {

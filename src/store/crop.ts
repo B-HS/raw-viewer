@@ -28,7 +28,7 @@ const currentDisplayDims = () => {
     return dispDims(best.width, best.height, best.flip)
 }
 
-export const cropDisplayRatio = (aspect: string): number | null => {
+export const cropDisplayRatio = (aspect: string) => {
     if (aspect === 'free') return null
     if (aspect === 'original') {
         const { dispW, dispH } = currentDisplayDims()
@@ -38,7 +38,7 @@ export const cropDisplayRatio = (aspect: string): number | null => {
     return parts.length === 2 && parts[0] > 0 && parts[1] > 0 ? parts[0] / parts[1] : null
 }
 
-export const cropNormRatio = (aspect: string): number | null => {
+export const cropNormRatio = (aspect: string) => {
     const ratio = cropDisplayRatio(aspect)
     if (ratio === null) return null
     const { dispW, dispH } = currentDisplayDims()
@@ -46,21 +46,21 @@ export const cropNormRatio = (aspect: string): number | null => {
     return displayAspect > 0 ? ratio / displayAspect : ratio
 }
 
-export const sourceToDisplay = (rect: Rect, flip: number): Rect => {
+export const sourceToDisplay = (rect: Rect, flip: number) => {
     if (flip === 3) return { left: 1 - rect.right, top: 1 - rect.bottom, right: 1 - rect.left, bottom: 1 - rect.top }
     if (flip === 6) return { left: 1 - rect.bottom, top: rect.left, right: 1 - rect.top, bottom: rect.right }
     if (flip === 5) return { left: rect.top, top: 1 - rect.right, right: rect.bottom, bottom: 1 - rect.left }
     return { ...rect }
 }
 
-export const displayToSource = (rect: Rect, flip: number): Rect => {
+export const displayToSource = (rect: Rect, flip: number) => {
     if (flip === 3) return { left: 1 - rect.right, top: 1 - rect.bottom, right: 1 - rect.left, bottom: 1 - rect.top }
     if (flip === 6) return { left: rect.top, top: 1 - rect.right, right: rect.bottom, bottom: 1 - rect.left }
     if (flip === 5) return { left: 1 - rect.bottom, top: rect.left, right: 1 - rect.top, bottom: rect.right }
     return { ...rect }
 }
 
-export const fitRectToRatio = (center: { x: number; y: number }, normRatio: number): Rect => {
+export const fitRectToRatio = (center: { x: number; y: number }, normRatio: number) => {
     const maxW = Math.min(center.x, 1 - center.x) * 2
     const maxH = Math.min(center.y, 1 - center.y) * 2
     let width = Math.min(maxW, maxH * normRatio)

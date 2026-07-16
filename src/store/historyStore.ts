@@ -39,7 +39,7 @@ export const connectHistoryTarget = (next: HistoryTarget) => {
     target = next
 }
 
-const emptyStack = (): Stack => ({ undo: [], redo: [] })
+const emptyStack = () => ({ undo: [], redo: [] })
 
 export const useHistoryStore = create<HistoryState>((set, get) => ({
     stacks: {},

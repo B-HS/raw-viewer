@@ -2,7 +2,7 @@ import { useSettings } from '../store/settings'
 import { ACTION_BY_ID, DEFAULT_BINDINGS } from './keymap'
 import type { Binding, ShortcutIgnore } from './keymap'
 
-export const resolveBinding = (id: string): Binding => useSettings.getState().shortcutOverrides[id] ?? DEFAULT_BINDINGS[id]
+export const resolveBinding = (id: string) => useSettings.getState().shortcutOverrides[id] ?? DEFAULT_BINDINGS[id]
 
 const bindingMatches = (event: KeyboardEvent, binding: Binding, ignore?: ShortcutIgnore[]) =>
     event.code === binding.code &&

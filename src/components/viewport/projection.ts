@@ -4,7 +4,7 @@ export type CanvasPoint = { x: number; y: number }
 
 export const flipDegrees = (flip: number) => (flip === 3 ? 180 : flip === 5 ? -90 : flip === 6 ? 90 : 0)
 
-export const uvToCanvas = (model: Float32Array, clientW: number, clientH: number, u: number, v: number): CanvasPoint => {
+export const uvToCanvas = (model: Float32Array, clientW: number, clientH: number, u: number, v: number) => {
     const posX = 2 * u - 1
     const posY = 1 - 2 * v
     const ndcX = model[0] * posX + model[3] * posY + model[6]
@@ -12,7 +12,7 @@ export const uvToCanvas = (model: Float32Array, clientW: number, clientH: number
     return { x: ((ndcX + 1) / 2) * clientW, y: ((1 - ndcY) / 2) * clientH }
 }
 
-export const canvasToUv = (model: Float32Array, clientW: number, clientH: number, x: number, y: number): ImagePoint | null => {
+export const canvasToUv = (model: Float32Array, clientW: number, clientH: number, x: number, y: number) => {
     const ndcX = (2 * x) / clientW - 1
     const ndcY = 1 - (2 * y) / clientH
     const a = model[0]
