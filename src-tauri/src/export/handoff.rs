@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
-use crate::platform::{CurrentPlatform, ExternalApp, Platform};
+use crate::platform::{ensure_app_bundle, CurrentPlatform, ExternalApp, Platform};
 
 fn ensure_exists(path: &Path) -> AppResult<()> {
     if path.is_file() {
@@ -16,6 +16,7 @@ fn ensure_exists(path: &Path) -> AppResult<()> {
 #[tauri::command]
 pub fn open_with_edited(path: PathBuf, app_path: PathBuf, platform: State<'_, CurrentPlatform>) -> AppResult<()> {
     ensure_exists(&path)?;
+    ensure_app_bundle(&app_path)?;
     let app = ExternalApp {
         id: String::new(),
         name: String::new(),

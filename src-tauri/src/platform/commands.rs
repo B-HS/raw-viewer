@@ -7,7 +7,7 @@ use tauri::State;
 use crate::error::{AppError, AppResult};
 use crate::pipeline::AppState;
 use crate::platform::recents::RecentsService;
-use crate::platform::{ColorSpaceId, CurrentPlatform, ExternalApp, Platform};
+use crate::platform::{ensure_app_bundle, ColorSpaceId, CurrentPlatform, ExternalApp, Platform};
 use crate::scan::pairing;
 use crate::types_platform::{PairInfo, RecentEntry};
 
@@ -121,6 +121,7 @@ pub fn reveal_in_file_manager(image_id: String, state: State<'_, AppState>, plat
 
 #[tauri::command]
 pub fn open_with_external(image_id: String, app_path: PathBuf, state: State<'_, AppState>, platform: State<'_, CurrentPlatform>) -> AppResult<()> {
+    ensure_app_bundle(&app_path)?;
     let path = state
         .services
         .registry
