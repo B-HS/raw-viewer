@@ -233,6 +233,7 @@ export const en = {
         copyFiles: 'Copy Files',
         copyPath: 'Copy Path',
         reveal: 'Reveal in Finder',
+        openInNewWindow: 'Open in New Window',
         openWith: 'Open With',
         openWithOriginal: 'Original File',
         openWithEdited: 'Edited Copy (TIFF)',
@@ -474,6 +475,13 @@ export const en = {
         themeDark: 'Dark',
         themeLight: 'Light',
         viewportBackground: 'Viewport background',
+        openInNewWindow: 'Open files in a new window',
+        openInNewWindowNote:
+            'When on, files opened from Finder or the Dock open in a separate window instead of replacing the current one. Off by default.',
+        color: 'Color',
+        monitorProfile: 'Apply monitor ICC profile',
+        monitorProfileNote:
+            'Map edited images through the monitor ICC profile (relative colorimetric) instead of the standard P3/sRGB path. Affects RAW rendering only; off by default.',
         map: 'Map',
         showAddress: 'Show address (Nominatim)',
         showAddressNote:

@@ -47,6 +47,25 @@ vec3 hsv2rgb(vec3 c) {
 }
 `
 
+const LUT3D = `
+uniform sampler2D uLut;
+uniform float uLutSize;
+vec3 sampleDisplayLut(vec3 rgb) {
+    float n = uLutSize;
+    float w = n * n;
+    vec3 c = clamp(rgb, 0.0, 1.0);
+    float bCoord = c.b * (n - 1.0);
+    float b0 = floor(bCoord);
+    float b1 = min(b0 + 1.0, n - 1.0);
+    float bf = bCoord - b0;
+    float xr = 0.5 + c.r * (n - 1.0);
+    float v = (0.5 + c.g * (n - 1.0)) / n;
+    vec3 s0 = texture(uLut, vec2((b0 * n + xr) / w, v)).rgb;
+    vec3 s1 = texture(uLut, vec2((b1 * n + xr) / w, v)).rgb;
+    return mix(s0, s1, bf);
+}
+`
+
 export const FRAG_PASS1 = `#version 300 es
 precision highp float;
 in vec2 vUv;
@@ -434,12 +453,14 @@ uniform mat3 uRec2020ToDisplay;
 uniform mat3 uSrgbToDisplay;
 uniform int uClipMode;
 uniform int uHasBase;
+uniform int uUseLut;
 uniform vec3 uSplit;
 uniform int uCropMode;
 uniform vec4 uCrop;
 uniform vec2 uCanvas;
 out vec4 o;
 ${SRGB}
+${LUT3D}
 void main() {
     vec2 screen = gl_FragCoord.xy / uCanvas;
     float axisCoord = uSplit.y < 0.5 ? screen.x : 1.0 - screen.y;
@@ -449,8 +470,12 @@ void main() {
     bool clipLo = all(lessThanEqual(lin, vec3(0.0)));
     vec3 c = lin;
     if (uSourceKind == 0) {
-        c = uRec2020ToDisplay * c;
-        c = oetf(c);
+        if (uUseLut == 1) {
+            c = sampleDisplayLut(c);
+        } else {
+            c = uRec2020ToDisplay * c;
+            c = oetf(c);
+        }
     } else if (uDisplayP3 == 1) {
         vec3 l = eotf(c);
         l = uSrgbToDisplay * l;

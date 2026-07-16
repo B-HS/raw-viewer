@@ -126,6 +126,17 @@ else
     bad "export-icc-embed" "ICC embed test/helper missing in src/export"
 fi
 
+# isolated-decode roundtrips — #[ignore]-gated out of the default `cargo test` suite (spawn child + real LibRaw decode); run them explicitly here
+ISO_OUT=$( cd "$TAURI_DIR" && cargo test --release --lib 'isolate::tests::' -- --ignored 2>&1 )
+ISO_RC=$?
+ISO_RES=$(printf '%s\n' "$ISO_OUT" | grep -E 'test result:' | tail -1)
+ISO_RAN=$(printf '%s\n' "$ISO_OUT" | grep -cE 'isolate::tests::[a-z_]+ \.\.\. ok' || true)
+if [ "$ISO_RC" = "0" ] && [ "$ISO_RAN" -ge 2 ]; then
+    ok "isolated-decode-roundtrip" "cargo test --release isolate::tests -- --ignored -> ran $ISO_RAN gated tests ($ISO_RES)"
+else
+    bad "isolated-decode-roundtrip" "rc=$ISO_RC ran=$ISO_RAN ($ISO_RES) — expected >=2 gated isolate roundtrip tests to pass (fixtures/tier1 + release build required)"
+fi
+
 echo "=============================================================="
 printf 'SUMMARY  %d PASS  %d FAIL  (%d checks)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"
 echo "perf targets (PRD 7.1) are measured separately:"

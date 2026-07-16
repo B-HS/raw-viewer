@@ -119,9 +119,11 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 그리드 뷰(G)·히스토리 패널(⌘⌥Z, jumpTo)·단축키 리매핑(38액션 레지스트리+녹화+충돌감지)
 - 3f 후속: 워커×내부OMP 오버서브스크립션 튜닝, Bayer L2 재현성 필요 시 동일 핀, GFX100은 X-Trans가 아니라 Bayer 중형(문서 정정 — quality-assurance 반영 필요), 줌/팬 키는 리매핑 제외(GL 소유), 크롭 도구·숫자키 패밀리 fixed
 
-### 미결 결정 (사용자)
-1. **prod 병합 시점** — dev(0~3f) 상태. 허락 대기.
-2. **X-Trans 병렬화** — ① 바이트 동일성 게이트 완화(±1 LSB 허용) 후 병렬(13.4→2.2s) ② bilinear L1 프록시 ③ 현행(결정적, 느림). 권장 ①.
+### 결정 반영 (2026-07-16 사용자 확정)
+1. **X-Trans 병렬화 = 게이트 완화 후 병렬 (완료, dev 952e1b9)**: 핀 제거 → X-T5 L1 13447→2139ms·L2 13417→2056ms(6.3~6.5×). 게이트는 X-Trans만 절대오차 8/1023(실측 양성 피크 0.0052의 1.5×) 허용, Bayer/모노 바이트 동일성 유지, 15라운드 안정. openmp-report.md §6.
+2. **prod 병합 승인 → 실행 완료**: origin/prod = 21c1333 (Phase 0~4b + X-Trans 병렬화).
+3. personal-llm 기록 = 생략(사용자).
+- 잔여 미달: X-T5는 병렬화 후에도 L1 250/L2 1200 목표 미달(40MP 풀해상도 Markesteijn 자체 한계) — 기준기(M1)에선 더 김. 추가 개선은 bilinear 프록시 전환뿐(품질 트레이드오프, 미채택).
 
 ## Phase 4 (진행 중)
 ### 4a — **완료, dev 반영(c6f93c9)**
@@ -132,8 +134,15 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 격리 디코딩(__decode 서브커맨드, 크래시 루프 감지→배너, 기본 off) · 성능 설정 배선(preloadRadius/l2Policy/isolatedDecode — 3c 부채 해소) · 역지오코딩(Nominatim 정책 준수, 기본 off) — 테스트 297
 - 후속: 격리 디코드 통합테스트가 스위트를 40분까지 늘림 → #[ignore] 게이팅 또는 nextest 분리 필요
 
-### 4 잔여 (이 기기에서 진행 불가/저가치)
-다중 윈도우(P2) · 모니터 ICC 전체 적용 · WebGPU(macOS 26+ 필요) · Windows/Linux platform(하드웨어 필요) · JPEG XL(P2) · 로컬 보정(별도 논의 §12.2)
+### 4c — **완료, dev 반영(90a8b19)**
+- [x] MW: 다중 윈도우 — 윈도우별 내비/idle 상태, union 취소 정책, open_in_new_window(생성 전 큐잉), window-* capability, Destroyed 정리, 설정·컨텍스트 메뉴 배선 — 테스트 304 (수동 확인 절차는 MW 보고 §수동 검증 참조)
+- [x] IC: 모니터 ICC — NSColorSpace ICC → lcms2 33³ LUT(relative colorimetric) → pass8 트라이리니어(기본 off) · JXL은 순수 Rust 인코더 미성숙으로 이월(docs/quality-assurance/jxl-assessment.md)
+- [x] 격리 디코드 왕복 테스트 게이팅(--ignored + 수용 스크립트 명시 실행) — 기본 스위트 ~77s
+- 정정: "스위트 40분"은 X-Trans 병렬화 이전 수치였음(이미 해소)
+- 4c SPEC-GAP: PixelStore current 슬롯 단일(다중 윈도우 극한 메모리 압박 시 비활성 창 current evict 가능), EditService on_navigate 단일 current(조기 flush 무해), 다중 윈도우 런타임 검증은 수동 필요
+
+### 4 잔여 (이 기기에서 진행 불가)
+WebGPU(macOS 26+ 필요) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
 
 ### Phase 3 검증 잔여
 §8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인

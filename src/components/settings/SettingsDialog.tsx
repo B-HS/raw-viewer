@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { clearCache, getCacheStats } from '../../ipc/about'
+import { hasDisplayIccProfile } from '../../ipc/display'
 import { useModalDismiss } from '../../lib/useModalDismiss'
 import { useOverlays } from '../../store/overlays'
 import { useSettings } from '../../store/settings'
@@ -70,13 +71,16 @@ export const SettingsDialog: FC = () => {
     const language = useSettings((state) => state.language)
     const theme = useSettings((state) => state.theme)
     const viewportBackground = useSettings((state) => state.viewportBackground)
+    const useMonitorProfile = useSettings((state) => state.useMonitorProfile)
     const preloadRadius = useSettings((state) => state.preloadRadius)
     const l2Policy = useSettings((state) => state.l2Policy)
     const isolatedDecode = useSettings((state) => state.isolatedDecode)
     const showAddress = useSettings((state) => state.showAddress)
+    const openInNewWindow = useSettings((state) => state.openInNewWindow)
     const tab = useSettingsTab((state) => state.tab)
     const [version, setVersion] = useState('')
     const [stats, setStats] = useState<CacheStats | null>(null)
+    const [monitorAvailable, setMonitorAvailable] = useState(false)
 
     const close = () => useOverlays.getState().closeSettings()
 
@@ -105,6 +109,9 @@ export const SettingsDialog: FC = () => {
             .then(setVersion)
             .catch(() => setVersion(''))
         refreshStats()
+        hasDisplayIccProfile()
+            .then(setMonitorAvailable)
+            .catch(() => setMonitorAvailable(false))
     }, [open])
 
     useModalDismiss(dialogRef, close)
@@ -185,6 +192,27 @@ export const SettingsDialog: FC = () => {
                                         className='h-7 w-12 cursor-pointer rounded border border-neutral-700 bg-neutral-800'
                                     />
                                 </Field>
+                                <Field label={t('settings.openInNewWindow')}>
+                                    <Toggle
+                                        checked={openInNewWindow}
+                                        onChange={(value) => useSettings.getState().setOpenInNewWindow(value)}
+                                        label={t('settings.openInNewWindow')}
+                                    />
+                                </Field>
+                                <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.openInNewWindowNote')}</p>
+                                {monitorAvailable && (
+                                    <>
+                                        <SectionTitle>{t('settings.color')}</SectionTitle>
+                                        <Field label={t('settings.monitorProfile')}>
+                                            <Toggle
+                                                checked={useMonitorProfile}
+                                                onChange={(value) => useSettings.getState().setUseMonitorProfile(value)}
+                                                label={t('settings.monitorProfile')}
+                                            />
+                                        </Field>
+                                        <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.monitorProfileNote')}</p>
+                                    </>
+                                )}
                                 <SectionTitle>{t('settings.map')}</SectionTitle>
                                 <Field label={t('settings.showAddress')}>
                                     <Toggle
