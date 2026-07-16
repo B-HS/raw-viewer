@@ -150,6 +150,7 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 구조: historyStore↔editStore 순환을 `connectHistoryTarget` 주입으로 해소 · keymap↔settings 순환은 `shortcuts/resolve.ts` 분리로 해소 · `i18n/index.ts` barrel → `i18n/i18n.ts` · store 조작 액션(smartCopy·trash)을 `src/actions/`로 재배치(lib은 순수 유틸만) · gl 공용 타입 `gl/viewTypes.ts` 분리(type-only 순환 해소)
 - [x] 컨벤션: 추론 가능한 명시 반환 타입 26곳 제거(재귀 `gcd`·튜플 반환·`replaceRootPatches`/`buildLensPass` 등 컨텍스트 타이핑 필수 7곳은 유지) · 매직넘버 상수화 · Filmstrip/GridView 선택 로직 `components/listSelection.ts` 공통화 · localStorage `JSON.parse as` 3곳 unknown+가드 전환
 - [x] Rust: clippy 경고 전체 해소(0건) · 이벤트 채널명 리터럴을 `events.rs` 상수로 집중
+- [x] 배포 파이프라인 (사용자 지시, 2026-07-16): GitHub Actions — CI(PR·수동: prettier→tsc→clippy→test→빌드) + Release(`v*` 태그: 버전 일치 검증→검증→`tauri build`→DMG draft 릴리스). 서명·공증은 시크릿 존재 시 자동 활성화(무시크릿이면 무서명 DMG). `scripts/fetch-dnglab.sh` 신설(로컬·CI 공용). 상세·시크릿 목록은 [docs/release.md](./release.md)
 - 잔여 결정 사항: `read_watermark_png`·export 출력 경로는 dialog 경유 전제(커맨드 자체는 경로 무제한 — persisted-scope 도입 여부는 추후 결정) · `store:default` 스코프 축소 미적용 · 오류 삼킴(`catch {}`) 패턴은 기존 정책 유지
 
 ### 4 잔여
