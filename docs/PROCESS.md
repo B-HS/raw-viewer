@@ -9,13 +9,16 @@
 - `~/.claude/convention/*.md` — 코드 컨벤션 (arrow-fn only, 주석 금지(JSDoc·SPEC-GAP 예외), 타입 유도 등)
 - `~/personal-llm/*.md` — 개인 작업 규칙 (커밋 author 단독, 요청 전 커밋 금지 등)
 
-## 환경 (확정)
+## 환경 (확정 — 2026-07-16 신규 머신 이전)
 | 항목 | 값 |
 |------|-----|
-| 기기 | macOS 15.7.3 arm64 (Apple Silicon) |
-| Rust | 1.95.0 |
-| Node | 22.14.0 / pnpm 10.6.2 |
-| 프로젝트 루트 | `/Users/gkn/raw-viewer` (= PRD의 `aetherlens/` 루트) |
+| 기기 | macOS 26.5.2 arm64 (Apple Silicon) |
+| Rust | 1.97.0 (rustup, `~/.cargo/bin` — 셸 프로필 미수정) |
+| Bun | 1.3.14 (Node 24.18.0 병존) |
+| libomp | Homebrew(정적 libomp.a 링크 — 없으면 LibRaw가 OpenMP 없이 빌드되어 X-Trans 병렬화 무효) |
+| 프로젝트 루트 | `/Users/hyunseokbyun/development/raw-viewer` (= PRD의 `aetherlens/` 루트) |
+
+신규 클론 복원 절차: `bun install` → rustup → `brew install libomp` → `scripts/sync-vendor.sh` → `scripts/sync-lensfun.sh` → dnglab v0.7.2를 `src-tauri/binaries/dnglab-aarch64-apple-darwin`에 배치(NOTICE.md URL) → `scripts/fetch-fixtures.sh`(tier1 16종, 약 600MB).
 
 ## 결정 로그 (사용자 이의 시 재검토)
 1. **패키지 매니저 = bun (사용자 확정 지시, 2026-07-15).** 처음 pnpm으로 셋업했다가 사용자 지시로 bun 전환. `bun install` / `bun run dev|build|tauri`. esbuild postinstall은 `trustedDependencies`로 허용. tauri.conf의 before*Command도 bun.
@@ -141,8 +144,16 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - 정정: "스위트 40분"은 X-Trans 병렬화 이전 수치였음(이미 해소)
 - 4c SPEC-GAP: PixelStore current 슬롯 단일(다중 윈도우 극한 메모리 압박 시 비활성 창 current evict 가능), EditService on_navigate 단일 current(조기 flush 무해), 다중 윈도우 런타임 검증은 수동 필요
 
-### 4 잔여 (이 기기에서 진행 불가)
-WebGPU(macOS 26+ 필요) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
+### 유지보수 — **완료, dev 반영(2026-07-16)**
+- [x] 신규 머신 환경 복원(위 환경 표·복원 절차) + GitHub 언어 통계 정정 — 생성 파일(licenses-rust.html·licenses-npm.json·ts-rs `src/types/`·lock)을 `.gitattributes` linguist-generated, `about.hbs` vendored, `src/types/`는 `.prettierignore` 제외
+- [x] 보안: CSP 명시(`default-src 'self'` 기반 + devCsp, 디버그 번들 기동 후 `frontend ready` 로그로 스모크 검증) · `open_with_external`/`open_with_edited`의 `app_path`를 `ensure_app_bundle`로 검증(테스트 3건) · aether 프로토콜 CORS를 웹뷰 오리진으로 한정 · opener capability를 사용처 기준 축소(reveal + 지도 URL 2종 scope)
+- [x] 구조: historyStore↔editStore 순환을 `connectHistoryTarget` 주입으로 해소 · keymap↔settings 순환은 `shortcuts/resolve.ts` 분리로 해소 · `i18n/index.ts` barrel → `i18n/i18n.ts` · store 조작 액션(smartCopy·trash)을 `src/actions/`로 재배치(lib은 순수 유틸만) · gl 공용 타입 `gl/viewTypes.ts` 분리(type-only 순환 해소)
+- [x] 컨벤션: 추론 가능한 명시 반환 타입 26곳 제거(재귀 `gcd`·튜플 반환·`replaceRootPatches`/`buildLensPass` 등 컨텍스트 타이핑 필수 7곳은 유지) · 매직넘버 상수화 · Filmstrip/GridView 선택 로직 `components/listSelection.ts` 공통화 · localStorage `JSON.parse as` 3곳 unknown+가드 전환
+- [x] Rust: clippy 경고 전체 해소(0건) · 이벤트 채널명 리터럴을 `events.rs` 상수로 집중
+- 잔여 결정 사항: `read_watermark_png`·export 출력 경로는 dialog 경유 전제(커맨드 자체는 경로 무제한 — persisted-scope 도입 여부는 추후 결정) · `store:default` 스코프 축소 미적용 · 오류 삼킴(`catch {}`) 패턴은 기존 정책 유지
+
+### 4 잔여
+WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수는 사용자 지시 대기) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
 
 ### Phase 3 검증 잔여
 §8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인
@@ -154,6 +165,6 @@ PRD §11 체크리스트를 그대로 따른다.
 - (build.rs) libjpeg 미링크: LibRaw의 lossy-JPEG 압축 DNG·일부 내장 썸네일 디코딩 불가 가능. Phase 1 L0 구현 시 재평가.
 
 ## 다음 세션 시작점
-1. 이 문서와 docs/PRD.md §0(절대 규칙)·§11(마일스톤), phase1~3a 계약 문서 재확인.
-2. Phase 3a 워크플로(wf_0bb60c34-2bd) 결과 통합·검증 → 3b 웨이브(프리셋·Export·클립보드·Dock·파일연결 등) 계약 작성 후 진행.
+1. 이 문서와 docs/PRD.md §0(절대 규칙)·§11(마일스톤) 재확인. Phase 4c까지 dev 반영 완료, 2026-07-16 유지보수(보안·구조·컨벤션 정비)도 dev 반영 완료.
+2. 남은 트랙: Phase 4 잔여(WebGPU — 현 머신에서 가능) · Phase 3 수동 검증 35항목(사용자 재석) · 유지보수 잔여 결정 사항(persisted-scope·store 스코프).
 3. 사용자 지시: 중단 지시 전까지 Phase 경계에서 멈추지 않고 연속 진행. 시각 검증(실렌더)은 사용자 재석 시 수행.
