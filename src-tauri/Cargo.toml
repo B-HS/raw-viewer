@@ -1,6 +1,6 @@
 [package]
 name = "raw-viewer"
-version = "0.1.1"
+version = "0.1.2"
 description = "Cross-platform RAW image viewer and non-destructive editor"
 authors = ["Hyunseok Byun"]
 edition = "2021"
@@ -37,7 +37,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 image = "0.25"
 jpeg-encoder = { version = "0.6", features = ["std"] }
-lcms2 = "6"
+lcms2 = { version = "6", features = ["static"] }
 uuid = { version = "1", features = ["v4"] }
 little_exif = "0.6"
 tauri-plugin-single-instance = "2"
