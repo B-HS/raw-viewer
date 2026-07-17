@@ -153,6 +153,13 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 배포 파이프라인 (사용자 지시, 2026-07-16): GitHub Actions — CI(PR·수동: prettier→tsc→clippy→test→빌드) + Release(`v*` 태그: 버전 일치 검증→검증→`tauri build`→DMG draft 릴리스). 서명·공증은 시크릿 존재 시 자동 활성화(무시크릿이면 무서명 DMG). `scripts/fetch-dnglab.sh` 신설(로컬·CI 공용). 상세·시크릿 목록은 [docs/release.md](./release.md)
 - 잔여 결정 사항: `read_watermark_png`·export 출력 경로는 dialog 경유 전제(커맨드 자체는 경로 무제한 — persisted-scope 도입 여부는 추후 결정) · `store:default` 스코프 축소 미적용 · 오류 삼킴(`catch {}`) 패턴은 기존 정책 유지
 
+### 비-RAW 공통 포맷 디코드 — **완료 (2026-07-18, 사용자 버그 리포트로 착수)**
+- [x] FR-1.3 일반 포맷: `decode/common.rs` 신설 — jpg/jpeg/png/webp/tif/tiff/bmp/gif(첫 프레임)는 `image` 크레이트, heic/heif/avif는 macOS ImageIO(`platform/macos/imageio.rs`, CGImageSource→sRGB CGBitmapContext, objc2-image-io 추가). `decode::extract_thumb/decode_half/decode_full`에서 확장자 라우팅 — 파이프라인·캐시·격리 디코드·CPU 폴백 전부 무수정 통과.
+- [x] 색: sRGB EOTF 역변환(`color::srgb_eotf`로 승격, cpurender는 위임) → linear f16 버퍼 + `cam_to_rec2020 = sRGB→Rec2020 행렬`(`color::rec2020_from_srgb_linear_matrix`). 기존 셰이더/편집 체인이 RAW와 동일하게 동작. 16bpc PNG/TIFF는 16비트 경로 유지, 알파는 검정 합성.
+- [x] EXIF orientation → LibRaw flip 코드 매핑(kamadak-exif; 미러 계열은 회전으로 근사). L0(512px JPEG q85)는 회전을 굽고 업스케일 금지. ImageIO 경로는 transform 옵션으로 자체 회전.
+- [x] 검증: 유닛 7건(선형화·다운샘플·알파·orientation·썸네일·webp·heic[sips 왕복]) + 실바이너리 `__decode` e2e로 jpg/png/heic/avif × L0/L1/L2 전부 확인.
+- SPEC-GAP: 비-RAW 임베디드 ICC(P3 JPEG 등)는 image-크레이트 경로에서 sRGB 가정(ImageIO 경로는 sRGB로 색변환됨). AVIF irot/imir 회전 미반영(EXIF만). 애니메이션 webp/gif는 첫 프레임.
+
 ### 4 잔여
 WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수는 사용자 지시 대기) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
 
