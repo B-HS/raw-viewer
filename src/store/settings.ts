@@ -28,6 +28,7 @@ export type SettingsValues = {
     slideshowIntervalMs: number
     sortKey: SortKey
     sortOrder: SortOrder
+    autoUpdateCheck: boolean
     shortcutOverrides: Record<string, Binding>
 }
 
@@ -64,6 +65,7 @@ const DEFAULTS: SettingsValues = {
     slideshowIntervalMs: 3000,
     sortKey: 'name',
     sortOrder: 'asc',
+    autoUpdateCheck: true,
     shortcutOverrides: {},
 }
 
@@ -124,6 +126,7 @@ type SettingsStore = SettingsValues & {
     commitGridCellSize: () => void
     setSlideshowInterval: (ms: number) => void
     setSort: (key: SortKey, order: SortOrder) => void
+    setAutoUpdateCheck: (enabled: boolean) => void
     setShortcutBinding: (id: string, binding: Binding) => void
     resetShortcutBinding: (id: string) => void
     resetShortcutBindings: () => void
@@ -151,6 +154,7 @@ export const useSettings = create<SettingsStore>((set, get) => ({
             const slideshowIntervalMs = await store.get('slideshowIntervalMs')
             const sortKey = await store.get('sortKey')
             const sortOrder = await store.get('sortOrder')
+            const autoUpdateCheck = await store.get('autoUpdateCheck')
             const shortcutOverrides = await store.get('shortcutOverrides')
             values = {
                 language: isLanguage(language) ? language : DEFAULTS.language,
@@ -169,6 +173,7 @@ export const useSettings = create<SettingsStore>((set, get) => ({
                     typeof slideshowIntervalMs === 'number' ? clampSlideshowInterval(slideshowIntervalMs) : DEFAULTS.slideshowIntervalMs,
                 sortKey: isSortKey(sortKey) ? sortKey : DEFAULTS.sortKey,
                 sortOrder: isSortOrder(sortOrder) ? sortOrder : DEFAULTS.sortOrder,
+                autoUpdateCheck: typeof autoUpdateCheck === 'boolean' ? autoUpdateCheck : DEFAULTS.autoUpdateCheck,
                 shortcutOverrides: sanitizeOverrides(shortcutOverrides),
             }
         } catch {}
@@ -237,6 +242,10 @@ export const useSettings = create<SettingsStore>((set, get) => ({
         const clamped = clampSlideshowInterval(ms)
         set({ slideshowIntervalMs: clamped })
         persist('slideshowIntervalMs', clamped)
+    },
+    setAutoUpdateCheck: (enabled) => {
+        set({ autoUpdateCheck: enabled })
+        persist('autoUpdateCheck', enabled)
     },
     setSort: (key, order) => {
         set({ sortKey: key, sortOrder: order })

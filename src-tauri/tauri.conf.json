@@ -95,6 +95,13 @@
         ],
         "macOS": {
             "minimumSystemVersion": "13.0"
+        },
+        "createUpdaterArtifacts": true
+    },
+    "plugins": {
+        "updater": {
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZBRkNFQUJGQUI2QzQxQzkKUldUSlFXeXJ2K3I4K3QrVTJVNlJCRWFXSEVFSEFiT0VpNlY5andmWE04UE5EaE1OS3VDb1UwdFoK",
+            "endpoints": ["https://github.com/B-HS/raw-viewer/releases/latest/download/latest.json"]
         }
     }
 }

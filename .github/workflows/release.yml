@@ -117,8 +117,28 @@ jobs:
             echo "notarization: skipped (APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID not all set)"
           fi
 
+      - name: Configure updater signing
+        env:
+          UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          UPDATER_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$UPDATER_KEY" ]; then
+            {
+              echo "TAURI_SIGNING_PRIVATE_KEY=$UPDATER_KEY"
+              echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$UPDATER_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "updater signing: enabled"
+          else
+            echo "updater signing: skipped (TAURI_SIGNING_PRIVATE_KEY not set)"
+          fi
+
       - name: Build app bundle
-        run: bun run tauri build
+        run: |
+          if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            bun run tauri build
+          else
+            bun run tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
 
       - name: Verify bundle is self-contained
         run: |
@@ -139,6 +159,30 @@ jobs:
         run: |
           mkdir -p dist-release
           cp src-tauri/target/release/bundle/dmg/*.dmg dist-release/
+          UPDATER_TGZ=$(find src-tauri/target/release/bundle/macos -name '*.app.tar.gz' -maxdepth 1 2>/dev/null | head -1 || true)
+          if [ -n "$UPDATER_TGZ" ] && [ -f "$UPDATER_TGZ.sig" ]; then
+            cp "$UPDATER_TGZ" "$UPDATER_TGZ.sig" dist-release/
+            VERSION=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+            ASSET=$(basename "$UPDATER_TGZ") SIG_FILE="$UPDATER_TGZ.sig" VERSION="$VERSION" python3 - << 'PYEOF'
+          import datetime
+          import json
+          import os
+          latest = {
+              'version': os.environ['VERSION'],
+              'pub_date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+              'platforms': {
+                  'darwin-aarch64': {
+                      'signature': open(os.environ['SIG_FILE']).read().strip(),
+                      'url': f"https://github.com/B-HS/raw-viewer/releases/download/v{os.environ['VERSION']}/{os.environ['ASSET']}",
+                  }
+              },
+          }
+          json.dump(latest, open('dist-release/latest.json', 'w'), indent=2)
+          PYEOF
+            echo "updater manifest: dist-release/latest.json"
+          else
+            echo "updater artifacts absent (unsigned build) - latest.json skipped"
+          fi
           shasum -a 256 dist-release/*.dmg > dist-release/SHA256SUMS.txt
           cat dist-release/SHA256SUMS.txt
 
