@@ -337,3 +337,13 @@ pub fn register_image(path: PathBuf, state: State<'_, AppState>) -> AppResult<cr
     state.services.registry.insert(entry.image_id.clone(), entry.path.clone());
     Ok(entry)
 }
+
+#[tauri::command]
+pub async fn probe_capture_dates(image_ids: Vec<String>, state: State<'_, AppState>) -> AppResult<std::collections::HashMap<String, Option<f64>>> {
+    let mut result = std::collections::HashMap::with_capacity(image_ids.len());
+    for id in image_ids {
+        let capture = state.services.registry.resolve(&id).and_then(|path| meta::capture_ms(&path)).map(|ms| ms as f64);
+        result.insert(id, capture);
+    }
+    Ok(result)
+}

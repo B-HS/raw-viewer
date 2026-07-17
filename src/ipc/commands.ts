@@ -35,6 +35,8 @@ export const toggleFullscreen = () => invoke<boolean>('toggle_fullscreen')
 
 export const registerImage = (path: string) => invoke<ImageEntry>('register_image', { path })
 
+export const probeCaptureDates = (imageIds: string[]) => invoke<Record<string, number | null>>('probe_capture_dates', { imageIds })
+
 export const fullscreenState = () => invoke<boolean>('fullscreen_state')
 
 export const renderCpuFrame = (imageId: string, maxEdge: number) => invoke<CpuFrameReadyPayload>('render_cpu_frame', { imageId, maxEdge })

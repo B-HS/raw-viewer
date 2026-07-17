@@ -182,6 +182,7 @@ pub fn run() {
             commands::toggle_fullscreen,
             commands::fullscreen_state,
             commands::register_image,
+            commands::probe_capture_dates,
             exiftool::detect_exiftool,
             exiftool::get_deep_metadata,
             lens::find_lens_profile,

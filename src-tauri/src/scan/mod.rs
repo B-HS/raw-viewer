@@ -39,11 +39,20 @@ pub fn make_entry(abs_path: PathBuf) -> ImageEntry {
     let file_name = abs_path.file_name().and_then(|value| value.to_str()).unwrap_or_default().to_owned();
     let is_raw = is_raw_ext(&abs_path);
     let id = image_id(&abs_path);
+    let metadata = std::fs::metadata(&abs_path).ok();
+    let modified_ms = metadata
+        .as_ref()
+        .and_then(|meta| meta.modified().ok())
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as f64);
+    let file_size = metadata.map(|meta| meta.len() as f64);
     ImageEntry {
         image_id: id,
         path: abs_path,
         file_name,
         is_raw,
+        modified_ms,
+        file_size,
     }
 }
 

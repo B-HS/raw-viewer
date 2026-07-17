@@ -22,7 +22,17 @@ import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
 import { useSettingsTab } from './components/settings/settingsTab'
-import { frontendReady, fullscreenState, navigate, openInNewWindow, openPath, registerImage, scanDirectory, toggleFullscreen } from './ipc/commands'
+import {
+    frontendReady,
+    fullscreenState,
+    navigate,
+    openInNewWindow,
+    openPath,
+    probeCaptureDates,
+    registerImage,
+    scanDirectory,
+    toggleFullscreen,
+} from './ipc/commands'
 import { onDecodeCrashLoop, onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
 import { requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
@@ -187,6 +197,8 @@ export const App: FC = () => {
     const gridActive = useGridView((state) => state.active)
     const isFullscreen = useUiStore((state) => state.isFullscreen)
     const slideshowActive = useUiStore((state) => state.slideshowActive)
+    const sortKey = useSettings((state) => state.sortKey)
+    const sortOrder = useSettings((state) => state.sortOrder)
     const { t } = useTranslation()
 
     const handleOpen = async (path: string) => {
@@ -489,7 +501,13 @@ export const App: FC = () => {
                 event.preventDefault()
                 const playlist = usePlaylist.getState()
                 const current = playlist.entries[playlist.currentIndex]
-                if (current) useExportStore.getState().runDng(current.imageId, current.fileName, current)
+                if (!current) return
+                if (playlist.selection.length > 1) {
+                    const items = playlist.selection.map((id) => ({ imageId: id, entry: playlist.entries.find((e) => e.imageId === id) }))
+                    useExportStore.getState().runDngBatch(items)
+                } else {
+                    useExportStore.getState().runDng(current.imageId, current.fileName, current)
+                }
             } else if (matchAction(event, 'file.selectAll')) {
                 event.preventDefault()
                 selectAllFiltered()
@@ -618,6 +636,30 @@ export const App: FC = () => {
         }
         run().catch(() => undefined)
     }, [currentImageId, scanning])
+
+    useEffect(() => {
+        usePlaylist.getState().setSort(sortKey, sortOrder)
+        if (sortKey !== 'captureDate') return
+        const known = usePlaylist.getState().sortAux.captureMs ?? {}
+        const missing = usePlaylist
+            .getState()
+            .entries.filter((entry) => known[entry.imageId] === undefined)
+            .map((entry) => entry.imageId)
+        if (missing.length === 0) return
+        probeCaptureDates(missing)
+            .then((captureMs) => usePlaylist.getState().mergeSortAux({ captureMs }))
+            .catch(() => undefined)
+    }, [sortKey, sortOrder, entryCount])
+
+    useEffect(() => {
+        if (sortKey !== 'rating') return
+        const sync = () => {
+            const ratings = Object.fromEntries(Object.entries(useOrganize.getState().entries).map(([id, entry]) => [id, entry.rating]))
+            usePlaylist.getState().mergeSortAux({ ratings })
+        }
+        sync()
+        return useOrganize.subscribe(sync)
+    }, [sortKey])
 
     useEffect(() => {
         if (!slideshowActive) return

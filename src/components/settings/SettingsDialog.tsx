@@ -78,6 +78,8 @@ export const SettingsDialog: FC = () => {
     const showAddress = useSettings((state) => state.showAddress)
     const openInNewWindow = useSettings((state) => state.openInNewWindow)
     const slideshowIntervalMs = useSettings((state) => state.slideshowIntervalMs)
+    const sortKey = useSettings((state) => state.sortKey)
+    const sortOrder = useSettings((state) => state.sortOrder)
     const tab = useSettingsTab((state) => state.tab)
     const [version, setVersion] = useState('')
     const [stats, setStats] = useState<CacheStats | null>(null)
@@ -201,6 +203,29 @@ export const SettingsDialog: FC = () => {
                                     />
                                 </Field>
                                 <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.openInNewWindowNote')}</p>
+                                <Field label={t('settings.sort')}>
+                                    <Segmented
+                                        value={sortKey}
+                                        onChange={(value) => useSettings.getState().setSort(value, sortOrder)}
+                                        options={[
+                                            ['name', t('settings.sortName')],
+                                            ['captureDate', t('settings.sortCaptureDate')],
+                                            ['modifiedDate', t('settings.sortModifiedDate')],
+                                            ['fileSize', t('settings.sortFileSize')],
+                                            ['rating', t('settings.sortRating')],
+                                        ]}
+                                    />
+                                </Field>
+                                <Field label={t('settings.sortOrder')}>
+                                    <Segmented
+                                        value={sortOrder}
+                                        onChange={(value) => useSettings.getState().setSort(sortKey, value)}
+                                        options={[
+                                            ['asc', t('settings.sortAsc')],
+                                            ['desc', t('settings.sortDesc')],
+                                        ]}
+                                    />
+                                </Field>
                                 <Field label={`${t('settings.slideshowInterval')} ${slideshowIntervalMs / 1000}s`}>
                                     <input
                                         type='range'
