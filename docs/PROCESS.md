@@ -168,7 +168,7 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 > 사양의 단일 출처: [docs/phase5-contract.md](./phase5-contract.md). 사용자 지시: 멈추라 할 때까지 연속 진행. 각 항목 완료 시 검증(부록 B) 통과 후 체크.
 
 ### A. 정확성 결함
-- [ ] A1. 비-RAW 임베디드 ICC 처리 (lcms2 변환, P3 픽스처 수치 테스트)
+- [x] A1. 비-RAW 임베디드 ICC 처리 — image `into_decoder().icc_profile()` → sRGB 태그는 고속 경로, 그 외 lcms2 Transform(RGB_8/16→RGB_FLT, 소스 ICC→rec2020 linear 프로파일)로 버퍼 직접 변환 + identity 행렬. 실패 시 sRGB 폴백(warn). 테스트: rec2020-linear ICC 임베드 PNG(비순환 검증)·P3 적색(R>0.70) — 9건 통과
 - [ ] A2. 오류 삼킴 선별 정리 (전수 조사 → 부록 A 기록 → (b)(c) 지점 수정)
 
 ### B. 빠진 기능
