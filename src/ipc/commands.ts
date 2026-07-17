@@ -37,6 +37,12 @@ export const registerImage = (path: string) => invoke<ImageEntry>('register_imag
 
 export const probeCaptureDates = (imageIds: string[]) => invoke<Record<string, number | null>>('probe_capture_dates', { imageIds })
 
+export const renameImage = (imageId: string, newName: string) => invoke<ImageEntry>('rename_image', { imageId, newName })
+
+export const moveImages = (imageIds: string[], destDir: string) => invoke<string[]>('move_images', { imageIds, destDir })
+
+export const copyImages = (imageIds: string[], destDir: string) => invoke<number>('copy_images', { imageIds, destDir })
+
 export const fullscreenState = () => invoke<boolean>('fullscreen_state')
 
 export const renderCpuFrame = (imageId: string, maxEdge: number) => invoke<CpuFrameReadyPayload>('render_cpu_frame', { imageId, maxEdge })

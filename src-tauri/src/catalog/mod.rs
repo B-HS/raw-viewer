@@ -168,6 +168,19 @@ impl Catalog {
         write_row(&conn, &key, edit_state, version, content_key, sidecar_mtime_ns, updated_at)
     }
 
+    pub fn reassign_path(&self, old_path: &Path, new_path: &Path, updated_at: i64) -> AppResult<bool> {
+        let old_key = path_key(old_path);
+        let new_key = path_key(new_path);
+        let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
+        let changed = conn
+            .execute(
+                "UPDATE images SET path = ?1, updated_at = ?2 WHERE path = ?3",
+                params![new_key, updated_at, old_key],
+            )
+            .map_err(db_err)?;
+        Ok(changed > 0)
+    }
+
     pub fn update_sidecar_mtime(&self, path: &Path, sidecar_mtime_ns: i64) -> AppResult<()> {
         let key = path_key(path);
         let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
@@ -402,6 +415,23 @@ mod tests {
             Ok(catalog) => catalog,
             Err(error) => panic!("open_memory failed: {error}"),
         }
+    }
+
+    #[test]
+    fn reassign_path_moves_edit_and_organize_state() {
+        let catalog = catalog();
+        let old_path = Path::new("/abs/OLD.CR2");
+        let new_path = Path::new("/abs/NEW.CR2");
+        let version = catalog.set_edit_checked(old_path, Some("{\"a\":1}"), 0, None, None, 42);
+        assert_eq!(version.ok(), Some(1));
+        catalog.set_rating(old_path, 4, 43).expect("rating");
+        assert!(catalog.reassign_path(old_path, new_path, 44).expect("reassign"));
+        assert!(catalog.load_by_path(old_path).expect("old lookup").is_none());
+        let migrated = catalog.load_by_path(new_path).expect("new lookup").expect("row present");
+        assert_eq!(migrated.edit_state.as_deref(), Some("{\"a\":1}"));
+        let organize = catalog.load_organize(new_path).expect("organize").expect("row");
+        assert_eq!(organize.rating, 4);
+        assert!(!catalog.reassign_path(Path::new("/abs/NOPE.CR2"), Path::new("/abs/X.CR2"), 45).expect("missing row"));
     }
 
     #[test]

@@ -9,6 +9,7 @@ import { AboutDialog } from './components/AboutDialog'
 import { CommandPalette } from './components/CommandPalette'
 import { SettingsDialog } from './components/settings/SettingsDialog'
 import { ContextMenu } from './components/ContextMenu'
+import { RenameDialog } from './components/RenameDialog'
 import { ExportDialog } from './components/ExportDialog'
 import { Filmstrip } from './components/filmstrip/Filmstrip'
 import { FilmstripResizer } from './components/filmstrip/FilmstripResizer'
@@ -41,6 +42,7 @@ import { copyFilesToClipboard, noteRecent } from './ipc/platform'
 import { smartCopyCurrent } from './actions/smartCopy'
 import { confirmAndTrash } from './actions/trash'
 import { i18n } from './i18n/i18n'
+import { checkForUpdate } from './ipc/updater'
 import { zoomRatio } from './gl/viewTransform'
 import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
 import { matchAction, resolveBinding } from './shortcuts/resolve'
@@ -638,6 +640,15 @@ export const App: FC = () => {
     }, [currentImageId, scanning])
 
     useEffect(() => {
+        if (!useSettings.getState().autoUpdateCheck) return
+        checkForUpdate()
+            .then((update) => {
+                if (update) useToast.getState().show(i18n.t('toast.updateAvailable', { version: update.version }))
+            })
+            .catch(() => undefined)
+    }, [])
+
+    useEffect(() => {
         usePlaylist.getState().setSort(sortKey, sortOrder)
         if (sortKey !== 'captureDate') return
         const known = usePlaylist.getState().sortAux.captureMs ?? {}
@@ -859,6 +870,7 @@ export const App: FC = () => {
                 {currentName ? t('app.ariaPosition', { position: currentPosition + 1, total: entryCount, name: currentName }) : ''}
             </div>
             <ContextMenu />
+            <RenameDialog />
             <ExportDialog />
             <SettingsDialog />
             <AboutDialog />

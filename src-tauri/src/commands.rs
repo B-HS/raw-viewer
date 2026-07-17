@@ -347,3 +347,121 @@ pub async fn probe_capture_dates(image_ids: Vec<String>, state: State<'_, AppSta
     }
     Ok(result)
 }
+
+fn validate_file_name(name: &str) -> AppResult<()> {
+    if name.trim().is_empty() || name.contains('/') || name.contains('\\') || name.starts_with('.') {
+        return Err(AppError::Io(format!("invalid file name: {name}")));
+    }
+    Ok(())
+}
+
+fn move_sidecar(old_path: &Path, new_path: &Path) {
+    let old_sidecar = crate::xmp::sidecar_path(old_path);
+    if old_sidecar.is_file() {
+        if let Err(error) = std::fs::rename(&old_sidecar, crate::xmp::sidecar_path(new_path)) {
+            tracing::warn!(%error, "sidecar rename failed");
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn rename_image(
+    image_id: String,
+    new_name: String,
+    state: State<'_, AppState>,
+    edits: State<'_, EditService>,
+) -> AppResult<crate::types::ImageEntry> {
+    validate_file_name(&new_name)?;
+    let old_path = resolve_path(&state.services.registry, &image_id)?;
+    let old_ext = old_path.extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase();
+    let new_ext = Path::new(&new_name).extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase();
+    if old_ext != new_ext {
+        return Err(AppError::Io(format!("extension must stay .{old_ext}")));
+    }
+    let parent = old_path.parent().ok_or_else(|| AppError::Io("no parent directory".into()))?;
+    let new_path = parent.join(&new_name);
+    if new_path.exists() {
+        return Err(AppError::Io(format!("already exists: {new_name}")));
+    }
+    edits.flush_all();
+    std::fs::rename(&old_path, &new_path).map_err(|error| AppError::Io(error.to_string()))?;
+    move_sidecar(&old_path, &new_path);
+    let _ = edits.reassign_path(&old_path, &new_path);
+    state.services.registry.remove(&image_id);
+    state.services.store.remove(&image_id);
+    let entry = scan::make_entry(new_path);
+    state.services.registry.insert(entry.image_id.clone(), entry.path.clone());
+    Ok(entry)
+}
+
+#[tauri::command]
+pub async fn move_images(
+    image_ids: Vec<String>,
+    dest_dir: PathBuf,
+    state: State<'_, AppState>,
+    edits: State<'_, EditService>,
+) -> AppResult<Vec<String>> {
+    if !dest_dir.is_dir() {
+        return Err(AppError::Io(format!("not a directory: {}", dest_dir.display())));
+    }
+    edits.flush_all();
+    let mut moved = Vec::new();
+    let mut failed: Vec<String> = Vec::new();
+    for image_id in image_ids {
+        let Some(old_path) = state.services.registry.resolve(&image_id) else {
+            failed.push(image_id);
+            continue;
+        };
+        let Some(file_name) = old_path.file_name() else {
+            failed.push(image_id);
+            continue;
+        };
+        let new_path = dest_dir.join(file_name);
+        if new_path.exists() || std::fs::rename(&old_path, &new_path).is_err() {
+            failed.push(image_id);
+            continue;
+        }
+        move_sidecar(&old_path, &new_path);
+        let _ = edits.reassign_path(&old_path, &new_path);
+        state.services.registry.remove(&image_id);
+        state.services.store.remove(&image_id);
+        moved.push(image_id);
+    }
+    if !failed.is_empty() {
+        return Err(AppError::Io(format!("{} file(s) could not be moved", failed.len())));
+    }
+    Ok(moved)
+}
+
+#[tauri::command]
+pub async fn copy_images(image_ids: Vec<String>, dest_dir: PathBuf, state: State<'_, AppState>) -> AppResult<u32> {
+    if !dest_dir.is_dir() {
+        return Err(AppError::Io(format!("not a directory: {}", dest_dir.display())));
+    }
+    let mut copied = 0u32;
+    let mut failed = 0u32;
+    for image_id in image_ids {
+        let Some(path) = state.services.registry.resolve(&image_id) else {
+            failed += 1;
+            continue;
+        };
+        let Some(file_name) = path.file_name() else {
+            failed += 1;
+            continue;
+        };
+        let target = dest_dir.join(file_name);
+        if target.exists() || std::fs::copy(&path, &target).is_err() {
+            failed += 1;
+            continue;
+        }
+        let sidecar = crate::xmp::sidecar_path(&path);
+        if sidecar.is_file() {
+            let _ = std::fs::copy(&sidecar, crate::xmp::sidecar_path(&target));
+        }
+        copied += 1;
+    }
+    if failed > 0 {
+        return Err(AppError::Io(format!("{failed} file(s) could not be copied")));
+    }
+    Ok(copied)
+}

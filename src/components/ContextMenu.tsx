@@ -3,11 +3,12 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { openInNewWindow } from '../ipc/commands'
+import { copyImages, moveImages, openInNewWindow } from '../ipc/commands'
 import { copyFilesToClipboard, openWithExternal } from '../ipc/platform'
 import { smartCopyCurrent } from '../actions/smartCopy'
 import { confirmAndTrash } from '../actions/trash'
 import { useContextMenu } from '../store/contextMenu'
+import { useRenameDialog } from '../store/renameDialog'
 import { useEditClipboard } from '../store/editClipboard'
 import { useEditStore } from '../store/editStore'
 import { useExportStore } from '../store/exportStore'
@@ -57,6 +58,29 @@ export const ContextMenu: FC = () => {
     const run = (action: () => void) => {
         action()
         close()
+    }
+
+    const moveToFolder = async () => {
+        const dir = await openDialog({ directory: true, multiple: false, title: t('menu.moveToFolder') }).catch(() => null)
+        if (typeof dir !== 'string') return
+        try {
+            const moved = await moveImages(imageIds, dir)
+            usePlaylist.getState().removeEntries(moved)
+            useToast.getState().show(t('toast.moveDone', { count: moved.length }))
+        } catch {
+            useToast.getState().show(t('toast.moveFailed'))
+        }
+    }
+
+    const copyToFolder = async () => {
+        const dir = await openDialog({ directory: true, multiple: false, title: t('menu.copyToFolder') }).catch(() => null)
+        if (typeof dir !== 'string') return
+        try {
+            const copied = await copyImages(imageIds, dir)
+            useToast.getState().show(t('toast.copyToDone', { count: copied }))
+        } catch {
+            useToast.getState().show(t('toast.copyToFailed'))
+        }
     }
 
     const copyPath = () => {
@@ -232,6 +256,12 @@ export const ContextMenu: FC = () => {
                 <MenuItem onClick={() => run(() => useOrganize.getState().setFlag(imageIds, null))} shortcut='U'>
                     {t('menu.flagClear')}
                 </MenuItem>
+                <div className='my-1 border-t border-neutral-800' />
+                <MenuItem disabled={imageIds.length > 1 || !entry} onClick={() => run(() => entry && useRenameDialog.getState().openFor(entry))}>
+                    {t('menu.rename')}
+                </MenuItem>
+                <MenuItem onClick={() => run(moveToFolder)}>{t('menu.moveToFolder')}</MenuItem>
+                <MenuItem onClick={() => run(copyToFolder)}>{t('menu.copyToFolder')}</MenuItem>
                 <div className='my-1 border-t border-neutral-800' />
                 <MenuItem onClick={trash} shortcut='⌫' danger>
                     {t('menu.trash')}
