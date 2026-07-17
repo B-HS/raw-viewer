@@ -30,14 +30,16 @@
 
 | 시크릿 | 값 | 얻는 방법 |
 |--------|-----|-----------|
-| `APPLE_CERTIFICATE` | Developer ID Application 인증서 .p12의 base64 (한 줄) | Xcode/개발자 사이트에서 "Developer ID Application" 인증서 발급 → 키체인에서 .p12 내보내기 → `base64 -i cert.p12 \| pbcopy` |
-| `APPLE_CERTIFICATE_PASSWORD` | .p12 내보낼 때 지정한 암호 | 직접 지정 |
-| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: 이름 (팀ID)` | `security find-identity -v -p codesigning` 출력의 따옴표 안 문자열 |
+| `MACOS_CERTIFICATE_P12` | Developer ID Application 인증서 .p12의 base64 (한 줄) | Xcode/개발자 사이트에서 "Developer ID Application" 인증서 발급 → 키체인에서 .p12 내보내기 → `base64 -i cert.p12 \| pbcopy` |
+| `MACOS_CERTIFICATE_PASSWORD` | .p12 내보낼 때 지정한 암호 | 직접 지정 |
 | `APPLE_ID` | Apple ID 이메일 | — |
-| `APPLE_PASSWORD` | **앱 암호** (계정 비밀번호 아님) | appleid.apple.com → 로그인 및 보안 → 앱 암호 생성 |
-| `APPLE_TEAM_ID` | 10자리 팀 ID | developer.apple.com → Membership |
+| `APPLE_APP_SPECIFIC_PASSWORD` | **앱 암호** (계정 비밀번호 아님) | appleid.apple.com → 로그인 및 보안 → 앱 암호 생성 |
+| `APPLE_TEAM_ID` | 10자리 팀 ID (예: `SN98P5V7J4` 형식) | developer.apple.com → Membership |
+| `APPLE_SIGNING_IDENTITY` | (선택) `Developer ID Application: 이름 (팀ID)` 전체 문자열 | 미등록 시 워크플로가 .p12에서 **자동 추출**한다. 수동 지정으로 덮어쓸 때만 등록 |
 
-`APPLE_CERTIFICATE`가 있으면 서명, `APPLE_ID`까지 있으면 공증이 자동 활성화된다(워크플로가 시크릿 존재 여부로 분기 — 빈 값이면 건너뜀).
+`MACOS_CERTIFICATE_P12`가 있으면 서명, `APPLE_ID`+`APPLE_APP_SPECIFIC_PASSWORD`+`APPLE_TEAM_ID`가 모두 있으면 공증이 자동 활성화된다(워크플로가 시크릿 존재 여부로 분기 — 빈 값이면 건너뜀).
+
+주의: `APPLE_TEAM_ID`(10자리 코드)와 SIGNING_IDENTITY(인증서 이름 문자열)는 다른 값이다 — 팀 ID는 IDENTITY 문자열의 괄호 안에 포함될 뿐이다. 인증서는 반드시 **"Developer ID Application"** 타입이어야 한다("Apple Development" 타입은 배포 서명·공증 불가).
 
 등록 예: `gh secret set APPLE_TEAM_ID --repo B-HS/raw-viewer` (또는 웹 UI).
 

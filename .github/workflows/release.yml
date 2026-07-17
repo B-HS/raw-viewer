@@ -68,32 +68,48 @@ jobs:
 
       - name: Configure Apple code signing
         env:
-          APPLE_CERTIFICATE_SECRET: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD_SECRET: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY_SECRET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID_SECRET: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD_SECRET: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID_SECRET: ${{ secrets.APPLE_TEAM_ID }}
+          CERT_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY_OVERRIDE: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          NOTARY_APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -n "$APPLE_CERTIFICATE_SECRET" ]; then
+          if [ -n "$CERT_P12" ]; then
+            IDENTITY="$SIGNING_IDENTITY_OVERRIDE"
+            if [ -z "$IDENTITY" ]; then
+              PROBE_DIR="$(mktemp -d)"
+              printf '%s' "$CERT_P12" | base64 -d > "$PROBE_DIR/cert.p12"
+              KEYCHAIN="$PROBE_DIR/probe.keychain-db"
+              security create-keychain -p probe "$KEYCHAIN"
+              security unlock-keychain -p probe "$KEYCHAIN"
+              security import "$PROBE_DIR/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign >/dev/null
+              IDENTITY="$(security find-identity -p codesigning "$KEYCHAIN" | sed -n 's/.*"\(.*\)".*/\1/p' | head -1)"
+              security delete-keychain "$KEYCHAIN"
+              rm -rf "$PROBE_DIR"
+            fi
+            if [ -z "$IDENTITY" ]; then
+              echo "failed to derive signing identity from MACOS_CERTIFICATE_P12" >&2
+              exit 1
+            fi
             {
-              echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE_SECRET"
-              echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD_SECRET"
-              echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY_SECRET"
+              echo "APPLE_CERTIFICATE=$CERT_P12"
+              echo "APPLE_CERTIFICATE_PASSWORD=$CERT_PASSWORD"
+              echo "APPLE_SIGNING_IDENTITY=$IDENTITY"
             } >> "$GITHUB_ENV"
-            echo "code signing: enabled"
+            printf 'code signing: enabled (%s)\n' "$IDENTITY"
           else
-            echo "code signing: skipped (APPLE_CERTIFICATE not set)"
+            echo "code signing: skipped (MACOS_CERTIFICATE_P12 not set)"
           fi
-          if [ -n "$APPLE_ID_SECRET" ]; then
+          if [ -n "$NOTARY_APPLE_ID" ] && [ -n "$NOTARY_PASSWORD" ] && [ -n "$NOTARY_TEAM_ID" ]; then
             {
-              echo "APPLE_ID=$APPLE_ID_SECRET"
-              echo "APPLE_PASSWORD=$APPLE_PASSWORD_SECRET"
-              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID_SECRET"
+              echo "APPLE_ID=$NOTARY_APPLE_ID"
+              echo "APPLE_PASSWORD=$NOTARY_PASSWORD"
+              echo "APPLE_TEAM_ID=$NOTARY_TEAM_ID"
             } >> "$GITHUB_ENV"
             echo "notarization: enabled"
           else
-            echo "notarization: skipped (APPLE_ID not set)"
+            echo "notarization: skipped (APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID not all set)"
           fi
 
       - name: Build app bundle
