@@ -179,8 +179,8 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 - [x] B5. 전체화면 (KeyF, toggle_fullscreen 커맨드, UI 숨김, onResized 동기화)
 - [x] B6. 배치 Export — raster는 기존 구현 확인(shift+cmd+E 선택 전체, 진행/취소/재시도 완비. 평가 오판 정정), DNG 일괄(runDngBatch) 추가
 - [x] B7. 슬라이드쇼 (KeyS, 설정 간격 1-30s, 마지막 장 자동 정지, 전체화면 연동, 키 입력 시 해제)
-- [ ] B8. 파일 조작 — 이름 변경·이동·복사 (image_id 이관 설계 선행 확인)
-- [ ] B9. 자동 업데이트 (updater 플러그인 + latest.json + 서명키 — 개인키는 사용자 등록 필요)
+- [x] B8. 파일 조작 — rename_image·move_images·copy_images 커맨드(확장자 고정·충돌 거부·XMP 사이드카 동반), 카탈로그가 경로 키라 Catalog::reassign_path 1방으로 편집·별점 이관(테스트), 컨텍스트 메뉴+RenameDialog·폴더 선택 이동/복사·toast
+- [x] B9. 자동 업데이트 — updater+process 플러그인, 공개키 커밋·개인키 ~/raw-viewer-updater.key(사용자 백업 필요), 시작 시 확인(설정 가능)+설정에서 설치, 릴리스가 .app.tar.gz+.sig+latest.json 생성(시크릿 조건부). 주의: 비공개 저장소 동안 업데이트 확인은 실패(무해) — release.md 기록
 - [x] B10. 애니메이션 GIF/WebP 재생 — aether original/{id} 라우트(gif·webp 화이트리스트+CORS, 테스트), isAnimated(gif 상시·webp VP8X 플래그, 테스트), Viewport img 분기+배지
 
 ### C. 엔지니어링 건전성
