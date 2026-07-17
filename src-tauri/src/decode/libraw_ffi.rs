@@ -300,7 +300,7 @@ fn matrix_from_color(color: &sys::libraw_colordata_t) -> Option<[f32; 9]> {
     None
 }
 
-fn downsample_half(rgb: &[f16], width: usize, height: usize) -> (usize, usize, Vec<f16>) {
+pub(crate) fn downsample_half(rgb: &[f16], width: usize, height: usize) -> (usize, usize, Vec<f16>) {
     let out_width = width / 2;
     let out_height = height / 2;
     let mut out = Vec::with_capacity(out_width * out_height * 3);

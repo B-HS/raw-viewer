@@ -1,0 +1,317 @@
+use std::io::Cursor;
+use std::path::Path;
+use std::sync::atomic::Ordering;
+use std::sync::OnceLock;
+
+use half::f16;
+use image::imageops::FilterType;
+use image::DynamicImage;
+
+use super::{CancelFlag, DecodeError, DecodedRaw, ThumbData};
+use crate::color;
+
+const IMAGE_CRATE_EXTS: &[&str] = &["jpg", "jpeg", "png", "webp", "tif", "tiff", "bmp", "gif"];
+const PLATFORM_EXTS: &[&str] = &["heic", "heif", "avif"];
+const THUMB_MAX_EDGE: u32 = 512;
+const THUMB_JPEG_QUALITY: u8 = 85;
+
+fn ext_lower(path: &Path) -> Option<String> {
+    path.extension().and_then(|value| value.to_str()).map(|value| value.to_ascii_lowercase())
+}
+
+fn is_platform_ext(path: &Path) -> bool {
+    ext_lower(path).is_some_and(|ext| PLATFORM_EXTS.contains(&ext.as_str()))
+}
+
+pub fn is_common_path(path: &Path) -> bool {
+    ext_lower(path).is_some_and(|ext| IMAGE_CRATE_EXTS.contains(&ext.as_str()) || PLATFORM_EXTS.contains(&ext.as_str()))
+}
+
+fn check_cancel(cancel: &CancelFlag) -> Result<(), DecodeError> {
+    if cancel.load(Ordering::Relaxed) {
+        Err(DecodeError::Cancelled)
+    } else {
+        Ok(())
+    }
+}
+
+fn srgb_u8_to_linear() -> &'static [f32; 256] {
+    static LUT: OnceLock<[f32; 256]> = OnceLock::new();
+    LUT.get_or_init(|| {
+        let mut table = [0.0f32; 256];
+        for (index, slot) in table.iter_mut().enumerate() {
+            *slot = color::srgb_eotf(index as f32 / 255.0);
+        }
+        table
+    })
+}
+
+fn exif_flip(path: &Path) -> u8 {
+    let Ok(file) = std::fs::File::open(path) else { return 0 };
+    let mut reader = std::io::BufReader::new(file);
+    let Ok(parsed) = exif::Reader::new().read_from_container(&mut reader) else { return 0 };
+    let orientation = parsed
+        .get_field(exif::Tag::Orientation, exif::In::PRIMARY)
+        .and_then(|field| field.value.get_uint(0));
+    match orientation {
+        Some(3 | 4) => 3,
+        Some(5 | 8) => 5,
+        Some(6 | 7) => 6,
+        _ => 0,
+    }
+}
+
+struct SrgbPixels {
+    width: u32,
+    height: u32,
+    rgb_linear: Vec<f16>,
+}
+
+fn linearize_rgba8(width: u32, height: u32, rgba: &[u8]) -> SrgbPixels {
+    let lut = srgb_u8_to_linear();
+    let pixel_count = width as usize * height as usize;
+    let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
+    for pixel in rgba.chunks_exact(4) {
+        let alpha = pixel[3] as f32 / 255.0;
+        rgb_linear.push(f16::from_f32(lut[pixel[0] as usize] * alpha));
+        rgb_linear.push(f16::from_f32(lut[pixel[1] as usize] * alpha));
+        rgb_linear.push(f16::from_f32(lut[pixel[2] as usize] * alpha));
+    }
+    SrgbPixels { width, height, rgb_linear }
+}
+
+fn linearize_premultiplied_rgba8(width: u32, height: u32, rgba: &[u8]) -> SrgbPixels {
+    let lut = srgb_u8_to_linear();
+    let pixel_count = width as usize * height as usize;
+    let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
+    for pixel in rgba.chunks_exact(4) {
+        rgb_linear.push(f16::from_f32(lut[pixel[0] as usize]));
+        rgb_linear.push(f16::from_f32(lut[pixel[1] as usize]));
+        rgb_linear.push(f16::from_f32(lut[pixel[2] as usize]));
+    }
+    SrgbPixels { width, height, rgb_linear }
+}
+
+fn linearize_rgba16(width: u32, height: u32, rgba: &[u16]) -> SrgbPixels {
+    let pixel_count = width as usize * height as usize;
+    let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
+    for pixel in rgba.chunks_exact(4) {
+        let alpha = pixel[3] as f32 / 65535.0;
+        rgb_linear.push(f16::from_f32(color::srgb_eotf(pixel[0] as f32 / 65535.0) * alpha));
+        rgb_linear.push(f16::from_f32(color::srgb_eotf(pixel[1] as f32 / 65535.0) * alpha));
+        rgb_linear.push(f16::from_f32(color::srgb_eotf(pixel[2] as f32 / 65535.0) * alpha));
+    }
+    SrgbPixels { width, height, rgb_linear }
+}
+
+fn is_deep_color(image: &DynamicImage) -> bool {
+    matches!(
+        image,
+        DynamicImage::ImageLuma16(_) | DynamicImage::ImageLumaA16(_) | DynamicImage::ImageRgb16(_) | DynamicImage::ImageRgba16(_)
+    )
+}
+
+fn load_image_crate(bytes: &[u8]) -> Result<DynamicImage, DecodeError> {
+    image::load_from_memory(bytes).map_err(|error| DecodeError::Image(error.to_string()))
+}
+
+fn decode_pixels(path: &Path, cancel: &CancelFlag) -> Result<(SrgbPixels, u8), DecodeError> {
+    let bytes = std::fs::read(path).map_err(|error| DecodeError::Image(error.to_string()))?;
+    check_cancel(cancel)?;
+    if is_platform_ext(path) {
+        let decoded = platform_decode(&bytes, None)?;
+        check_cancel(cancel)?;
+        let pixels = linearize_premultiplied_rgba8(decoded.width, decoded.height, &decoded.rgba);
+        return Ok((pixels, 0));
+    }
+    let image = load_image_crate(&bytes)?;
+    check_cancel(cancel)?;
+    let pixels = if is_deep_color(&image) {
+        let rgba = image.to_rgba16();
+        linearize_rgba16(rgba.width(), rgba.height(), rgba.as_raw())
+    } else {
+        let rgba = image.to_rgba8();
+        linearize_rgba8(rgba.width(), rgba.height(), rgba.as_raw())
+    };
+    Ok((pixels, exif_flip(path)))
+}
+
+#[cfg(target_os = "macos")]
+fn platform_decode(bytes: &[u8], max_pixel_size: Option<u32>) -> Result<crate::platform::DecodedImage, DecodeError> {
+    crate::platform::macos::imageio::decode_to_srgb_rgba(bytes, max_pixel_size).map_err(|error| DecodeError::Image(error.to_string()))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn platform_decode(_bytes: &[u8], _max_pixel_size: Option<u32>) -> Result<crate::platform::DecodedImage, DecodeError> {
+    Err(DecodeError::Image("HEIC/HEIF/AVIF decoding requires a platform decoder".into()))
+}
+
+pub fn decode_common(path: &Path, half: bool, cancel: &CancelFlag) -> Result<DecodedRaw, DecodeError> {
+    let (pixels, flip) = decode_pixels(path, cancel)?;
+    check_cancel(cancel)?;
+    let (width, height, rgb_f16) = if half && pixels.width >= 2 && pixels.height >= 2 {
+        let (w, h, data) = super::libraw_ffi::downsample_half(&pixels.rgb_linear, pixels.width as usize, pixels.height as usize);
+        (w as u32, h as u32, data)
+    } else {
+        (pixels.width, pixels.height, pixels.rgb_linear)
+    };
+    Ok(DecodedRaw {
+        width,
+        height,
+        rgb_f16,
+        cam_to_rec2020: Some(color::rec2020_from_srgb_linear_matrix()),
+        flip,
+    })
+}
+
+fn oriented_thumbnail(image: &DynamicImage, flip: u8) -> DynamicImage {
+    let thumb = if image.width().max(image.height()) > THUMB_MAX_EDGE {
+        image.resize(THUMB_MAX_EDGE, THUMB_MAX_EDGE, FilterType::Triangle)
+    } else {
+        image.clone()
+    };
+    match flip {
+        3 => thumb.rotate180(),
+        5 => thumb.rotate270(),
+        6 => thumb.rotate90(),
+        _ => thumb,
+    }
+}
+
+fn encode_thumb_jpeg(image: &DynamicImage) -> Result<ThumbData, DecodeError> {
+    let rgb = image.to_rgb8();
+    let (width, height) = (rgb.width(), rgb.height());
+    let mut jpeg = Vec::new();
+    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(Cursor::new(&mut jpeg), THUMB_JPEG_QUALITY);
+    rgb.write_with_encoder(encoder).map_err(|error| DecodeError::Image(error.to_string()))?;
+    Ok(ThumbData { jpeg, width, height })
+}
+
+pub fn extract_common_thumb(path: &Path) -> Result<ThumbData, DecodeError> {
+    let bytes = std::fs::read(path).map_err(|error| DecodeError::Image(error.to_string()))?;
+    if is_platform_ext(path) {
+        let decoded = platform_decode(&bytes, Some(THUMB_MAX_EDGE))?;
+        let rgba = image::RgbaImage::from_raw(decoded.width, decoded.height, decoded.rgba)
+            .ok_or_else(|| DecodeError::Image("imageio thumbnail buffer size mismatch".into()))?;
+        return encode_thumb_jpeg(&DynamicImage::ImageRgba8(rgba));
+    }
+    let image = load_image_crate(&bytes)?;
+    encode_thumb_jpeg(&oriented_thumbnail(&image, exif_flip(path)))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    use super::*;
+
+    fn temp_dir() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("raw-viewer-common-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        dir
+    }
+
+    fn write_png(path: &Path, width: u32, height: u32, rgba: [u8; 4]) {
+        let image = image::RgbaImage::from_pixel(width, height, image::Rgba(rgba));
+        image.save(path).expect("png write");
+    }
+
+    fn no_cancel() -> CancelFlag {
+        Arc::new(AtomicBool::new(false))
+    }
+
+    #[test]
+    fn png_mid_gray_linearizes_with_srgb_eotf() {
+        let path = temp_dir().join("mid-gray.png");
+        write_png(&path, 4, 4, [128, 128, 128, 255]);
+        let decoded = decode_common(&path, false, &no_cancel()).expect("decode");
+        assert_eq!((decoded.width, decoded.height), (4, 4));
+        assert_eq!(decoded.flip, 0);
+        let expected = color::srgb_eotf(128.0 / 255.0);
+        let sample = decoded.rgb_f16[0].to_f32();
+        assert!((sample - expected).abs() < 1e-3, "expected {expected}, got {sample}");
+        let matrix = decoded.cam_to_rec2020.expect("srgb matrix present");
+        assert!((matrix[0] - color::rec2020_from_srgb_linear_matrix()[0]).abs() < 1e-6);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn half_level_downsamples_dimensions() {
+        let path = temp_dir().join("half.png");
+        write_png(&path, 8, 6, [200, 10, 30, 255]);
+        let decoded = decode_common(&path, true, &no_cancel()).expect("decode");
+        assert_eq!((decoded.width, decoded.height), (4, 3));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn alpha_composites_over_black() {
+        let path = temp_dir().join("alpha.png");
+        write_png(&path, 2, 2, [255, 255, 255, 128]);
+        let decoded = decode_common(&path, false, &no_cancel()).expect("decode");
+        let expected = 128.0 / 255.0;
+        let sample = decoded.rgb_f16[0].to_f32();
+        assert!((sample - expected).abs() < 5e-3, "expected {expected}, got {sample}");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn jpeg_orientation_maps_to_libraw_flip() {
+        let path = temp_dir().join("oriented.jpg");
+        let image = image::RgbImage::from_pixel(6, 4, image::Rgb([90, 90, 90]));
+        image.save(&path).expect("jpeg write");
+        let mut metadata = little_exif::metadata::Metadata::new();
+        metadata.set_tag(little_exif::exif_tag::ExifTag::Orientation(vec![6]));
+        metadata.write_to_file(&path).expect("exif write");
+        assert_eq!(exif_flip(&path), 6);
+        let decoded = decode_common(&path, false, &no_cancel()).expect("decode");
+        assert_eq!(decoded.flip, 6);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn thumbnail_fits_max_edge_and_encodes_jpeg() {
+        let path = temp_dir().join("thumb.png");
+        write_png(&path, 1024, 512, [10, 200, 40, 255]);
+        let thumb = extract_common_thumb(&path).expect("thumb");
+        assert!(thumb.width <= THUMB_MAX_EDGE && thumb.height <= THUMB_MAX_EDGE);
+        assert_eq!((thumb.width, thumb.height), (512, 256));
+        assert_eq!(&thumb.jpeg[0..2], &[0xFF, 0xD8]);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn webp_decodes() {
+        let path = temp_dir().join("sample.webp");
+        let image = image::RgbaImage::from_pixel(10, 8, image::Rgba([50, 100, 150, 255]));
+        image.save(&path).expect("webp write");
+        let decoded = decode_common(&path, false, &no_cancel()).expect("decode");
+        assert_eq!((decoded.width, decoded.height), (10, 8));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn imageio_decodes_heic_via_sips() {
+        let dir = temp_dir();
+        let png = dir.join("imageio-src.png");
+        write_png(&png, 12, 10, [30, 60, 90, 255]);
+        let heic = dir.join("imageio-src.heic");
+        let converted = std::process::Command::new("sips")
+            .args(["-s", "format", "heic", png.to_str().unwrap(), "--out", heic.to_str().unwrap()])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
+        if !converted {
+            eprintln!("[skip] sips heic conversion unavailable");
+            return;
+        }
+        let decoded = decode_common(&heic, false, &no_cancel()).expect("heic decode");
+        assert_eq!((decoded.width, decoded.height), (12, 10));
+        let thumb = extract_common_thumb(&heic).expect("heic thumb");
+        assert_eq!((thumb.width, thumb.height), (12, 10));
+        let _ = std::fs::remove_file(&png);
+        let _ = std::fs::remove_file(&heic);
+    }
+}

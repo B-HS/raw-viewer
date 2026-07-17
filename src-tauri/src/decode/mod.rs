@@ -1,3 +1,4 @@
+pub mod common;
 pub mod libraw_ffi;
 
 #[cfg(test)]
@@ -18,6 +19,8 @@ pub type CancelFlag = Arc<AtomicBool>;
 pub enum DecodeError {
     #[error("libraw error: {0}")]
     LibRaw(String),
+    #[error("image error: {0}")]
+    Image(String),
     #[error("decode panicked")]
     Panic,
     #[error("cancelled")]
@@ -47,6 +50,9 @@ pub struct DecodedRaw {
 pub fn extract_thumb(path: &Path) -> Result<ThumbData, DecodeError> {
     let file = file_label(path);
     let _span = tracing::info_span!("decode.l0", file = %file).entered();
+    if common::is_common_path(path) {
+        return common::extract_common_thumb(path);
+    }
     libraw_ffi::extract_thumb(path)
 }
 
@@ -105,12 +111,18 @@ pub fn probe_metadata(path: &Path) -> Option<ProbeMetadata> {
 pub fn decode_half(path: &Path, cancel: &CancelFlag) -> Result<DecodedRaw, DecodeError> {
     let file = file_label(path);
     let _span = tracing::info_span!("decode.l1", file = %file).entered();
+    if common::is_common_path(path) {
+        return common::decode_common(path, true, cancel);
+    }
     libraw_ffi::decode(path, libraw_ffi::DecodeLevel::Half, cancel)
 }
 
 pub fn decode_full(path: &Path, cancel: &CancelFlag) -> Result<DecodedRaw, DecodeError> {
     let file = file_label(path);
     let _span = tracing::info_span!("decode.l2", file = %file).entered();
+    if common::is_common_path(path) {
+        return common::decode_common(path, false, cancel);
+    }
     libraw_ffi::decode(path, libraw_ffi::DecodeLevel::Full, cancel)
 }
 

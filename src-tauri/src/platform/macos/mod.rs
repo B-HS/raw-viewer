@@ -1,4 +1,5 @@
 pub mod dock;
+pub mod imageio;
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -195,8 +196,8 @@ impl Platform for MacOsPlatform {
         Ok(AccessToken { path: path.to_path_buf() })
     }
 
-    fn decode_heic(&self, _bytes: &[u8]) -> AppResult<DecodedImage> {
-        Err(AppError::NotSupportedOnPlatform)
+    fn decode_heic(&self, bytes: &[u8]) -> AppResult<DecodedImage> {
+        imageio::decode_to_srgb_rgba(bytes, None)
     }
 
     fn move_to_trash(&self, _paths: &[PathBuf]) -> AppResult<Vec<TrashToken>> {
