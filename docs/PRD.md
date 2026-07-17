@@ -2343,12 +2343,12 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 ### Phase 0 — 기반 (선행 필수)
 ```
 [x] Tauri 2 + Vite + React + TS(strict) + Tailwind 스캐폴딩
-[x] vendor/libraw 서브모듈 + build.rs bindgen + GPL pack 제외 빌드 플래그
+[x] vendor/libraw + build.rs bindgen + GPL pack 제외 빌드 플래그 (구현: 서브모듈 대신 pin+스크립트 `scripts/sync-vendor.sh`, vendor/ 미추적 — 결정 2026-07-15)
 [x] cargo-deny / deny.toml (GPL 전면 금지)  ★R4를 처음부터 강제
 [x] ts-rs 파이프라인 (Rust struct → TS interface 자동 생성)
 [x] tracing 계측 + 성능 오버레이 스켈레톤
 [x] platform trait + MacOsPlatform 스텁 (Windows/Linux는 NotSupported 반환)
-[x] tests/fixtures/ 에 Tier 1 코퍼스 배치 (git-lfs)
+[x] tests/fixtures/ 에 Tier 1 코퍼스 배치 (구현: git-lfs 대신 fetch 스크립트 `scripts/fetch-fixtures.sh`, 픽스처 미추적)
 [x] aether:// 프로토콜 등록 + 더미 응답  ★R1을 처음부터 강제
 검증: 빈 창이 뜬다. cargo deny 통과. aether://ping 이 응답한다.
 ```
@@ -2391,7 +2391,7 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 
 ### Phase 3 — 워크플로우 & 통합
 ```
-[x] 필름스트립 (가상화, 아틀라스) (§FR-17.1)
+[x] 필름스트립 (가상화) (§FR-17.1) — 아틀라스는 미구현(실측 병목 확인 전 보류, PROCESS 남은 작업)
 [x] 별점/플래그/라벨 + 필터 (§FR-17.3)
 [x] 프리셋 시스템 + XMP 이중 네임스페이스 (§FR-12) + 번들 프리셋 10종
 [x] 설정 복사/붙여넣기 + Auto Sync (§FR-13)
@@ -2432,6 +2432,8 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 > **아래 항목은 이 PRD의 범위 밖이다. 구현하지 말 것.** Phase 3 완료 시점에 사용자와 별도 논의 후 추가 PRD를 작성한다.
 
 ### 12.1 CI/CD 및 배포 (사용자 요청에 따라 명시적 보류)
+
+> **정정 (2026-07-16~17):** 아래 중 GitHub Actions(macOS arm64 단일), macOS 서명+공증, Tauri Updater, 앱 아이콘(자리표시자)은 이후 사용자 지시로 보류 해제되어 구현 완료됐다. 현행 상태의 단일 출처는 [docs/release.md](./release.md). 나머지 항목(Windows 서명·릴리스 채널·크래시 리포팅·텔레메트리·성능 게이트·패키지 매니저 배포·MAS)은 여전히 보류.
 ```
 ⏸ GitHub Actions 워크플로우 (matrix build: macOS arm64/x64, Windows x64, Linux x64)
 ⏸ macOS 코드 서명 (Developer ID Application) + notarization (notarytool)
@@ -2555,7 +2557,7 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 ✗ tauri::App::native_toc_menu                             → 존재하지 않는 API. objc2 (§FR-18.2)
 ✗ CF_DIB를 macOS에서                                      → NSPasteboardTypePNG (§FR-15)
 ✗ OSM attribution 제거                                    → ODbL 위반 (§10.4)
-✗ CI/CD · 코드 서명 구현                                   → §12. 별도 논의 후
+✗ CI/CD · 코드 서명 구현                                   → §12. 별도 논의 후 (→ 2026-07-16 사용자 지시로 해제·구현됨, docs/release.md)
 ```
 
 ---

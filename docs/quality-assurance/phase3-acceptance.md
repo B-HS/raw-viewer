@@ -61,7 +61,7 @@ L0 = `extract_thumb`(내장 JPEG 추출) · L1 = `decode_half`(half_size) · L2 
 
 - **X-T5는 L1 ≈ L2 (둘 다 13.4초).** → `half_size`가 X-Trans(X-T5)에서 **디코드 시간을 전혀 줄이지 못함**. `decode_half`가 `decode_full`과 **동일한 풀해상도 단일 스레드 Markesteijn 디모자이킹**을 돈다. 이것이 P2 250ms 초과의 근본 원인.
 - 근거(메커니즘): LibRaw의 `half_size` 단축(2×2 CFA 블록 → 1픽셀)은 **Bayer 전용 최적화**다. X-Trans(6×6 CFA, `filters==9`)는 이 경로를 타지 않고 `xtrans_interpolate`(Markesteijn)를 **풀해상도·단일 스레드**로 수행한다(현 빌드는 OpenMP 미링크; 3b에서 `LIBRAW_NOTHREADS`는 제거했으나 OpenMP는 추가하지 않음). 따라서 X-Trans L1은 풀 Markesteijn 비용을 그대로 지불.
-- GFX100은 L1(2.2s) < L2(4.07s)로 half_size가 ~1.85배 줄이긴 하나, 둘 다 예산을 크게 초과(102MP Markesteijn).
+- GFX100은 L1(2.2s) < L2(4.07s)로 half_size가 ~1.85배 줄이긴 하나, 둘 다 예산을 크게 초과. (정정: GFX100은 X-Trans가 아니라 **102MP 중형 Bayer** 센서 — half_size 단축이 동작하는 이유이며, 비용은 Markesteijn이 아니라 픽셀 수 자체다.)
 - PROCESS 이월기록(디버그·단일 스레드 44s)과 정합: release로 44s→13.4s로 내려왔으나 여전히 목표의 ~54배.
 
 ### 개선안 (구현 변경은 하지 않음 — 계약 지시)
@@ -81,7 +81,7 @@ L0 = `extract_thumb`(내장 JPEG 추출) · L1 = `decode_half`(half_size) · L2 
 ### ◆ 기능
 
 - [x] Tier 1 16기종 열림 + L0/L1(전부)·L2(부분집합) 디코드 — **[자동-통과]** 통합테스트 `tier1_corpus_thumb_and_half_decode`(cargo test) + 본 성능 하니스가 16기종 전부 L0/L1 디코드(§1 표). *"순서대로 표시"의 UI 표현은 수동.*
-- [ ] X-Trans(X-T5·GFX100) 격자 아티팩트 없음 — **[수동 필요]** X-T5/GFX100을 100% 줌으로 열어 미로/격자 육안(디코드는 성공, §4 참조).
+- [ ] X-Trans(X-T5) 격자 아티팩트 없음 — **[수동 필요]** X-T5를 100% 줌으로 열어 미로/격자 육안(디코드는 성공, §4 참조). (정정: GFX100은 중형 Bayer라 X-Trans 격자 검사 대상 아님 — 고해상 디테일 육안만.)
 - [ ] 모노크롬 DNG 흑백(컬러 노이즈 없음) — **[수동 필요]** leica-m-monochrom.dng 열어 육안(디코드 L1 123ms 성공, L0 없음).
 - [ ] Foveon X3F 크래시 없이 "미지원 센서" 배지 + L0 — **[수동 필요]** sigma-sd-quattro.x3f 열어 배지+L0 확인. *디코드 측: L0 2ms·L1 714ms 크래시 없이 성공(자동 확인분).*
 - [ ] 손상 CR2 패닉 없이 에러 UI + ←→ 탐색 — **[수동 필요]** tier2 truncated 픽스처(`make-tier2-fixtures.sh`) 열어 에러 UI+방향키. *`catch_unwind`+precancelled 테스트는 자동분.*
@@ -159,6 +159,8 @@ PASS  export-icc-embed         every_space_produces_a_valid_icc_profile + embed_
 ```
 
 ### cargo-deny 자동-실패 상세 (R4 아님 — allow-list 정책 갭)
+
+> **해소됨 (추기):** 이후 `src-tauri/deny.toml` allow-list에 `IJG`·`NCSA`가 추가되어 이 FAIL은 현 저장소 기준 해소 상태다. (현 개발 머신에는 cargo-deny 미설치라 재실행 검증은 하지 않음 — 아래는 당시 스냅샷 원문)
 
 `cargo deny check licenses`가 rc=4로 실패한다. **GPL/AGPL은 0개**(R4 충족). 거부된 것은 **permissive 라이선스 2건이 deny.toml allow-list에 없어서**다:
 

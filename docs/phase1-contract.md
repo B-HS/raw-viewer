@@ -50,6 +50,7 @@ L1/L2 → Content-Type: application/octet-stream, 바디 = AETH 헤더 16B + 페
   헤더(LE): [0..4)="AETH" ASCII, [4..8) width u32, [8..12) height u32, [12] fmt u8(2=f16), [13] channels u8(3), [14..16) reserved 0
   페이로드: interleaved row-major RGB f16 LE (SPEC-GAP: planar 대신 interleaved — texImage2D 직행)
 모든 응답에 Access-Control-Allow-Origin:* + Cache-Control: no-cache. 미보유 → 404 (F는 다음 level-ready에서 재시도).
+(정정 2026-07-16: CORS는 이후 `*`에서 빌드별 webview origin 한정으로 축소됨 — 현행은 architecture-backend.md 참조)
 ```
 
 ## 커맨드 (R2 구현, F 소비 — 시그니처 고정)
