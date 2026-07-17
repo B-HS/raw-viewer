@@ -103,7 +103,7 @@ const applyViewportBackground = (color: string) => document.documentElement.styl
 const isSortKey = (value: unknown): value is SortKey => (SORT_KEYS as readonly unknown[]).includes(value)
 const isSortOrder = (value: unknown): value is SortOrder => value === 'asc' || value === 'desc'
 
-const isLanguage = (value: unknown): value is AppLanguage => value === 'system' || value === 'ko' || value === 'en'
+const isLanguage = (value: unknown): value is AppLanguage => value === 'system' || value === 'ko' || value === 'en' || value === 'ja'
 const isTheme = (value: unknown): value is AppTheme => value === 'system' || value === 'dark' || value === 'light'
 const isL2Policy = (value: unknown): value is L2Policy => value === 'always' || value === 'idle' || value === 'zoom'
 

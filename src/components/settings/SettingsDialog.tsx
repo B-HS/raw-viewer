@@ -155,6 +155,7 @@ export const SettingsDialog: FC = () => {
                     <button
                         type='button'
                         onClick={close}
+                        title={t('common.close')}
                         aria-label={t('common.close')}
                         className='rounded px-2 py-0.5 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'>
                         ✕
@@ -191,6 +192,7 @@ export const SettingsDialog: FC = () => {
                                             ['system', t('settings.languageSystem')],
                                             ['ko', t('settings.languageKo')],
                                             ['en', t('settings.languageEn')],
+                                            ['ja', t('settings.languageJa')],
                                         ]}
                                     />
                                 </Field>
