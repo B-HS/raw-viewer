@@ -2,6 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import type { CpuFrameReadyPayload } from '../types/CpuFrameReadyPayload'
 import type { EditState } from '../types/EditState'
 import type { EditStateEnvelope } from '../types/EditStateEnvelope'
+import type { ImageEntry } from '../types/ImageEntry'
 import type { OpenResult } from '../types/OpenResult'
 import type { PendingOpenRequest } from '../types/PendingOpenRequest'
 import type { ScanBatch } from '../types/ScanBatch'
@@ -31,6 +32,8 @@ export const resetEditState = (imageId: string) => invoke<EditStateEnvelope>('re
 export const flushEdits = () => invoke<void>('flush_edits')
 
 export const toggleFullscreen = () => invoke<boolean>('toggle_fullscreen')
+
+export const registerImage = (path: string) => invoke<ImageEntry>('register_image', { path })
 
 export const fullscreenState = () => invoke<boolean>('fullscreen_state')
 

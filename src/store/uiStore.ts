@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { EngineApi } from '../gl/engineApi'
 import type { ClippingMode, CompareSplit } from '../gl/viewTypes'
 import type { HslBand } from '../types/HslBand'
+import type { ImageEntry } from '../types/ImageEntry'
 import type { EditSection } from './editDefaults'
 
 export type CropOverlayStyle = 'thirds' | 'golden' | 'diag' | 'none'
@@ -15,6 +16,8 @@ type UiState = {
     panelVisible: boolean
     isFullscreen: boolean
     zoomRequest: { preset: ZoomPreset; nonce: number } | null
+    pairSwap: Record<string, ImageEntry>
+    slideshowActive: boolean
     activeSection: EditSection
     clipping: ClippingMode
     compare: CompareSplit
@@ -27,6 +30,9 @@ type UiState = {
     attachEngine: (engine: EngineApi | null) => void
     setFullscreen: (on: boolean) => void
     requestZoom: (preset: ZoomPreset) => void
+    setPairSwap: (shownId: string, original: ImageEntry) => void
+    setSlideshow: (on: boolean) => void
+    clearPairSwap: (shownId: string) => void
     togglePanel: () => void
     setActiveSection: (section: EditSection) => void
     toggleClipping: (target: Exclude<ClippingMode, 'none'>) => void
@@ -47,6 +53,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     panelVisible: true,
     isFullscreen: false,
     zoomRequest: null,
+    pairSwap: {},
+    slideshowActive: false,
     activeSection: 'basic',
     clipping: 'none',
     compare: null,
@@ -67,6 +75,13 @@ export const useUiStore = create<UiState>((set, get) => ({
     },
     setFullscreen: (on) => set({ isFullscreen: on }),
     requestZoom: (preset) => set((state) => ({ zoomRequest: { preset, nonce: (state.zoomRequest?.nonce ?? 0) + 1 } })),
+    setSlideshow: (on) => set({ slideshowActive: on }),
+    setPairSwap: (shownId, original) => set((state) => ({ pairSwap: { ...state.pairSwap, [shownId]: original } })),
+    clearPairSwap: (shownId) =>
+        set((state) => {
+            const { [shownId]: _removed, ...rest } = state.pairSwap
+            return { pairSwap: rest }
+        }),
     togglePanel: () => set((state) => ({ panelVisible: !state.panelVisible })),
     setActiveSection: (section) => set({ activeSection: section }),
     toggleClipping: (target) =>

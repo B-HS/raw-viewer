@@ -326,3 +326,14 @@ pub fn toggle_fullscreen(window: tauri::Window) -> AppResult<bool> {
 pub fn fullscreen_state(window: tauri::Window) -> AppResult<bool> {
     window.is_fullscreen().map_err(|error| AppError::Internal(error.to_string()))
 }
+
+#[tauri::command]
+pub fn register_image(path: PathBuf, state: State<'_, AppState>) -> AppResult<crate::types::ImageEntry> {
+    let canonical = path.canonicalize().map_err(|error| AppError::Io(error.to_string()))?;
+    if !canonical.is_file() || !scan::is_supported(&canonical) {
+        return Err(AppError::Io(format!("unsupported or missing file: {}", canonical.display())));
+    }
+    let entry = scan::make_entry(canonical);
+    state.services.registry.insert(entry.image_id.clone(), entry.path.clone());
+    Ok(entry)
+}

@@ -478,6 +478,7 @@ export const en = {
         openInNewWindow: 'Open files in a new window',
         openInNewWindowNote:
             'When on, files opened from Finder or the Dock open in a separate window instead of replacing the current one. Off by default.',
+        slideshowInterval: 'Slideshow interval',
         color: 'Color',
         monitorProfile: 'Apply monitor ICC profile',
         monitorProfileNote:
@@ -581,6 +582,7 @@ export const en = {
     },
     toast: {
         copying: 'Copying...',
+        pairJpegFailed: 'Failed to open paired JPEG',
         copied: 'Copied to clipboard',
         copyFailed: 'Failed to copy',
         pathCopied: 'Path copied',
@@ -666,6 +668,8 @@ export const en = {
         viewPalette: 'Command palette',
         viewSettings: 'Settings',
         viewFullscreen: 'Toggle fullscreen',
+        viewTogglePairJpeg: 'Toggle RAW/JPEG pair',
+        viewSlideshow: 'Slideshow',
         editUndo: 'Undo',
         editRedo: 'Redo',
         editReset: 'Reset (⌥ section)',

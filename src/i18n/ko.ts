@@ -477,6 +477,7 @@ export const ko = {
         viewportBackground: '뷰포트 배경',
         openInNewWindow: '파일을 새 창에서 열기',
         openInNewWindowNote: '켜면 Finder나 Dock에서 연 파일이 현재 창을 바꾸지 않고 별도의 새 창에서 열립니다. 기본값은 꺼짐입니다.',
+        slideshowInterval: '슬라이드쇼 간격',
         color: '색상',
         monitorProfile: '모니터 ICC 프로파일 적용',
         monitorProfileNote:
@@ -580,6 +581,7 @@ export const ko = {
     },
     toast: {
         copying: '복사 중...',
+        pairJpegFailed: '페어 JPEG를 열지 못했습니다',
         copied: '클립보드에 복사됨',
         copyFailed: '복사에 실패했습니다',
         pathCopied: '경로 복사됨',
@@ -665,6 +667,8 @@ export const ko = {
         viewPalette: '커맨드 팔레트',
         viewSettings: '설정',
         viewFullscreen: '전체화면 전환',
+        viewTogglePairJpeg: 'RAW/JPEG 페어 전환',
+        viewSlideshow: '슬라이드쇼',
         editUndo: '실행 취소',
         editRedo: '다시 실행',
         editReset: '초기화 (⌥ 섹션)',

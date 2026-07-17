@@ -67,6 +67,8 @@ export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
     { id: 'view.palette', section: 'view', label: 'shortcut.viewPalette', binding: { code: 'KeyP', meta: true, shift: true } },
     { id: 'view.settings', section: 'view', label: 'shortcut.viewSettings', binding: { code: 'Comma', meta: true } },
     { id: 'view.fullscreen', section: 'view', label: 'shortcut.viewFullscreen', binding: { code: 'KeyF' } },
+    { id: 'view.togglePairJpeg', section: 'view', label: 'shortcut.viewTogglePairJpeg', binding: { code: 'KeyJ', meta: true } },
+    { id: 'view.slideshow', section: 'view', label: 'shortcut.viewSlideshow', binding: { code: 'KeyS' } },
     { id: 'edit.undo', section: 'edit', label: 'shortcut.editUndo', binding: { code: 'KeyZ', meta: true } },
     { id: 'edit.redo', section: 'edit', label: 'shortcut.editRedo', binding: { code: 'KeyZ', meta: true, shift: true } },
     { id: 'edit.reset', section: 'edit', label: 'shortcut.editReset', binding: { code: 'KeyR', meta: true }, ignore: ['alt'] },

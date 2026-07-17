@@ -22,7 +22,7 @@ import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
 import { useSettingsTab } from './components/settings/settingsTab'
-import { frontendReady, fullscreenState, navigate, openInNewWindow, openPath, scanDirectory, toggleFullscreen } from './ipc/commands'
+import { frontendReady, fullscreenState, navigate, openInNewWindow, openPath, registerImage, scanDirectory, toggleFullscreen } from './ipc/commands'
 import { onDecodeCrashLoop, onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
 import { requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
@@ -30,6 +30,7 @@ import { flushOrganize } from './ipc/organize'
 import { copyFilesToClipboard, noteRecent } from './ipc/platform'
 import { smartCopyCurrent } from './actions/smartCopy'
 import { confirmAndTrash } from './actions/trash'
+import { i18n } from './i18n/i18n'
 import { zoomRatio } from './gl/viewTransform'
 import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
 import { matchAction, resolveBinding } from './shortcuts/resolve'
@@ -119,6 +120,28 @@ const advanceToNextFiltered = () => {
     if (target != null) usePlaylist.getState().focusIndex(target)
 }
 
+const togglePairJpeg = async () => {
+    const state = usePlaylist.getState()
+    const current = state.entries[state.currentIndex]
+    if (!current) return
+    const original = useUiStore.getState().pairSwap[current.imageId]
+    if (original) {
+        usePlaylist.getState().replaceEntryAt(state.currentIndex, original)
+        useUiStore.getState().clearPairSwap(current.imageId)
+        return
+    }
+    if (!current.isRaw) return
+    const jpegPath = usePairs.getState().jpegByRaw[current.imageId]
+    if (!jpegPath) return
+    try {
+        const jpegEntry = await registerImage(jpegPath)
+        useUiStore.getState().setPairSwap(jpegEntry.imageId, current)
+        usePlaylist.getState().replaceEntryAt(usePlaylist.getState().currentIndex, jpegEntry)
+    } catch {
+        useToast.getState().show(i18n.t('toast.pairJpegFailed'))
+    }
+}
+
 const navigateFlagged = (direction: 'prev' | 'next') => {
     const state = usePlaylist.getState()
     const organize = useOrganize.getState().entries
@@ -163,6 +186,7 @@ export const App: FC = () => {
     const currentPosition = usePlaylist((state) => state.currentIndex)
     const gridActive = useGridView((state) => state.active)
     const isFullscreen = useUiStore((state) => state.isFullscreen)
+    const slideshowActive = useUiStore((state) => state.slideshowActive)
     const { t } = useTranslation()
 
     const handleOpen = async (path: string) => {
@@ -418,6 +442,12 @@ export const App: FC = () => {
                 toggleFullscreen()
                     .then((on) => useUiStore.getState().setFullscreen(on))
                     .catch(() => undefined)
+            } else if (matchAction(event, 'view.togglePairJpeg')) {
+                event.preventDefault()
+                togglePairJpeg()
+            } else if (matchAction(event, 'view.slideshow')) {
+                event.preventDefault()
+                useUiStore.getState().setSlideshow(!useUiStore.getState().slideshowActive)
             } else if (matchAction(event, 'view.settings')) {
                 event.preventDefault()
                 useOverlays.getState().openSettings()
@@ -588,6 +618,35 @@ export const App: FC = () => {
         }
         run().catch(() => undefined)
     }, [currentImageId, scanning])
+
+    useEffect(() => {
+        if (!slideshowActive) return
+        const enteredFullscreen = !useUiStore.getState().isFullscreen
+        if (enteredFullscreen)
+            toggleFullscreen()
+                .then((on) => useUiStore.getState().setFullscreen(on))
+                .catch(() => undefined)
+        const advance = () => {
+            const list = activeFilteredList()
+            const position = list.indexOf(usePlaylist.getState().currentIndex)
+            if (position < 0 || position >= list.length - 1) {
+                useUiStore.getState().setSlideshow(false)
+                return
+            }
+            usePlaylist.getState().focusIndex(list[position + 1])
+        }
+        const timer = setInterval(advance, useSettings.getState().slideshowIntervalMs)
+        const stopOnKey = () => useUiStore.getState().setSlideshow(false)
+        window.addEventListener('keydown', stopOnKey)
+        return () => {
+            clearInterval(timer)
+            window.removeEventListener('keydown', stopOnKey)
+            if (enteredFullscreen && useUiStore.getState().isFullscreen)
+                toggleFullscreen()
+                    .then((on) => useUiStore.getState().setFullscreen(on))
+                    .catch(() => undefined)
+        }
+    }, [slideshowActive])
 
     useEffect(() => {
         let disposed = false

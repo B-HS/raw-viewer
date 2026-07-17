@@ -46,6 +46,7 @@ type PlaylistState = {
     setScanTotal: (total: number) => void
     setCurrentIndex: (index: number) => void
     focusIndex: (index: number) => void
+    replaceEntryAt: (index: number, entry: ImageEntry) => void
     selectToggle: (index: number) => void
     selectRange: (imageIds: string[], index: number) => void
     selectAll: (imageIds: string[]) => void
@@ -145,6 +146,14 @@ export const usePlaylist = create<PlaylistState>((set) => ({
             if (max < 0) return { currentIndex: 0, selection: [], selectionAnchor: null }
             const clamped = index < 0 ? 0 : index > max ? max : index
             return { currentIndex: clamped, selection: [state.entries[clamped].imageId], selectionAnchor: clamped }
+        }),
+    replaceEntryAt: (index, entry) =>
+        set((state) => {
+            const previous = state.entries[index]
+            if (!previous) return state
+            const entries = state.entries.map((item, position) => (position === index ? entry : item))
+            const selection = state.selection.map((id) => (id === previous.imageId ? entry.imageId : id))
+            return { entries, selection }
         }),
     selectToggle: (index) =>
         set((state) => {

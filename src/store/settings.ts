@@ -23,6 +23,7 @@ export type SettingsValues = {
     recentApps: string[]
     filmstripHeight: number
     gridCellSize: number
+    slideshowIntervalMs: number
     shortcutOverrides: Record<string, Binding>
 }
 
@@ -30,6 +31,9 @@ const RECENT_APPS_MAX = 6
 
 const FILMSTRIP_MIN = 60
 const FILMSTRIP_MAX = 200
+
+const SLIDESHOW_MIN_MS = 1000
+const SLIDESHOW_MAX_MS = 30000
 
 export const GRID_CELL_MIN = 90
 export const GRID_CELL_MAX = 260
@@ -53,8 +57,11 @@ const DEFAULTS: SettingsValues = {
     recentApps: [],
     filmstripHeight: 96,
     gridCellSize: 140,
+    slideshowIntervalMs: 3000,
     shortcutOverrides: {},
 }
+
+const clampSlideshowInterval = (value: number) => Math.max(SLIDESHOW_MIN_MS, Math.min(SLIDESHOW_MAX_MS, Math.round(value)))
 
 const pushPerformance = (values: Pick<SettingsValues, 'preloadRadius' | 'l2Policy' | 'isolatedDecode'>) =>
     setPerformanceSettings(values.preloadRadius, values.l2Policy, values.isolatedDecode).catch(() => undefined)
@@ -106,6 +113,7 @@ type SettingsStore = SettingsValues & {
     commitFilmstripHeight: () => void
     setGridCellSize: (size: number) => void
     commitGridCellSize: () => void
+    setSlideshowInterval: (ms: number) => void
     setShortcutBinding: (id: string, binding: Binding) => void
     resetShortcutBinding: (id: string) => void
     resetShortcutBindings: () => void
@@ -130,6 +138,7 @@ export const useSettings = create<SettingsStore>((set, get) => ({
             const recentApps = await store.get('recentApps')
             const filmstripHeight = await store.get('filmstripHeight')
             const gridCellSize = await store.get('gridCellSize')
+            const slideshowIntervalMs = await store.get('slideshowIntervalMs')
             const shortcutOverrides = await store.get('shortcutOverrides')
             values = {
                 language: isLanguage(language) ? language : DEFAULTS.language,
@@ -144,6 +153,8 @@ export const useSettings = create<SettingsStore>((set, get) => ({
                 recentApps: Array.isArray(recentApps) ? recentApps.filter((item): item is string => typeof item === 'string') : DEFAULTS.recentApps,
                 filmstripHeight: typeof filmstripHeight === 'number' ? clampFilmstripHeight(filmstripHeight) : DEFAULTS.filmstripHeight,
                 gridCellSize: typeof gridCellSize === 'number' ? clampGridCellSize(gridCellSize) : DEFAULTS.gridCellSize,
+                slideshowIntervalMs:
+                    typeof slideshowIntervalMs === 'number' ? clampSlideshowInterval(slideshowIntervalMs) : DEFAULTS.slideshowIntervalMs,
                 shortcutOverrides: sanitizeOverrides(shortcutOverrides),
             }
         } catch {}
@@ -208,6 +219,11 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     commitFilmstripHeight: () => persist('filmstripHeight', get().filmstripHeight),
     setGridCellSize: (size) => set({ gridCellSize: clampGridCellSize(size) }),
     commitGridCellSize: () => persist('gridCellSize', get().gridCellSize),
+    setSlideshowInterval: (ms) => {
+        const clamped = clampSlideshowInterval(ms)
+        set({ slideshowIntervalMs: clamped })
+        persist('slideshowIntervalMs', clamped)
+    },
     setShortcutBinding: (id, binding) => {
         const shortcutOverrides = { ...get().shortcutOverrides, [id]: binding }
         set({ shortcutOverrides })

@@ -77,6 +77,7 @@ export const SettingsDialog: FC = () => {
     const isolatedDecode = useSettings((state) => state.isolatedDecode)
     const showAddress = useSettings((state) => state.showAddress)
     const openInNewWindow = useSettings((state) => state.openInNewWindow)
+    const slideshowIntervalMs = useSettings((state) => state.slideshowIntervalMs)
     const tab = useSettingsTab((state) => state.tab)
     const [version, setVersion] = useState('')
     const [stats, setStats] = useState<CacheStats | null>(null)
@@ -200,6 +201,18 @@ export const SettingsDialog: FC = () => {
                                     />
                                 </Field>
                                 <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.openInNewWindowNote')}</p>
+                                <Field label={`${t('settings.slideshowInterval')} ${slideshowIntervalMs / 1000}s`}>
+                                    <input
+                                        type='range'
+                                        min={1000}
+                                        max={30000}
+                                        step={1000}
+                                        value={slideshowIntervalMs}
+                                        onChange={(event) => useSettings.getState().setSlideshowInterval(Number(event.target.value))}
+                                        aria-label={t('settings.slideshowInterval')}
+                                        className='w-40 accent-neutral-300'
+                                    />
+                                </Field>
                                 {monitorAvailable && (
                                     <>
                                         <SectionTitle>{t('settings.color')}</SectionTitle>
