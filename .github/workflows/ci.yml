@@ -60,6 +60,9 @@ jobs:
       - name: Typecheck
         run: bunx tsc --noEmit
 
+      - name: Lint
+        run: bun run lint
+
       - name: Frontend tests
         run: bun run test
 

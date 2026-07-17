@@ -9,6 +9,7 @@ const entry = (fileName: string, patch: Partial<ImageEntry> = {}): ImageEntry =>
     isRaw: true,
     modifiedMs: null,
     fileSize: null,
+    isAnimated: false,
     ...patch,
 })
 

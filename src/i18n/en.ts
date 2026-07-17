@@ -198,6 +198,7 @@ export const en = {
         loadFailed: 'Failed to load image',
         copyDetails: 'Copy details',
         navHint: 'Use ← → to keep browsing',
+        animatedBadge: 'Animation - edits are not applied',
         compareBefore: 'Before',
         compareAfter: 'After',
     },

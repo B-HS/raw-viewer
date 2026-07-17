@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { REC2020_LUMA } from '../../gl/colorSpaces'
+import { aetherUrl } from '../../ipc/pixels'
 import { useEditStore } from '../../store/editStore'
 import { useHistogram } from '../../store/histogramStore'
 import { useLens } from '../../store/lens'
@@ -80,6 +81,16 @@ export const Viewport: FC = () => {
             useHistogram.getState().setData(null)
         }
     }, [engine])
+
+    if (current?.isAnimated)
+        return (
+            <div className='relative flex h-full w-full items-center justify-center overflow-hidden bg-viewport'>
+                <img src={aetherUrl(`original/${current.imageId}`)} alt={current.fileName} className='max-h-full max-w-full object-contain' />
+                <span className='pointer-events-none absolute bottom-3 right-3 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-200'>
+                    {t('viewport.animatedBadge')}
+                </span>
+            </div>
+        )
 
     if (gpuError)
         return (

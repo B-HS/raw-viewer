@@ -198,6 +198,7 @@ export const ko = {
         loadFailed: '이미지를 불러올 수 없습니다',
         copyDetails: '세부 정보 복사',
         navHint: '← → 로 계속 탐색할 수 있습니다',
+        animatedBadge: '애니메이션 - 편집이 적용되지 않습니다',
         compareBefore: '편집 전',
         compareAfter: '편집 후',
     },

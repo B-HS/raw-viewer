@@ -10,6 +10,7 @@ const entry = (fileName: string, isRaw = true): ImageEntry => ({
     isRaw,
     modifiedMs: null,
     fileSize: null,
+    isAnimated: false,
 })
 
 const organize = (patch: Partial<OrganizeEntry>): OrganizeEntry => ({ imageId: 'x', rating: 0, flag: null, label: null, ...patch })
