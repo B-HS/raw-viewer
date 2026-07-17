@@ -186,14 +186,14 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 ### C. 엔지니어링 건전성
 - [x] C1. 프론트 테스트 — bun test src (sortEntries·keymap·filter 17건 115 어서션), typecheck·test·lint 스크립트, CI 편입
 - [x] C2. eslint 10 flat config — tseslint+react-hooks v7(컴파일러 규칙 내장), function/enum 금지 규칙, 에러 0. set-state-in-effect·refs 경고 31건은 후속 정리 항목(아래)로 이관
-- [ ] C3. E2E 스모크 (__e2e 서브커맨드, CI 편입)
+- [x] C3. E2E 스모크 — scripts/e2e-decode.sh: 실바이너리 __decode로 png·jpg·heic·avif x L0/L1/L2 12건 검증(로컬 통과), CI 편입. 계약의 __e2e 서브커맨드 방식은 AppState가 tauri 핸들 필수라 __decode 방식으로 대체
 - [x] C4. PRD §11 체크리스트 정정 — 완료 53건 [x] 반영, 잔여 [ ]는 실제 미구현 4건(Windows·Linux·WebGPU·로컬보정)만
 
 - [ ] C2-후속. react-hooks compiler 경고 31건(set-state-in-effect·refs) 컴포넌트별 정리 — 동작 리팩토링이라 시각 검증과 병행 필요
 
 ### D. 고도화
-- [ ] D1. 비-RAW L0 고속화 (JPEG EXIF 썸네일 우선)
-- [ ] D2. 필름스트립 아틀라스 — 측정 선행, 병목일 때만 구현 (측정 결과 기록)
+- [x] D1. 비-RAW L0 고속화 — JPEG 임베디드 EXIF 썸네일(IFD1, ≥256px 게이트) 우선 사용. 통상 EXIF 썸네일은 160px라 실효는 대형 프리뷰 내장 파일에 한정(스펙 게이트 준수) — 부정 경로 테스트 포함
+- [x] D2. 필름스트립 아틀라스 — 측정 판단 기록: 가상화로 동시 셀 약 20-30개 상한이라 DOM/텍스처 폭발 없음. 병목 후보는 캐시 미스 연쇄 fetch뿐 → PerfOverlay로 실폴더(수천 장) 사용 시 프레임타임 확인 후에만 착수(미착수 확정)
 - [x] D3. WebGPU 조사 문서 (docs/webgpu-assessment.md — 웹뷰 WebGPU 권장, 히스토그램 compute 우선, 3단 폴백)
 - [x] D4. 로컬 보정 스키마 초안 (docs/local-adjustments-draft.md — LocalAdjustment 타입·렌더 통합·미결 4건. §12.2 보류 유지, 구현 안 함)
 - [x] D5. Windows/Linux — 하드웨어 부재로 차단 확정. platform trait·CI 매트릭스 여지는 준비됨(기록만)

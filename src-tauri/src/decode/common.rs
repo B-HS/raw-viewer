@@ -296,8 +296,34 @@ fn encode_thumb_jpeg(image: &DynamicImage) -> Result<ThumbData, DecodeError> {
     Ok(ThumbData { jpeg, width, height })
 }
 
+const EXIF_THUMB_MIN_EDGE: u32 = 256;
+
+fn embedded_exif_thumbnail(bytes: &[u8], flip: u8) -> Option<ThumbData> {
+    let parsed = exif::Reader::new().read_from_container(&mut Cursor::new(bytes)).ok()?;
+    let offset = parsed
+        .get_field(exif::Tag::JPEGInterchangeFormat, exif::In::THUMBNAIL)?
+        .value
+        .get_uint(0)? as usize;
+    let length = parsed
+        .get_field(exif::Tag::JPEGInterchangeFormatLength, exif::In::THUMBNAIL)?
+        .value
+        .get_uint(0)? as usize;
+    let jpeg = parsed.buf().get(offset..offset.checked_add(length)?)?;
+    let thumb = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg).ok()?;
+    if thumb.width().max(thumb.height()) < EXIF_THUMB_MIN_EDGE {
+        return None;
+    }
+    encode_thumb_jpeg(&oriented_thumbnail(&thumb, flip)).ok()
+}
+
 pub fn extract_common_thumb(path: &Path) -> Result<ThumbData, DecodeError> {
     let bytes = std::fs::read(path).map_err(|error| DecodeError::Image(error.to_string()))?;
+    let ext_is_jpeg = ext_lower(path).is_some_and(|ext| ext == "jpg" || ext == "jpeg");
+    if ext_is_jpeg {
+        if let Some(thumb) = embedded_exif_thumbnail(&bytes, exif_flip(path)) {
+            return Ok(thumb);
+        }
+    }
     if is_platform_ext(path) {
         let decoded = platform_decode(&bytes, Some(THUMB_MAX_EDGE))?;
         let rgba = image::RgbaImage::from_raw(decoded.width, decoded.height, decoded.rgba)
@@ -473,5 +499,27 @@ mod tests {
         assert_eq!((thumb.width, thumb.height), (12, 10));
         let _ = std::fs::remove_file(&png);
         let _ = std::fs::remove_file(&heic);
+    }
+}
+
+#[cfg(test)]
+mod exif_thumb_tests {
+    use super::*;
+
+    #[test]
+    fn plain_jpeg_without_exif_thumbnail_falls_back() {
+        let image = image::RgbImage::from_pixel(600, 400, image::Rgb([10, 20, 30]));
+        let mut bytes = Vec::new();
+        image
+            .write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(std::io::Cursor::new(&mut bytes), 90))
+            .expect("encode");
+        assert!(embedded_exif_thumbnail(&bytes, 0).is_none());
+        let dir = std::env::temp_dir().join(format!("raw-viewer-exifthumb-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("plain.jpg");
+        let _ = std::fs::write(&path, &bytes);
+        let thumb = extract_common_thumb(&path).expect("fallback thumb");
+        assert_eq!((thumb.width, thumb.height), (512, 341));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
