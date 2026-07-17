@@ -160,6 +160,15 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 검증: 유닛 7건(선형화·다운샘플·알파·orientation·썸네일·webp·heic[sips 왕복]) + 실바이너리 `__decode` e2e로 jpg/png/heic/avif × L0/L1/L2 전부 확인.
 - SPEC-GAP: 비-RAW 임베디드 ICC(P3 JPEG 등)는 image-크레이트 경로에서 sRGB 가정(ImageIO 경로는 sRGB로 색변환됨). AVIF irot/imir 회전 미반영(EXIF만). 애니메이션 webp/gif는 첫 프레임.
 
+### 사용자 피드백 웨이브 (2026-07-18 오후) — 진행 중
+- [x] F1. 창 닫기 버그 — 원인: JS onCloseRequested 등록 시 tauri가 닫기를 JS에 위임하는데 `core:window:allow-close/destroy` 권한 부재로 close()·destroy() 모두 거부 → 영구 미닫힘. 수정: 권한 추가 + 핸들러를 destroy() 1회 호출로 정리(실패 시 closingRef 복구)
+- [x] F2. Open With 크래시 — 원인: 콜드 스타트 시 RunEvent::Opened가 setup(Ready)보다 먼저 도착, `state::<OpenQueue>()`가 "state before manage" 패닉 → extern "C" 경계(tao application_open_urls)에서 abort. 수정: OpenQueue를 Builder::manage로 이동(이벤트 루프 전 등록) + handle_open을 try_state로 방어. 기존 버퍼링 설계가 그대로 동작
+- [x] F3. 아이콘 크기 상향 — 필터바 별점/플래그/라벨(11→14-16px+클릭타깃 확대), 필름스트립 배지(8→10px, 10→12px), 히스토그램 클리핑(8px 타깃→24px), 크롭 ⇄↺↻, 프리셋 ↥✕
+- [x] F4. 툴팁 — 아이콘·버튼 전수에 title 추가(감사 목록 기반): 필터바 전체(플래그 의미 설명 포함), 히스토그램, 크롭, 프리셋(출처 ◈/⬢ 의미 포함), 샘플러 핀, 다이얼로그 닫기, 단축키 초기화
+- [x] F5. 일본어 지원 — src/i18n/ja.ts(645키, en과 구조 완전 일치 기계 검증), 언어 3종+시스템, 폴백 en. 기여 방법은 docs/i18n.md
+- [x] F6. 커스텀 타이틀바 — decorations:false(주창+보조창), TitleBar 컴포넌트(드래그 영역·메뉴: 열기/내보내기/프리셋 가져오기/전체화면/설정/정보·창 컨트롤 3종), window-state DECORATIONS 플래그 제외(기존 사용자 복원 함정), 전체화면 시 숨김, 크래시 배너 오프셋
+- [x] F-검증. 실기동 스모크 — Open With 콜드 스타트 재현: 디버그 번들을 `open -a <app> 사진.jpg`로 기동, 앱 생존·신규 크래시 리포트 0 확인. 닫기 버튼·타이틀바 드래그는 코드 근거(권한+destroy, tauri 소스 분석) 확정, 시각 확인은 사용자 실사용 시
+
 ### 4 잔여
 WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수는 사용자 지시 대기) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
 
