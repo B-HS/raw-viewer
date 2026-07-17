@@ -8,6 +8,8 @@
     ],
     "scripts": {
         "dev": "vite",
+        "typecheck": "tsc --noEmit",
+        "test": "bun test src",
         "build": "tsc --noEmit && vite build",
         "preview": "vite preview",
         "tauri": "tauri"

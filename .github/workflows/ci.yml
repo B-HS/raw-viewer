@@ -60,6 +60,9 @@ jobs:
       - name: Typecheck
         run: bunx tsc --noEmit
 
+      - name: Frontend tests
+        run: bun run test
+
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings

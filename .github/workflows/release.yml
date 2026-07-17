@@ -64,6 +64,9 @@ jobs:
           bash scripts/fetch-dnglab.sh
           bash scripts/fetch-fixtures.sh
 
+      - name: Frontend tests
+        run: bun run test
+
       - name: Verify (tests, release profile shared with build)
         working-directory: src-tauri
         run: cargo test --release
