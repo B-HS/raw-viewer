@@ -41,11 +41,7 @@ pub fn srgb_oetf(x: f32) -> f32 {
 }
 
 pub fn srgb_eotf(x: f32) -> f32 {
-    if x <= 0.040_45 {
-        x / 12.92
-    } else {
-        ((x + 0.055) / 1.055).powf(2.4)
-    }
+    crate::color::srgb_eotf(x)
 }
 
 pub fn fract(x: f32) -> f32 {

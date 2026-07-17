@@ -1,6 +1,6 @@
 [package]
 name = "raw-viewer"
-version = "0.1.2"
+version = "0.2.0"
 description = "Cross-platform RAW image viewer and non-destructive editor"
 authors = ["Hyunseok Byun"]
 edition = "2021"
@@ -63,7 +63,10 @@ objc2-app-kit = { version = "0.3", features = [
     "NSGraphics",
     "block2",
 ] }
+objc2-core-foundation = "0.3.2"
+objc2-core-graphics = "0.3.2"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSData", "NSURL", "NSError"] }
+objc2-image-io = "0.3.2"
 
 [features]
 default = ["libraw"]

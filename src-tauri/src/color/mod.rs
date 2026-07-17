@@ -65,6 +65,18 @@ fn all_finite(m: &[[f32; 3]; 3]) -> bool {
     m.iter().all(|row| row.iter().all(|value| value.is_finite()))
 }
 
+pub fn srgb_eotf(x: f32) -> f32 {
+    if x <= 0.040_45 {
+        x / 12.92
+    } else {
+        ((x + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+pub fn rec2020_from_srgb_linear_matrix() -> [f32; 9] {
+    flatten(&matmul3(&REC2020_FROM_XYZ_D65, &XYZ_FROM_SRGB_LINEAR))
+}
+
 pub fn cam_to_rec2020(cam_xyz: &[[f32; 3]; 3]) -> Option<[f32; 9]> {
     let xyz_from_cam = invert3(cam_xyz)?;
     let channel_gain = matvec3(cam_xyz, &D65_WHITE_XYZ);
