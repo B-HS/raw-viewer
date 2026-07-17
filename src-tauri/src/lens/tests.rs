@@ -79,7 +79,7 @@ const FIXTURE: &str = r#"<?xml version="1.0"?>
 "#;
 
 fn index() -> LensIndex {
-    LensIndex::from_str(FIXTURE)
+    LensIndex::from_xml(FIXTURE)
 }
 
 fn zoom_query() -> LensQuery {

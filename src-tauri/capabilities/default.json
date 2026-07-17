@@ -3,5 +3,14 @@
     "identifier": "default",
     "description": "Default capability for the main window and per-file secondary windows",
     "windows": ["main", "window-*"],
-    "permissions": ["core:default", "dialog:default", "opener:default", "opener:allow-reveal-item-in-dir", "store:default"]
+    "permissions": [
+        "core:default",
+        "dialog:default",
+        "opener:allow-reveal-item-in-dir",
+        {
+            "identifier": "opener:allow-open-url",
+            "allow": [{ "url": "https://www.google.com/maps/**" }, { "url": "https://maps.apple.com/**" }]
+        },
+        "store:default"
+    ]
 }

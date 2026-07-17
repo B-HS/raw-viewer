@@ -1,8 +1,8 @@
 import { applyPatches as applyImmerPatches, enablePatches, produceWithPatches } from 'immer'
 import { create } from 'zustand'
-import { i18n } from '../i18n'
+import { i18n } from '../i18n/i18n'
 import { cloneDefaultSection, DEFAULT_EDIT_STATE, isDefault } from './editDefaults'
-import { useHistoryStore } from './historyStore'
+import { connectHistoryTarget, useHistoryStore } from './historyStore'
 import { useUiStore } from './uiStore'
 import { getEditState, isConflictError, resetEditState, setEditStateCommand } from '../ipc/commands'
 import type { EditSection } from './editDefaults'
@@ -184,4 +184,9 @@ export const useEditStore = create<EditStoreState>((set, get) => {
             await chain
         },
     }
+})
+
+connectHistoryTarget({
+    imageId: () => useEditStore.getState().imageId,
+    applyPatches: (patches) => useEditStore.getState().applyPatches(patches),
 })

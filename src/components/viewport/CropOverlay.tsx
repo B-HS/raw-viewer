@@ -17,7 +17,7 @@ const MIN_PX = 24
 
 const clamp = (value: number, lo: number, hi: number) => (value < lo ? lo : value > hi ? hi : value)
 
-const gridLines = (style: CropOverlayStyle): number[] => {
+const gridLines = (style: CropOverlayStyle) => {
     if (style === 'thirds') return [1 / 3, 2 / 3]
     if (style === 'golden') return [0.382, 0.618]
     return []
@@ -78,7 +78,7 @@ export const CropOverlay: FC = () => {
         setCropRect(displayToSource({ left: dl, top: dt, right: dr, bottom: db }, payload.flip), crop.aspect)
     }
 
-    const resize = (handle: Exclude<Handle, 'move'>, px: number, py: number, start: RectPx): RectPx => {
+    const resize = (handle: Exclude<Handle, 'move'>, px: number, py: number, start: RectPx) => {
         const cx = clamp(px, ix, ix + iw)
         const cy = clamp(py, iy, iy + ih)
         let left = start.x

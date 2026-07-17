@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { i18n } from '../i18n'
+import { i18n } from '../i18n/i18n'
 import { useEditStore } from './editStore'
 import { usePlaylist } from './playlist'
 import { PRESET_SECTIONS } from './presetStore'

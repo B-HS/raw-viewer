@@ -1,5 +1,5 @@
 import { revealInFileManager } from '../ipc/platform'
-import { smartCopyCurrent } from '../lib/smartCopy'
+import { smartCopyCurrent } from '../actions/smartCopy'
 import { isFilterActive, useFilter } from '../store/filter'
 import { useEditStore } from '../store/editStore'
 import { useExportStore } from '../store/exportStore'

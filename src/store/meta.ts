@@ -1,14 +1,19 @@
 import { create } from 'zustand'
-import { i18n } from '../i18n'
+import { i18n } from '../i18n/i18n'
 import { getMetadata } from '../ipc/meta'
 import type { ImageMetadata } from '../types/ImageMetadata'
 
 const COLLAPSE_KEY = 'raw-viewer:meta-collapsed'
 
+const isCollapsedMap = (value: unknown): value is Record<string, boolean> =>
+    typeof value === 'object' && value !== null && Object.values(value).every((item) => typeof item === 'boolean')
+
 const loadCollapsed = () => {
     try {
         const raw = localStorage.getItem(COLLAPSE_KEY)
-        return raw ? (JSON.parse(raw) as Record<string, boolean>) : {}
+        if (!raw) return {}
+        const parsed: unknown = JSON.parse(raw)
+        return isCollapsedMap(parsed) ? parsed : {}
     } catch {
         return {}
     }

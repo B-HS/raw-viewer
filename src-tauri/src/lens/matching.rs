@@ -262,8 +262,8 @@ fn interpolate_vignetting(
         }
         smallest = smallest.min(dist);
         let weight = 1.0 / dist.powf(VIGNETTING_IDW_POWER);
-        for index in 0..3 {
-            accum[index] += weight * entry.terms[index];
+        for (accumulated, term) in accum.iter_mut().zip(entry.terms.iter()) {
+            *accumulated += weight * term;
         }
         total_weight += weight;
     }

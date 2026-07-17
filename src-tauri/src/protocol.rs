@@ -12,6 +12,19 @@ use crate::types::ProxyLevel;
 const TEXT_PLAIN: &str = "text/plain; charset=utf-8";
 const OCTET_STREAM: &str = "application/octet-stream";
 const IMAGE_JPEG: &str = "image/jpeg";
+const DEV_WEBVIEW_ORIGIN: &str = "http://localhost:1420";
+const WINDOWS_WEBVIEW_ORIGIN: &str = "http://tauri.localhost";
+const DEFAULT_WEBVIEW_ORIGIN: &str = "tauri://localhost";
+
+fn webview_origin() -> &'static str {
+    if cfg!(dev) {
+        DEV_WEBVIEW_ORIGIN
+    } else if cfg!(windows) {
+        WINDOWS_WEBVIEW_ORIGIN
+    } else {
+        DEFAULT_WEBVIEW_ORIGIN
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 enum RouteKind {
@@ -99,7 +112,7 @@ fn cpu_frame_response(body: &Arc<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, OCTET_STREAM)
-        .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(ACCESS_CONTROL_ALLOW_ORIGIN, webview_origin())
         .header(CACHE_CONTROL, "no-cache")
         .body(Cow::Owned(body.as_ref().clone()))
         .unwrap_or_else(|_| Response::new(Cow::Borrowed(b"".as_slice())))
@@ -128,7 +141,7 @@ fn pixels_response(level: ProxyLevel, body: &Arc<Vec<u8>>) -> Response<Cow<'stat
     Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, content_type)
-        .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(ACCESS_CONTROL_ALLOW_ORIGIN, webview_origin())
         .header(CACHE_CONTROL, "no-cache")
         .body(Cow::Owned(body.as_ref().clone()))
         .unwrap_or_else(|_| Response::new(Cow::Borrowed(b"".as_slice())))
@@ -146,7 +159,7 @@ fn respond_text(status: StatusCode, body: Cow<'static, [u8]>) -> Response<Cow<'s
     Response::builder()
         .status(status)
         .header(CONTENT_TYPE, TEXT_PLAIN)
-        .header(ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(ACCESS_CONTROL_ALLOW_ORIGIN, webview_origin())
         .body(body)
         .unwrap_or_else(|_| Response::new(Cow::Borrowed(b"".as_slice())))
 }
@@ -162,7 +175,7 @@ mod tests {
         assert_eq!(response.body().as_ref(), b"pong");
         assert_eq!(
             response.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).and_then(|value| value.to_str().ok()),
-            Some("*"),
+            Some(webview_origin()),
         );
     }
 
@@ -205,7 +218,7 @@ mod tests {
         assert_eq!(response.headers().get(CACHE_CONTROL).and_then(|value| value.to_str().ok()), Some("no-cache"));
         assert_eq!(
             response.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).and_then(|value| value.to_str().ok()),
-            Some("*"),
+            Some(webview_origin()),
         );
         assert_eq!(response.body().as_ref(), &[1u8, 2, 3, 4]);
     }

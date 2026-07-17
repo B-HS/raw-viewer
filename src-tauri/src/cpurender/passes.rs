@@ -251,7 +251,7 @@ pub fn pass7_effects(src: &[f32], width: usize, height: usize, effects: &Effects
             if vignette_amount != 0.0 {
                 let dx = (px as f32 + 0.5) / fw - 0.5;
                 let dy = (py as f32 + 0.5) / fh - 0.5;
-                let linf = dx.abs().max(dy.abs()) * 1.414_213_6;
+                let linf = dx.abs().max(dy.abs()) * std::f32::consts::SQRT_2;
                 let l2 = (dx * dx + dy * dy).sqrt();
                 let round_mix = (vignette_roundness + 100.0) / 200.0;
                 let rr = linf * (1.0 - round_mix) + l2 * round_mix;

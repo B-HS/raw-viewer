@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FC, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isEditableTarget } from '../../shortcuts/keymap'
-import { useContextMenu } from '../../store/contextMenu'
+import { openEntryContext, selectEntryAt } from '../listSelection'
 import { isFilterActive, useFilter } from '../../store/filter'
 import { useGridView } from '../../store/gridView'
 import { useOrganize } from '../../store/organize'
@@ -57,28 +57,11 @@ export const GridView: FC = () => {
         useGridView.getState().close()
     }
 
-    const handleSelect = (visiblePos: number, entryIndex: number, event: MouseEvent) => {
-        if (event.metaKey) return usePlaylist.getState().selectToggle(entryIndex)
-        if (event.shiftKey) {
-            const anchor = usePlaylist.getState().selectionAnchor
-            const anchorPos = anchor == null ? -1 : list.indexOf(anchor)
-            if (anchorPos < 0) return usePlaylist.getState().focusIndex(entryIndex)
-            const lo = Math.min(anchorPos, visiblePos)
-            const hi = Math.max(anchorPos, visiblePos)
-            const ids = list.slice(lo, hi + 1).map((index) => entries[index].imageId)
-            return usePlaylist.getState().selectRange(ids, entryIndex)
-        }
-        usePlaylist.getState().focusIndex(entryIndex)
-    }
+    const handleSelect = (visiblePos: number, entryIndex: number, event: MouseEvent) => selectEntryAt(list, entries, visiblePos, entryIndex, event)
 
     const handleContext = (entryIndex: number, event: MouseEvent) => {
-        event.preventDefault()
         event.stopPropagation()
-        const state = usePlaylist.getState()
-        const id = entries[entryIndex].imageId
-        const targets = state.selection.length > 1 && state.selection.includes(id) ? state.selection : [id]
-        if (!state.selection.includes(id)) state.focusIndex(entryIndex)
-        useContextMenu.getState().openAt(event.clientX, event.clientY, targets)
+        openEntryContext(entries, entryIndex, event)
     }
 
     useEffect(() => {

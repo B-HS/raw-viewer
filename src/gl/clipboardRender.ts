@@ -23,7 +23,7 @@ const encodeOetf = (value: number) => {
 
 const toByte = (value: number) => Math.max(0, Math.min(255, Math.round(value * 255)))
 
-const downscaleSource = (source: ExportSource, maxEdge: number): ExportSource => {
+const downscaleSource = (source: ExportSource, maxEdge: number) => {
     const longEdge = Math.max(source.width, source.height)
     if (longEdge <= maxEdge) return source
     const scale = maxEdge / longEdge

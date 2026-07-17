@@ -8,10 +8,23 @@ type Persisted = { rightPanel: RightPanel; filmstripVisible: boolean }
 
 const DEFAULTS: Persisted = { rightPanel: 'edit', filmstripVisible: true }
 
+const RIGHT_PANELS: readonly RightPanel[] = ['edit', 'meta', 'preset', 'history', 'none']
+
+const isRightPanel = (value: unknown): value is RightPanel => (RIGHT_PANELS as readonly unknown[]).includes(value)
+
+const sanitizePersisted = (value: unknown) => {
+    if (typeof value !== 'object' || value === null) return DEFAULTS
+    const record = value as Record<string, unknown>
+    return {
+        rightPanel: isRightPanel(record.rightPanel) ? record.rightPanel : DEFAULTS.rightPanel,
+        filmstripVisible: typeof record.filmstripVisible === 'boolean' ? record.filmstripVisible : DEFAULTS.filmstripVisible,
+    }
+}
+
 const load = () => {
     try {
         const raw = localStorage.getItem(LAYOUT_KEY)
-        return raw ? { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Persisted>) } : DEFAULTS
+        return raw ? sanitizePersisted(JSON.parse(raw)) : DEFAULTS
     } catch {
         return DEFAULTS
     }

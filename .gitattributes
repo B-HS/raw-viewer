@@ -1,0 +1,6 @@
+src-tauri/resources/licenses-rust.html linguist-generated
+src-tauri/resources/licenses-npm.json linguist-generated
+src/types/*.ts linguist-generated
+src-tauri/about.hbs linguist-vendored
+bun.lock linguist-generated
+src-tauri/Cargo.lock linguist-generated

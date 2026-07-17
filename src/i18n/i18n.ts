@@ -7,7 +7,7 @@ export type AppLanguage = 'system' | 'ko' | 'en'
 
 export type UiLanguage = 'ko' | 'en'
 
-export const resolveLanguage = (language: AppLanguage): UiLanguage => {
+export const resolveLanguage = (language: AppLanguage) => {
     if (language === 'ko' || language === 'en') return language
     return typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('ko') ? 'ko' : 'en'
 }

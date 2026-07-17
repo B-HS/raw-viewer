@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::types_platform::OpenRequestPayload;
 
 #[cfg(target_os = "macos")]
@@ -17,6 +17,16 @@ pub mod recents;
 pub use open_queue::OpenQueue;
 pub use recents::RecentsService;
 
+pub fn ensure_app_bundle(path: &Path) -> AppResult<()> {
+    let is_macos_bundle = path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("app")) && path.is_dir();
+    let is_windows_executable = cfg!(windows) && path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe")) && path.is_file();
+    if is_macos_bundle || is_windows_executable {
+        Ok(())
+    } else {
+        Err(AppError::Io(format!("not an application bundle: {}", path.display())))
+    }
+}
+
 pub fn handle_open(app: &AppHandle, path: PathBuf) {
     match app.state::<OpenQueue>().accept(path) {
         Some(ready) => emit_open(app, ready),
@@ -26,7 +36,7 @@ pub fn handle_open(app: &AppHandle, path: PathBuf) {
 
 fn emit_open(app: &AppHandle, path: PathBuf) {
     focus_window(app);
-    if let Err(error) = app.emit("file:open-request", OpenRequestPayload { path }) {
+    if let Err(error) = app.emit(crate::events::EVENT_FILE_OPEN_REQUEST, OpenRequestPayload { path }) {
         tracing::warn!(%error, "emit file:open-request failed");
     }
 }
@@ -99,3 +109,30 @@ pub trait Platform: Send + Sync + 'static {
 
 #[cfg(target_os = "macos")]
 pub type CurrentPlatform = macos::MacOsPlatform;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ensure_app_bundle_ok_for_app_directory() {
+        let dir = std::env::temp_dir().join(format!("raw-viewer-bundle-{}.app", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        assert!(ensure_app_bundle(&dir).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ensure_app_bundle_rejects_missing_path() {
+        let missing = std::env::temp_dir().join("raw-viewer-bundle-does-not-exist.app");
+        assert!(matches!(ensure_app_bundle(&missing), Err(AppError::Io(_))));
+    }
+
+    #[test]
+    fn ensure_app_bundle_rejects_non_app_path() {
+        let dir = std::env::temp_dir().join(format!("raw-viewer-bundle-plain-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        assert!(matches!(ensure_app_bundle(&dir), Err(AppError::Io(_))));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

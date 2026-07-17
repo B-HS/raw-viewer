@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn half_alpha_blends_rgb8() {
-        let mut pixels = vec![0u8; 1 * 1 * 3];
+        let mut pixels = vec![0u8; 3];
         let overlay = solid_overlay(1, 1, Rgba([255, 255, 255, 128]));
         let Ok(()) = composite(&mut pixels, 1, 1, false, &overlay) else {
             panic!("composite failed");

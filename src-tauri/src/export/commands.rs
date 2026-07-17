@@ -85,7 +85,7 @@ pub async fn export_finish(job_id: String, app: AppHandle, state: State<'_, AppS
     tauri::async_runtime::spawn_blocking(move || {
         finish::finish_job(&job, &source, |done, total| {
             let _ = handle.emit(
-                "export:progress",
+                crate::events::EVENT_EXPORT_PROGRESS,
                 ExportProgressPayload {
                     job_id: progress_id.clone(),
                     phase: ExportPhase::Encode,

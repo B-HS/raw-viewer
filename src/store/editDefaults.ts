@@ -4,7 +4,7 @@ import type { HslBand } from '../types/HslBand'
 
 export const HSL_BANDS: HslBand[] = ['red', 'orange', 'yellow', 'green', 'aqua', 'blue', 'purple', 'magenta']
 
-const identityCurve = (): CurvePoint[] => [
+const identityCurve = () => [
     { x: 0, y: 0 },
     { x: 1, y: 1 },
 ]
@@ -145,7 +145,7 @@ export const isDefault = (state: EditState) => stateSignature(state) === DEFAULT
 
 export type EditSection = 'basic' | 'tone-curve' | 'hsl' | 'lens' | 'detail' | 'effects' | 'crop'
 
-export const cloneDefaultSection = (section: EditSection, state: EditState): EditState => {
+export const cloneDefaultSection = (section: EditSection, state: EditState) => {
     const next: EditState = { ...state }
     if (section === 'basic') {
         next.wb = { ...DEFAULT_EDIT_STATE.wb, tempShift: state.wb.tempShift === null ? null : 0 }

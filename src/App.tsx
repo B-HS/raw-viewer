@@ -3,7 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
-import type { MouseEvent } from 'react'
+import type { FC, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AboutDialog } from './components/AboutDialog'
 import { CommandPalette } from './components/CommandPalette'
@@ -28,9 +28,10 @@ import { requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
 import { flushOrganize } from './ipc/organize'
 import { copyFilesToClipboard, noteRecent } from './ipc/platform'
-import { smartCopyCurrent } from './lib/smartCopy'
-import { confirmAndTrash } from './lib/trash'
-import { digitValue, isEditableTarget, KEYMAP, matchAction, PAGE_STEP, resolveBinding } from './shortcuts/keymap'
+import { smartCopyCurrent } from './actions/smartCopy'
+import { confirmAndTrash } from './actions/trash'
+import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
+import { matchAction, resolveBinding } from './shortcuts/resolve'
 import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from './store/crop'
 import { useContextMenu } from './store/contextMenu'
 import { useEditClipboard } from './store/editClipboard'
@@ -119,14 +120,16 @@ const advanceToNextFiltered = () => {
 
 const selectAllFiltered = () => {
     const state = usePlaylist.getState()
-    const list =
-        state.filteredIndices.length > 0 || isFilterActive(useFilter.getState()) ? state.filteredIndices : state.entries.map((_, index) => index)
-    usePlaylist.getState().selectAll(list.map((index) => state.entries[index].imageId))
+    usePlaylist.getState().selectAll(activeFilteredList().map((index) => state.entries[index].imageId))
 }
 
 const PANEL_TABS: readonly Exclude<RightPanel, 'none'>[] = ['edit', 'meta', 'preset', 'history']
 
-export const App = () => {
+const META_LOAD_DEBOUNCE_MS = 150
+const L2_ZOOM_ENTER_RATIO = 0.999
+const L2_ZOOM_EXIT_RATIO = 0.95
+
+export const App: FC = () => {
     const pendingIndexRef = useRef<number | null>(null)
     const rafRef = useRef<number | null>(null)
     const closingRef = useRef(false)
@@ -545,7 +548,7 @@ export const App = () => {
         const timer = setTimeout(() => {
             useMeta.getState().loadForImage(currentImageId)
             useLens.getState().loadForImage(currentImageId)
-        }, 150)
+        }, META_LOAD_DEBOUNCE_MS)
         return () => clearTimeout(timer)
     }, [currentImageId])
 
@@ -588,12 +591,12 @@ export const App = () => {
             const best = usePlaylist.getState().best[imageId]
             if (!best || best.level === 'l2' || best.width <= 0) return
             const percent = Math.hypot(model[0] * clientW, model[1] * clientH) / best.width
-            if (percent >= 0.999) {
+            if (percent >= L2_ZOOM_ENTER_RATIO) {
                 if (l2ZoomRef.current !== imageId) {
                     l2ZoomRef.current = imageId
                     requestL2(imageId).catch(() => undefined)
                 }
-            } else if (percent < 0.95 && l2ZoomRef.current === imageId) {
+            } else if (percent < L2_ZOOM_EXIT_RATIO && l2ZoomRef.current === imageId) {
                 l2ZoomRef.current = null
             }
         }

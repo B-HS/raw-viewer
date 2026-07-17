@@ -7,6 +7,11 @@ use crate::types::{DecodeFailedPayload, LevelReadyPayload, ProxyLevel};
 
 pub const EVENT_LEVEL_READY: &str = "image:level-ready";
 pub const EVENT_DECODE_FAILED: &str = "image:decode-failed";
+pub const EVENT_FS_CHANGED: &str = "fs:changed";
+pub const EVENT_FILE_OPEN_REQUEST: &str = "file:open-request";
+pub const EVENT_DOCK_OPEN: &str = "dock:open";
+pub const EVENT_RECENTS_CHANGED: &str = "recents:changed";
+pub const EVENT_EXPORT_PROGRESS: &str = "export:progress";
 
 #[derive(Default)]
 pub struct RevCounters {

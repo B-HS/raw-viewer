@@ -157,7 +157,7 @@ impl Shared {
         let content_key = content_key_for(path).or_else(|| record.as_ref().and_then(|value| value.content_key.clone()));
         let sidecar_mtime = xmp::sidecar_mtime_ns(path);
         let xmp_authoritative = match (sidecar_mtime, &record) {
-            (Some(mtime), Some(value)) => value.sidecar_mtime_ns.map_or(true, |synced| mtime > synced),
+            (Some(mtime), Some(value)) => value.sidecar_mtime_ns.is_none_or(|synced| mtime > synced),
             (Some(_), None) => true,
             (None, _) => false,
         };

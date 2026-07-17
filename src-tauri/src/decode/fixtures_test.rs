@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -8,11 +8,11 @@ fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("tests").join("fixtures").join("tier1")
 }
 
-fn extension(path: &PathBuf) -> String {
+fn extension(path: &Path) -> String {
     path.extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase()
 }
 
-fn file_name(path: &PathBuf) -> String {
+fn file_name(path: &Path) -> String {
     path.file_name().and_then(|value| value.to_str()).unwrap_or("").to_owned()
 }
 

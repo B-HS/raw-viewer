@@ -24,11 +24,10 @@ import {
     formatShutter,
 } from './format'
 import { MetaSection } from './MetaSection'
-import type { MetaRowData } from './MetaSection'
 
 type Pair = [string, string | null | undefined, boolean?]
 
-const rowsFrom = (pairs: Pair[]): MetaRowData[] =>
+const rowsFrom = (pairs: Pair[]) =>
     pairs.filter((pair) => pair[1] != null && pair[1] !== '').map((pair) => ({ label: pair[0], value: String(pair[1]), mono: pair[2] }))
 
 const sensorLabel = (sensor: SensorType, cfa: string | null) => {

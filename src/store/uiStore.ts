@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { ClippingMode, CompareSplit, EngineApi } from '../gl/engineApi'
+import type { EngineApi } from '../gl/engineApi'
+import type { ClippingMode, CompareSplit } from '../gl/viewTypes'
 import type { HslBand } from '../types/HslBand'
 import type { EditSection } from './editDefaults'
 

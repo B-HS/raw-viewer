@@ -115,7 +115,7 @@ pub fn run() {
             let services = app.state::<pipeline::AppState>().services.clone();
             let emit_handle = app.handle().clone();
             let emit: watch::EmitFn = Arc::new(move |payload| {
-                if let Err(error) = emit_handle.emit("fs:changed", payload) {
+                if let Err(error) = emit_handle.emit(events::EVENT_FS_CHANGED, payload) {
                     tracing::warn!(%error, "emit fs:changed failed");
                 }
             });

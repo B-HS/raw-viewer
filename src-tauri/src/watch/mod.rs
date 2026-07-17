@@ -152,9 +152,9 @@ mod tests {
             classify(&EventKind::Create(CreateKind::File), &[raw.clone(), text.clone()]),
             Some((FsChangeKind::Created, vec![raw.clone()]))
         );
-        assert_eq!(classify(&EventKind::Remove(RemoveKind::File), &[raw.clone()]), Some((FsChangeKind::Removed, vec![raw.clone()])));
+        assert_eq!(classify(&EventKind::Remove(RemoveKind::File), std::slice::from_ref(&raw)), Some((FsChangeKind::Removed, vec![raw.clone()])));
         assert_eq!(
-            classify(&EventKind::Modify(ModifyKind::Any), &[raw.clone()]),
+            classify(&EventKind::Modify(ModifyKind::Any), std::slice::from_ref(&raw)),
             Some((FsChangeKind::Modified, vec![raw]))
         );
         assert_eq!(classify(&EventKind::Create(CreateKind::File), &[text]), None);

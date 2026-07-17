@@ -293,8 +293,8 @@ mod tests {
 
         let items = vec![a.clone(), b.clone()];
         let _ = service.set_rating(&items, 4);
-        let _ = service.set_flag(&[a.clone()], Some(Flag::Pick));
-        let _ = service.set_label(&[b.clone()], Some("Blue".to_owned()));
+        let _ = service.set_flag(std::slice::from_ref(&a), Some(Flag::Pick));
+        let _ = service.set_label(std::slice::from_ref(&b), Some("Blue".to_owned()));
 
         let loaded = service.get_organize(&items).ok();
         let Some(entries) = loaded else {
@@ -354,7 +354,7 @@ mod tests {
             panic!("write_sidecar_full failed: {error}");
         }
         let service = memory_service();
-        let loaded = service.get_organize(&[a.clone()]).ok().and_then(|list| list.into_iter().next());
+        let loaded = service.get_organize(std::slice::from_ref(&a)).ok().and_then(|list| list.into_iter().next());
         assert!(matches!(loaded, Some(entry) if entry.rating == 5 && entry.flag == Some(Flag::Pick) && entry.label.as_deref() == Some("Purple")));
     }
 }

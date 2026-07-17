@@ -71,7 +71,7 @@ fn handle_dock_open(sender: &NSMenuItem) {
         let _ = window.show();
         let _ = window.set_focus();
     }
-    if let Err(error) = app.emit("dock:open", OpenRequestPayload { path }) {
+    if let Err(error) = app.emit(crate::events::EVENT_DOCK_OPEN, OpenRequestPayload { path }) {
         tracing::warn!(%error, "emit dock:open failed");
     }
 }
@@ -83,7 +83,7 @@ fn handle_dock_clear() {
     if let Err(error) = app.state::<RecentsService>().clear() {
         tracing::warn!(%error, "dock clear recents failed");
     }
-    let _ = app.emit("recents:changed", ());
+    let _ = app.emit(crate::events::EVENT_RECENTS_CHANGED, ());
 }
 
 extern "C-unwind" fn application_dock_menu(_this: *mut AnyObject, _cmd: Sel, _sender: *mut AnyObject) -> *mut NSMenu {

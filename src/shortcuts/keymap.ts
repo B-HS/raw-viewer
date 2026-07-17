@@ -1,5 +1,3 @@
-import { useSettings } from '../store/settings'
-
 export const KEYMAP = {
     zoom: {
         toggleFit: 'KeyZ',
@@ -93,13 +91,13 @@ export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
     { id: 'export.dng', section: 'export', label: 'shortcut.exportDng', binding: { code: 'KeyD', meta: true, shift: true } },
 ] as const
 
-const ACTION_BY_ID = new Map(SHORTCUT_ACTIONS.map((action) => [action.id, action]))
+export const ACTION_BY_ID = new Map(SHORTCUT_ACTIONS.map((action) => [action.id, action]))
 
 export const DEFAULT_BINDINGS: Record<string, Binding> = Object.fromEntries(SHORTCUT_ACTIONS.map((action) => [action.id, action.binding]))
 
 const isBinding = (value: unknown): value is Binding => typeof value === 'object' && value !== null && typeof (value as Binding).code === 'string'
 
-export const sanitizeOverrides = (value: unknown): Record<string, Binding> => {
+export const sanitizeOverrides = (value: unknown) => {
     if (typeof value !== 'object' || value === null) return {}
     const result: Record<string, Binding> = {}
     for (const [id, binding] of Object.entries(value as Record<string, unknown>)) {
@@ -108,17 +106,6 @@ export const sanitizeOverrides = (value: unknown): Record<string, Binding> => {
     }
     return result
 }
-
-export const resolveBinding = (id: string): Binding => useSettings.getState().shortcutOverrides[id] ?? DEFAULT_BINDINGS[id]
-
-const bindingMatches = (event: KeyboardEvent, binding: Binding, ignore?: ShortcutIgnore[]) =>
-    event.code === binding.code &&
-    event.metaKey === !!binding.meta &&
-    event.ctrlKey === !!binding.ctrl &&
-    (ignore?.includes('shift') ? true : event.shiftKey === !!binding.shift) &&
-    (ignore?.includes('alt') ? true : event.altKey === !!binding.alt)
-
-export const matchAction = (event: KeyboardEvent, id: string) => bindingMatches(event, resolveBinding(id), ACTION_BY_ID.get(id)?.ignore)
 
 const MODIFIER_CODES = new Set([
     'MetaLeft',
@@ -134,7 +121,7 @@ const MODIFIER_CODES = new Set([
     'CapsLock',
 ])
 
-export const eventToBinding = (event: KeyboardEvent): Binding | null => {
+export const eventToBinding = (event: KeyboardEvent) => {
     if (MODIFIER_CODES.has(event.code)) return null
     return { code: event.code, meta: event.metaKey, shift: event.shiftKey, alt: event.altKey, ctrl: event.ctrlKey }
 }
@@ -144,7 +131,7 @@ export const serializeBinding = (binding: Binding) =>
 
 export const bindingsEqual = (a: Binding, b: Binding) => serializeBinding(a) === serializeBinding(b)
 
-export const activeConflicts = (overrides: Record<string, Binding>): Set<string> => {
+export const activeConflicts = (overrides: Record<string, Binding>) => {
     const byBinding = new Map<string, string[]>()
     for (const action of SHORTCUT_ACTIONS) {
         const key = serializeBinding(overrides[action.id] ?? action.binding)
