@@ -163,6 +163,39 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 ### 4 잔여
 WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수는 사용자 지시 대기) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
 
+## Phase 5 — 뷰어 완성도·건전성·고도화 (진행 중, 2026-07-18 착수)
+
+> 사양의 단일 출처: [docs/phase5-contract.md](./phase5-contract.md). 사용자 지시: 멈추라 할 때까지 연속 진행. 각 항목 완료 시 검증(부록 B) 통과 후 체크.
+
+### A. 정확성 결함
+- [ ] A1. 비-RAW 임베디드 ICC 처리 (lcms2 변환, P3 픽스처 수치 테스트)
+- [ ] A2. 오류 삼킴 선별 정리 (전수 조사 → 부록 A 기록 → (b)(c) 지점 수정)
+
+### B. 빠진 기능
+- [ ] B1. 정렬 기준 선택 (SortKey 5종 + 방향, ImageEntry 확장, sortEntries 분리·테스트)
+- [ ] B2. 플래그 내비게이션 ⌘←/⌘→
+- [ ] B3. RAW+JPEG 페어 토글 ⌥J (pairOverride 설계)
+- [ ] B4. 줌 배율 표시 (StatusBar, 클릭 토글)
+- [ ] B5. 전체화면 (KeyF, UI 자동 숨김)
+- [ ] B6. 배치 Export (프론트 오케스트레이션, seq 증가, 중간 취소)
+- [ ] B7. 슬라이드쇼 (간격 설정, 마지막 장 정지)
+- [ ] B8. 파일 조작 — 이름 변경·이동·복사 (image_id 이관 설계 선행 확인)
+- [ ] B9. 자동 업데이트 (updater 플러그인 + latest.json + 서명키 — 개인키는 사용자 등록 필요)
+- [ ] B10. 애니메이션 GIF/WebP 재생 (aether original 라우트 + isAnimated)
+
+### C. 엔지니어링 건전성
+- [ ] C1. 프론트 테스트 인프라(bun:test+happy-dom) + 스토어/유틸 테스트 + CI 편입
+- [ ] C2. eslint 도입 (flat config, hooks·compiler 규칙, CI 편입, 결정 로그 갱신)
+- [ ] C3. E2E 스모크 (__e2e 서브커맨드, CI 편입)
+- [ ] C4. PRD §11 체크리스트 정정 (실제 상태 반영)
+
+### D. 고도화
+- [ ] D1. 비-RAW L0 고속화 (JPEG EXIF 썸네일 우선)
+- [ ] D2. 필름스트립 아틀라스 — 측정 선행, 병목일 때만 구현 (측정 결과 기록)
+- [ ] D3. WebGPU 조사 문서 (docs/webgpu-assessment.md)
+- [ ] D4. 로컬 보정 스키마 초안 (docs/local-adjustments-draft.md)
+- [ ] D5. Windows/Linux — 차단(하드웨어), 기록만
+
 ### Phase 3 검증 잔여
 §8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인
 
