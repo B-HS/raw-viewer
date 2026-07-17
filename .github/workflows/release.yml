@@ -48,6 +48,11 @@ jobs:
             src-tauri/binaries
           key: vendor-${{ runner.os }}-${{ hashFiles('src-tauri/libraw.pin', 'src-tauri/lensfun.pin', 'scripts/fetch-dnglab.sh') }}
 
+      - uses: actions/cache@v4
+        with:
+          path: tests/fixtures/tier1
+          key: fixtures-${{ hashFiles('scripts/fetch-fixtures.sh') }}
+
       - name: Install libomp
         run: brew install libomp
 
@@ -59,6 +64,7 @@ jobs:
           bash scripts/sync-vendor.sh
           bash scripts/sync-lensfun.sh
           bash scripts/fetch-dnglab.sh
+          bash scripts/fetch-fixtures.sh
 
       - name: Verify (clippy, tests)
         working-directory: src-tauri
