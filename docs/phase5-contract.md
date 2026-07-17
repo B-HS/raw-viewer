@@ -82,7 +82,7 @@
 - **차단 요소**: 서명 개인키 생성·시크릿 등록은 사용자 확인 필요(비밀 보관 주체).
 
 ### B10. 애니메이션 GIF/WebP 재생
-- **설계**: GL 파이프라인에 프레임 스트림을 넣는 대신 **원본 우회 경로**: `aether://localhost/original/{image_id}`(protocol.rs 라우트 추가 — registry 경로의 파일 바이트를 Content-Type과 함께 서빙, 확장자 화이트리스트 gif/webp/png/jpeg만). 프론트 Viewport에서 `entry`가 애니메이션 포맷(백엔드 probe: gif 항상, webp는 ANIM 청크 유무 — `ImageEntry.isAnimated` 필드 추가)이면 GL 캔버스 대신 `<img src=aether original>` 표시(브라우저 네이티브 재생). 편집 패널은 비활성(첫 프레임 편집은 기존 경로 유지 — 토글 제공).
+- **설계**: GL 파이프라인에 프레임 스트림을 넣는 대신 **원본 우회 경로**: `aether://localhost/original/{image_id}`(protocol.rs 라우트 추가 — registry 경로의 파일 바이트를 Content-Type과 함께 서빙, 확장자 화이트리스트 — 구현은 gif·webp 2종만, protocol.rs `ORIGINAL_EXT_CONTENT_TYPES`). 프론트 Viewport에서 `entry`가 애니메이션 포맷(백엔드 probe: gif 항상, webp는 ANIM 청크 유무 — `ImageEntry.isAnimated` 필드 추가)이면 GL 캔버스 대신 `<img src=aether original>` 표시(브라우저 네이티브 재생). 편집 패널은 비활성(첫 프레임 편집은 기존 경로 유지 — 토글 제공).
 - **수용 기준**: 애니메이션 GIF가 움직이며 표시, 정지 이미지 gif/webp는 기존 GL 경로 유지(isAnimated=false), aether original 라우트는 등록된 id + 화이트리스트 확장자만 서빙(보안 테스트).
 
 ## C. 엔지니어링 건전성
