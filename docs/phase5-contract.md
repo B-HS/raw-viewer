@@ -120,8 +120,20 @@
 ### D5. Windows/Linux (차단)
 - 하드웨어 부재로 착수 불가. 계약만 유지(PRD §9.3, platform 트레이트 준비됨). CI 매트릭스에 향후 windows-latest 추가 여지 기록.
 
-## 부록 A. 오류 삼킴 조사 결과 (A2 진행 시 채움)
-- (조사 후 기록)
+## 부록 A. 오류 삼킴 조사 결과 (2026-07-18 조사·조치 완료)
+
+전수: `catch {}` 12곳 · `.catch(() => undefined)` 45곳. 분류:
+
+- **(b) 사용자 통보로 전환 (조치함)**
+  - `CpuFallbackView.draw` — CPU 프레임 fetch/디코드 실패가 무통보였음 → 이미지당 1회 toast(`toast.cpuFrameFailed`, failedIdRef 가드)
+  - `editStore.resetAll` — 초기화 실패 무통보 → `toast.resetFailed`
+  - `editStore.applyServerState` — 프리셋/붙여넣기 후 상태 재적용 실패 무통보 → `toast.applyStateFailed`
+- **(a) 의도적 무시 (유지 — 사유)**
+  - localStorage/스토어 persist 계열(`settings.persist`, `meta/layout/exportStore` 저장) — 저장 실패는 UX 차단 사유 아님, 다음 기동 시 기본값 복구
+  - fire-and-forget IPC(`noteRecent`, `watchDirectory`, `revealItemInDir`, opener 계열, `flushOrganize` 종료 경로) — 부가 기능, 실패해도 주 흐름 유지
+  - `glContext` 확장 프로브, `App` 종료 직전 flush(닫힘을 막지 않기 위해 best-effort), `editStore.doSave`의 conflict 재로드(이미 conflict 처리 흐름 내부)
+  - 조회 실패 UI가 별도로 있는 곳(메타 패널 `loadFailed`, viewport 에러 UI) — catch는 상태 전이만 담당
+- **(c) 진단 로그**: 프론트 공용 로거 부재로 이번 범위에서는 도입하지 않음(도입 시 tracing IPC 브리지 설계 필요 — 후속 결정 사항)
 
 ## 부록 B. 검증 공통
 - 모든 항목: `cargo test`(+ 신규 유닛) → `bun test`(C1 이후) → `bunx tsc --noEmit` → prettier → 실행 스모크(`__decode`/`__e2e`/수동 절차 명시) 통과 후 체크.

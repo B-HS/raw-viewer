@@ -169,7 +169,7 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 
 ### A. 정확성 결함
 - [x] A1. 비-RAW 임베디드 ICC 처리 — image `into_decoder().icc_profile()` → sRGB 태그는 고속 경로, 그 외 lcms2 Transform(RGB_8/16→RGB_FLT, 소스 ICC→rec2020 linear 프로파일)로 버퍼 직접 변환 + identity 행렬. 실패 시 sRGB 폴백(warn). 테스트: rec2020-linear ICC 임베드 PNG(비순환 검증)·P3 적색(R>0.70) — 9건 통과
-- [ ] A2. 오류 삼킴 선별 정리 (전수 조사 → 부록 A 기록 → (b)(c) 지점 수정)
+- [x] A2. 오류 삼킴 선별 정리 — 전수 57곳 분류(phase5-contract 부록 A), 무통보 결함 3곳 toast 전환(CPU 프레임·초기화·상태 적용 실패)
 
 ### B. 빠진 기능
 - [x] B1. 정렬 기준 선택 — SortKey 5종+방향(설정 저장), ImageEntry에 modifiedMs·fileSize, 촬영일시는 probe_capture_dates 지연 로딩(수동 EXIF datetime 파서+테스트), rating은 organize 구독. lib/sortEntries 순수 분리

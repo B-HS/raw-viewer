@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { i18n } from '../i18n/i18n'
 import { cloneDefaultSection, DEFAULT_EDIT_STATE, isDefault } from './editDefaults'
 import { connectHistoryTarget, useHistoryStore } from './historyStore'
+import { useToast } from './toast'
 import { useUiStore } from './uiStore'
 import { getEditState, isConflictError, resetEditState, setEditStateCommand } from '../ipc/commands'
 import type { EditSection } from './editDefaults'
@@ -152,7 +153,9 @@ export const useEditStore = create<EditStoreState>((set, get) => {
                     persist: false,
                     version: envelope.editVersion,
                 })
-            } catch {}
+            } catch {
+                useToast.getState().show(i18n.t('toast.resetFailed'))
+            }
         },
         resetSection: (section) => {
             const { imageId, state } = get()
@@ -170,7 +173,9 @@ export const useEditStore = create<EditStoreState>((set, get) => {
                 const envelope = await getEditState(imageId)
                 if (get().imageId !== imageId) return
                 commitReplacement(imageId, get().state ?? state, envelope.state, label, { persist: false, version: envelope.editVersion })
-            } catch {}
+            } catch {
+                useToast.getState().show(i18n.t('toast.applyStateFailed'))
+            }
         },
         flushPending: async () => {
             if (saveTimer) {
