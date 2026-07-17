@@ -22,7 +22,7 @@ import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
 import { useSettingsTab } from './components/settings/settingsTab'
-import { frontendReady, navigate, openInNewWindow, openPath, scanDirectory } from './ipc/commands'
+import { frontendReady, fullscreenState, navigate, openInNewWindow, openPath, scanDirectory, toggleFullscreen } from './ipc/commands'
 import { onDecodeCrashLoop, onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
 import { requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
@@ -30,6 +30,7 @@ import { flushOrganize } from './ipc/organize'
 import { copyFilesToClipboard, noteRecent } from './ipc/platform'
 import { smartCopyCurrent } from './actions/smartCopy'
 import { confirmAndTrash } from './actions/trash'
+import { zoomRatio } from './gl/viewTransform'
 import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
 import { matchAction, resolveBinding } from './shortcuts/resolve'
 import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from './store/crop'
@@ -118,6 +119,16 @@ const advanceToNextFiltered = () => {
     if (target != null) usePlaylist.getState().focusIndex(target)
 }
 
+const navigateFlagged = (direction: 'prev' | 'next') => {
+    const state = usePlaylist.getState()
+    const organize = useOrganize.getState().entries
+    const flagged = activeFilteredList().filter((index) => organize[state.entries[index].imageId]?.flag === 'pick')
+    if (flagged.length === 0) return
+    const current = state.currentIndex
+    const target = direction === 'next' ? flagged.find((index) => index > current) : [...flagged].reverse().find((index) => index < current)
+    if (target != null) state.focusIndex(target)
+}
+
 const selectAllFiltered = () => {
     const state = usePlaylist.getState()
     usePlaylist.getState().selectAll(activeFilteredList().map((index) => state.entries[index].imageId))
@@ -151,6 +162,7 @@ export const App: FC = () => {
     const currentName = usePlaylist((state) => state.entries[state.currentIndex]?.fileName ?? '')
     const currentPosition = usePlaylist((state) => state.currentIndex)
     const gridActive = useGridView((state) => state.active)
+    const isFullscreen = useUiStore((state) => state.isFullscreen)
     const { t } = useTranslation()
 
     const handleOpen = async (path: string) => {
@@ -366,6 +378,12 @@ export const App: FC = () => {
             if (matchAction(event, 'view.history')) {
                 event.preventDefault()
                 useLayout.getState().selectRightPanel('history')
+            } else if (matchAction(event, 'nav.previousFlagged')) {
+                event.preventDefault()
+                navigateFlagged('prev')
+            } else if (matchAction(event, 'nav.nextFlagged')) {
+                event.preventDefault()
+                navigateFlagged('next')
             } else if (matchAction(event, 'edit.undo')) {
                 event.preventDefault()
                 useHistoryStore.getState().undo()
@@ -395,6 +413,11 @@ export const App: FC = () => {
             } else if (matchAction(event, 'file.open')) {
                 event.preventDefault()
                 pickAndOpen()
+            } else if (matchAction(event, 'view.fullscreen')) {
+                event.preventDefault()
+                toggleFullscreen()
+                    .then((on) => useUiStore.getState().setFullscreen(on))
+                    .catch(() => undefined)
             } else if (matchAction(event, 'view.settings')) {
                 event.preventDefault()
                 useOverlays.getState().openSettings()
@@ -569,6 +592,23 @@ export const App: FC = () => {
     useEffect(() => {
         let disposed = false
         let unlisten: (() => void) | null = null
+        const sync = () =>
+            fullscreenState()
+                .then((on) => useUiStore.getState().setFullscreen(on))
+                .catch(() => undefined)
+        getCurrentWindow()
+            .onResized(() => sync())
+            .then((dispose) => (disposed ? dispose() : (unlisten = dispose)))
+            .catch(() => undefined)
+        return () => {
+            disposed = true
+            unlisten?.()
+        }
+    }, [])
+
+    useEffect(() => {
+        let disposed = false
+        let unlisten: (() => void) | null = null
         onDecodeCrashLoop(() => {
             if (!useSettings.getState().isolatedDecode) setCrashLoopVisible(true)
         })
@@ -590,7 +630,7 @@ export const App: FC = () => {
             }
             const best = usePlaylist.getState().best[imageId]
             if (!best || best.level === 'l2' || best.width <= 0) return
-            const percent = Math.hypot(model[0] * clientW, model[1] * clientH) / best.width
+            const percent = zoomRatio(model, clientW, clientH, best.width)
             if (percent >= L2_ZOOM_ENTER_RATIO) {
                 if (l2ZoomRef.current !== imageId) {
                     l2ZoomRef.current = imageId
@@ -658,7 +698,7 @@ export const App: FC = () => {
                     <PerfOverlay visible={false} />
                     {gridActive && <GridView />}
                 </div>
-                {rightPanel !== 'none' && (
+                {rightPanel !== 'none' && !isFullscreen && (
                     <div className='flex h-full w-80 shrink-0 flex-col'>
                         <div className='flex shrink-0 border-b border-l border-neutral-800 bg-neutral-900 text-[11px]'>
                             {PANEL_TABS.map((id) => (
@@ -680,7 +720,7 @@ export const App: FC = () => {
                     </div>
                 )}
             </div>
-            {filmstripVisible && (
+            {filmstripVisible && !isFullscreen && (
                 <div className='flex shrink-0 flex-col'>
                     <FilmstripResizer />
                     <FilterBar />
@@ -689,7 +729,7 @@ export const App: FC = () => {
                     </div>
                 </div>
             )}
-            <StatusBar />
+            {!isFullscreen && <StatusBar />}
             {crashLoopVisible && (
                 <div
                     role='alert'

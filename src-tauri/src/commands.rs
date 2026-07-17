@@ -314,3 +314,15 @@ pub async fn copy_settings(
     let items = resolve_targets(&state.services.registry, &to);
     preset::copy_settings(&edits, &source.state, &mask, &items)
 }
+
+#[tauri::command]
+pub fn toggle_fullscreen(window: tauri::Window) -> AppResult<bool> {
+    let next = !window.is_fullscreen().map_err(|error| AppError::Internal(error.to_string()))?;
+    window.set_fullscreen(next).map_err(|error| AppError::Internal(error.to_string()))?;
+    Ok(next)
+}
+
+#[tauri::command]
+pub fn fullscreen_state(window: tauri::Window) -> AppResult<bool> {
+    window.is_fullscreen().map_err(|error| AppError::Internal(error.to_string()))
+}

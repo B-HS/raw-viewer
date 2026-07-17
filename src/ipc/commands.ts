@@ -30,6 +30,10 @@ export const resetEditState = (imageId: string) => invoke<EditStateEnvelope>('re
 
 export const flushEdits = () => invoke<void>('flush_edits')
 
+export const toggleFullscreen = () => invoke<boolean>('toggle_fullscreen')
+
+export const fullscreenState = () => invoke<boolean>('fullscreen_state')
+
 export const renderCpuFrame = (imageId: string, maxEdge: number) => invoke<CpuFrameReadyPayload>('render_cpu_frame', { imageId, maxEdge })
 
 export const isConflictError = (error: unknown) =>

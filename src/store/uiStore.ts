@@ -8,9 +8,13 @@ export type CropOverlayStyle = 'thirds' | 'golden' | 'diag' | 'none'
 
 const CROP_OVERLAY_ORDER: CropOverlayStyle[] = ['thirds', 'golden', 'diag', 'none']
 
+export type ZoomPreset = 'fit' | 'actual'
+
 type UiState = {
     engine: EngineApi | null
     panelVisible: boolean
+    isFullscreen: boolean
+    zoomRequest: { preset: ZoomPreset; nonce: number } | null
     activeSection: EditSection
     clipping: ClippingMode
     compare: CompareSplit
@@ -21,6 +25,8 @@ type UiState = {
     tatActive: boolean
     tatBand: HslBand | null
     attachEngine: (engine: EngineApi | null) => void
+    setFullscreen: (on: boolean) => void
+    requestZoom: (preset: ZoomPreset) => void
     togglePanel: () => void
     setActiveSection: (section: EditSection) => void
     toggleClipping: (target: Exclude<ClippingMode, 'none'>) => void
@@ -39,6 +45,8 @@ type UiState = {
 export const useUiStore = create<UiState>((set, get) => ({
     engine: null,
     panelVisible: true,
+    isFullscreen: false,
+    zoomRequest: null,
     activeSection: 'basic',
     clipping: 'none',
     compare: null,
@@ -57,6 +65,8 @@ export const useUiStore = create<UiState>((set, get) => ({
         engine.setSideBySide(state.sideBySide)
         engine.setCropEditMode(state.cropEditMode)
     },
+    setFullscreen: (on) => set({ isFullscreen: on }),
+    requestZoom: (preset) => set((state) => ({ zoomRequest: { preset, nonce: (state.zoomRequest?.nonce ?? 0) + 1 } })),
     togglePanel: () => set((state) => ({ panelVisible: !state.panelVisible })),
     setActiveSection: (section) => set({ activeSection: section }),
     toggleClipping: (target) =>

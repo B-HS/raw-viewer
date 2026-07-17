@@ -179,6 +179,8 @@ pub fn run() {
             commands::export_preset,
             commands::import_preset,
             commands::copy_settings,
+            commands::toggle_fullscreen,
+            commands::fullscreen_state,
             exiftool::detect_exiftool,
             exiftool::get_deep_metadata,
             lens::find_lens_profile,

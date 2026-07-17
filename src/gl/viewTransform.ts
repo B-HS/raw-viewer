@@ -76,3 +76,6 @@ export const toggleFit = (view: ViewState, m: Metrics, cursor: Point) => {
 }
 
 export const zoomTo = (zoom: number) => ({ fit: false, zoom: clamp(zoom, MIN_ZOOM, MAX_ZOOM), pan: { x: 0, y: 0 } })
+
+export const zoomRatio = (model: Float32Array, clientW: number, clientH: number, sourceWidth: number) =>
+    sourceWidth > 0 ? Math.hypot(model[0] * clientW, model[1] * clientH) / sourceWidth : 0

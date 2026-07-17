@@ -1,7 +1,10 @@
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
+import { zoomRatio } from '../gl/viewTransform'
 import { useMeta } from '../store/meta'
 import { usePlaylist } from '../store/playlist'
+import { useUiStore } from '../store/uiStore'
+import { useViewportProjection } from '../store/viewportProjection'
 import { formatAperture, formatBytes, formatShutter } from './panels/MetaPanel/format'
 
 export const StatusBar: FC = () => {
@@ -12,6 +15,7 @@ export const StatusBar: FC = () => {
     const best = usePlaylist((state) => state.best)
     const selection = usePlaylist((state) => state.selection)
     const metadata = useMeta((state) => state.metadata)
+    const projection = useViewportProjection()
 
     const current = entries[currentIndex]
     if (!current) return null
@@ -32,6 +36,11 @@ export const StatusBar: FC = () => {
     const shutter = exposure?.shutterSpeed ? formatShutter(exposure.shutterSpeed) : null
     const iso = exposure?.iso != null ? `ISO${exposure.iso}` : null
 
+    const zoomPercent =
+        projection.model && projection.imageId === current.imageId && level && level.width > 0
+            ? Math.round(zoomRatio(projection.model, projection.clientW, projection.clientH, level.width) * 100)
+            : null
+
     const parts = [positionText, dimensions, size, [aperture, shutter, iso].filter(Boolean).join(' ') || null].filter(Boolean)
 
     return (
@@ -39,6 +48,14 @@ export const StatusBar: FC = () => {
             <span className='truncate text-neutral-300'>{current.fileName}</span>
             <span className='text-neutral-600'>·</span>
             <span className='truncate'>{parts.join(' · ')}</span>
+            {zoomPercent != null && (
+                <button
+                    type='button'
+                    onClick={() => useUiStore.getState().requestZoom(zoomPercent === 100 ? 'fit' : 'actual')}
+                    className='shrink-0 rounded px-1 text-neutral-300 hover:bg-neutral-800'>
+                    {zoomPercent}%
+                </button>
+            )}
             {selection.length > 1 && (
                 <span className='ml-auto shrink-0 text-neutral-500'>{t('status.selectedCount', { count: selection.length })}</span>
             )}
