@@ -181,11 +181,11 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 - [x] B7. 슬라이드쇼 (KeyS, 설정 간격 1-30s, 마지막 장 자동 정지, 전체화면 연동, 키 입력 시 해제)
 - [ ] B8. 파일 조작 — 이름 변경·이동·복사 (image_id 이관 설계 선행 확인)
 - [ ] B9. 자동 업데이트 (updater 플러그인 + latest.json + 서명키 — 개인키는 사용자 등록 필요)
-- [ ] B10. 애니메이션 GIF/WebP 재생 (aether original 라우트 + isAnimated)
+- [x] B10. 애니메이션 GIF/WebP 재생 — aether original/{id} 라우트(gif·webp 화이트리스트+CORS, 테스트), isAnimated(gif 상시·webp VP8X 플래그, 테스트), Viewport img 분기+배지
 
 ### C. 엔지니어링 건전성
-- [ ] C1. 프론트 테스트 인프라(bun:test+happy-dom) + 스토어/유틸 테스트 + CI 편입
-- [ ] C2. eslint 도입 (flat config, hooks·compiler 규칙, CI 편입, 결정 로그 갱신)
+- [x] C1. 프론트 테스트 — bun test src (sortEntries·keymap·filter 17건 115 어서션), typecheck·test·lint 스크립트, CI 편입
+- [x] C2. eslint 10 flat config — tseslint+react-hooks v7(컴파일러 규칙 내장), function/enum 금지 규칙, 에러 0. set-state-in-effect·refs 경고 31건은 후속 정리 항목(아래)로 이관
 - [ ] C3. E2E 스모크 (__e2e 서브커맨드, CI 편입)
 - [ ] C4. PRD §11 체크리스트 정정 (실제 상태 반영)
 
