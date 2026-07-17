@@ -28,7 +28,11 @@ pub fn ensure_app_bundle(path: &Path) -> AppResult<()> {
 }
 
 pub fn handle_open(app: &AppHandle, path: PathBuf) {
-    match app.state::<OpenQueue>().accept(path) {
+    let Some(queue) = app.try_state::<OpenQueue>() else {
+        tracing::warn!(path = %path.display(), "open request before OpenQueue is managed; dropped");
+        return;
+    };
+    match queue.accept(path) {
         Some(ready) => emit_open(app, ready),
         None => focus_window(app),
     }

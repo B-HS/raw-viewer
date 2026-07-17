@@ -135,7 +135,11 @@ export const PresetPanel: FC = () => {
                                         disabled={!hasImage}
                                         onClick={() => usePresetStore.getState().applyToCurrent(preset.id, preset.name)}
                                         className='flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-xs text-neutral-200 hover:bg-neutral-800 disabled:opacity-40'>
-                                        <span className='text-neutral-500'>{preset.source === 'lr-import' ? '◈' : '⬢'}</span>
+                                        <span
+                                            className='text-neutral-500'
+                                            title={preset.source === 'lr-import' ? t('preset.sourceLr') : t('preset.sourceNative')}>
+                                            {preset.source === 'lr-import' ? '◈' : '⬢'}
+                                        </span>
                                         <span className='min-w-0 flex-1 truncate'>{preset.name}</span>
                                         {slotOf(preset) && <span className='shrink-0 text-[10px] text-neutral-600'>⌥{slotOf(preset)}</span>}
                                     </button>
@@ -144,7 +148,7 @@ export const PresetPanel: FC = () => {
                                         aria-label={t('preset.export')}
                                         title={t('preset.export')}
                                         onClick={() => usePresetStore.getState().exportToFile(preset.id, preset.name)}
-                                        className='shrink-0 rounded px-1.5 py-0.5 text-[10px] text-neutral-600 opacity-0 hover:bg-neutral-800 hover:text-neutral-300 group-hover:opacity-100'>
+                                        className='shrink-0 rounded px-1.5 py-1 text-xs leading-none text-neutral-600 opacity-0 hover:bg-neutral-800 hover:text-neutral-300 group-hover:opacity-100'>
                                         ↥
                                     </button>
                                     {!preset.builtin && (
@@ -158,7 +162,9 @@ export const PresetPanel: FC = () => {
                                                     setConfirmId(preset.id)
                                                 }
                                             }}
-                                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+                                            title={t('preset.delete')}
+                                            aria-label={t('preset.delete')}
+                                            className={`shrink-0 rounded px-1.5 py-1 text-xs leading-none ${
                                                 confirmId === preset.id
                                                     ? 'text-red-300 opacity-100 hover:bg-red-900/40'
                                                     : 'text-neutral-600 opacity-0 hover:bg-neutral-800 hover:text-neutral-300 group-hover:opacity-100'
