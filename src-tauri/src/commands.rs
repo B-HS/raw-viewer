@@ -61,6 +61,7 @@ pub async fn open_in_new_window(path: PathBuf, app: AppHandle, queue: State<'_, 
         .title("raw-viewer")
         .inner_size(1280.0, 800.0)
         .min_inner_size(900.0, 600.0)
+        .decorations(false)
         .build()
         .map_err(|error| {
             queue.drain_window(&label);

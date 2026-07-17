@@ -10,6 +10,7 @@ import { CommandPalette } from './components/CommandPalette'
 import { SettingsDialog } from './components/settings/SettingsDialog'
 import { ContextMenu } from './components/ContextMenu'
 import { RenameDialog } from './components/RenameDialog'
+import { TitleBar } from './components/TitleBar'
 import { ExportDialog } from './components/ExportDialog'
 import { Filmstrip } from './components/filmstrip/Filmstrip'
 import { FilmstripResizer } from './components/filmstrip/FilmstripResizer'
@@ -282,7 +283,11 @@ export const App: FC = () => {
                     await useEditStore.getState().flushPending()
                     await flushOrganize()
                 } catch {}
-                await getCurrentWindow().close()
+                try {
+                    await getCurrentWindow().destroy()
+                } catch {
+                    closingRef.current = false
+                }
             })
             .then((dispose) => {
                 unlisten = dispose
@@ -758,39 +763,43 @@ export const App: FC = () => {
 
     if (entryCount === 0)
         return (
-            <main className='flex h-screen w-screen select-none flex-col items-center justify-center gap-6 bg-viewport text-neutral-300'>
-                <div className='text-center'>
-                    <h1 className='text-xl font-semibold'>raw-viewer</h1>
-                    <p className='mt-2 text-sm text-neutral-400'>{t('app.dropHint')}</p>
+            <main className='flex h-screen w-screen select-none flex-col bg-viewport text-neutral-300'>
+                {!isFullscreen && <TitleBar onOpenFile={pickAndOpen} />}
+                <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-6'>
+                    <div className='text-center'>
+                        <h1 className='text-xl font-semibold'>raw-viewer</h1>
+                        <p className='mt-2 text-sm text-neutral-400'>{t('app.dropHint')}</p>
+                    </div>
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault()
+                            if (pathInput.trim()) handleOpen(pathInput.trim())
+                        }}
+                        className='flex w-full max-w-lg gap-2 px-6'>
+                        <input
+                            value={pathInput}
+                            onChange={(event) => setPathInput(event.target.value)}
+                            placeholder={t('app.pathPlaceholder')}
+                            className='flex-1 rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-400'
+                        />
+                        <button
+                            type='button'
+                            onClick={pickAndOpen}
+                            className='rounded border border-neutral-600 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800'>
+                            {t('app.pickFile')}
+                        </button>
+                        <button type='submit' className='rounded bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white'>
+                            {t('app.open')}
+                        </button>
+                    </form>
+                    {openError && <p className='px-6 text-xs text-red-400'>{openError}</p>}
                 </div>
-                <form
-                    onSubmit={(event) => {
-                        event.preventDefault()
-                        if (pathInput.trim()) handleOpen(pathInput.trim())
-                    }}
-                    className='flex w-full max-w-lg gap-2 px-6'>
-                    <input
-                        value={pathInput}
-                        onChange={(event) => setPathInput(event.target.value)}
-                        placeholder={t('app.pathPlaceholder')}
-                        className='flex-1 rounded border border-neutral-600 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-400'
-                    />
-                    <button
-                        type='button'
-                        onClick={pickAndOpen}
-                        className='rounded border border-neutral-600 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800'>
-                        {t('app.pickFile')}
-                    </button>
-                    <button type='submit' className='rounded bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white'>
-                        {t('app.open')}
-                    </button>
-                </form>
-                {openError && <p className='px-6 text-xs text-red-400'>{openError}</p>}
             </main>
         )
 
     return (
         <main className='relative flex h-screen w-screen select-none flex-col bg-viewport'>
+            {!isFullscreen && <TitleBar onOpenFile={pickAndOpen} />}
             <div className='flex min-h-0 flex-1'>
                 <div className='relative min-w-0 flex-1' onContextMenu={openContextMenu}>
                     <Viewport />
@@ -845,7 +854,7 @@ export const App: FC = () => {
             {crashLoopVisible && (
                 <div
                     role='alert'
-                    className='absolute left-1/2 top-3 z-[70] flex w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 items-center gap-3 rounded-md border border-amber-500/40 bg-neutral-900/95 px-4 py-2.5 text-xs text-neutral-200 shadow-lg'>
+                    className='absolute left-1/2 top-12 z-[70] flex w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 items-center gap-3 rounded-md border border-amber-500/40 bg-neutral-900/95 px-4 py-2.5 text-xs text-neutral-200 shadow-lg'>
                     <span className='min-w-0 flex-1 leading-snug'>{t('crashLoop.message')}</span>
                     <button
                         type='button'
