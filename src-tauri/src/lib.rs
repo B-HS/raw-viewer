@@ -46,6 +46,7 @@ fn init_tracing() {
 pub fn run() {
     init_tracing();
     let build_result = tauri::Builder::default()
+        .manage(platform::OpenQueue::new())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(arg) = argv.iter().skip(1).find(|value| !value.starts_with('-')) {
                 platform::handle_open(app, std::path::PathBuf::from(arg));
@@ -55,7 +56,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(tauri_plugin_window_state::StateFlags::all() & !tauri_plugin_window_state::StateFlags::DECORATIONS)
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol("aether", protocol::handle)
         .setup(|app| {
@@ -63,7 +68,6 @@ pub fn run() {
             app.manage(pipeline::AppState::new(handle));
             app.manage(export::ExportService::new());
             app.manage(cpurender::CpuFrameStore::new());
-            app.manage(platform::OpenQueue::new());
             #[cfg(target_os = "macos")]
             app.manage(platform::macos::MacOsPlatform::new(app.handle().clone()));
             let recents_service = match platform::RecentsService::open_default() {
