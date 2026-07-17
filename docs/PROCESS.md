@@ -173,10 +173,10 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 
 ### B. 빠진 기능
 - [ ] B1. 정렬 기준 선택 (SortKey 5종 + 방향, ImageEntry 확장, sortEntries 분리·테스트)
-- [ ] B2. 플래그 내비게이션 ⌘←/⌘→
+- [x] B2. 플래그 내비게이션 cmd+←/→ (keymap+App, i18n)
 - [ ] B3. RAW+JPEG 페어 토글 ⌥J (pairOverride 설계)
-- [ ] B4. 줌 배율 표시 (StatusBar, 클릭 토글)
-- [ ] B5. 전체화면 (KeyF, UI 자동 숨김)
+- [x] B4. 줌 배율 표시 (StatusBar, zoomRatio 공용화, 클릭 fit/100% 토글)
+- [x] B5. 전체화면 (KeyF, toggle_fullscreen 커맨드, UI 숨김, onResized 동기화)
 - [ ] B6. 배치 Export (프론트 오케스트레이션, seq 증가, 중간 취소)
 - [ ] B7. 슬라이드쇼 (간격 설정, 마지막 장 정지)
 - [ ] B8. 파일 조작 — 이름 변경·이동·복사 (image_id 이관 설계 선행 확인)
