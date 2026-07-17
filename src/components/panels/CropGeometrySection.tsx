@@ -63,13 +63,15 @@ export const CropGeometrySection: FC = () => {
                 <button
                     type='button'
                     onClick={swapCropAspect}
+                    title={t('panel.crop.swapAria')}
                     aria-label={t('panel.crop.swapAria')}
-                    className='rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700'>
+                    className='rounded bg-neutral-800 px-2 py-1 text-sm leading-none text-neutral-200 hover:bg-neutral-700'>
                     ⇄
                 </button>
                 <button
                     type='button'
                     onClick={() => useUiStore.getState().cycleCropOverlay()}
+                    title={t('panel.crop.overlayAria')}
                     aria-label={t('panel.crop.overlayAria')}
                     className='rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700'>
                     {t(`panel.crop.overlay.${cropOverlay}`)}
@@ -80,15 +82,17 @@ export const CropGeometrySection: FC = () => {
                 <button
                     type='button'
                     onClick={() => rotate(-1)}
+                    title={t('panel.crop.rotateLeftAria')}
                     aria-label={t('panel.crop.rotateLeftAria')}
-                    className='rounded bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700'>
+                    className='rounded bg-neutral-800 px-2 py-1 text-sm leading-none hover:bg-neutral-700'>
                     ↺
                 </button>
                 <button
                     type='button'
                     onClick={() => rotate(1)}
+                    title={t('panel.crop.rotateRightAria')}
                     aria-label={t('panel.crop.rotateRightAria')}
-                    className='rounded bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700'>
+                    className='rounded bg-neutral-800 px-2 py-1 text-sm leading-none hover:bg-neutral-700'>
                     ↻
                 </button>
                 <label className='ml-2 flex items-center gap-1 text-xs text-neutral-300'>

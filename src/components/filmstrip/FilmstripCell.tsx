@@ -78,14 +78,14 @@ export const FilmstripCell: FC<FilmstripCellProps> = ({
                     )}
                     {flag && (
                         <span
-                            className={`pointer-events-none absolute bottom-0.5 left-0.5 text-[10px] ${flag === 'pick' ? 'text-emerald-400' : 'text-red-400'}`}>
+                            className={`pointer-events-none absolute bottom-0.5 left-0.5 text-xs ${flag === 'pick' ? 'text-emerald-400' : 'text-red-400'}`}>
                             {flag === 'pick' ? '⚑' : '⚐'}
                         </span>
                     )}
                 </div>
                 <div className='shrink-0 bg-neutral-900/90 px-1 pb-0.5'>
                     {rating > 0 && (
-                        <div className='text-center text-[8px] leading-none text-amber-400'>
+                        <div className='text-center text-[10px] leading-none text-amber-400'>
                             {'★'.repeat(rating)}
                             <span className='text-neutral-700'>{'★'.repeat(5 - rating)}</span>
                         </div>

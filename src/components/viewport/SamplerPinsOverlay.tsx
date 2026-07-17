@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FC } from 'react'
+import { useTranslation } from 'react-i18next'
 import { usePlaylist } from '../../store/playlist'
 import { useSamplerPins } from '../../store/samplerPins'
 import { useUiStore } from '../../store/uiStore'
@@ -23,6 +24,7 @@ const formatValue = (unit: SamplerUnit, srgb: [number, number, number]) => {
 const PinsLive: FC<{ imageId: string; pins: SamplerPin[] }> = ({ imageId, pins }) => {
     const nonce = useViewportProjection((state) => state.nonce)
     const [resolved, setResolved] = useState<Resolved[]>([])
+    const { t } = useTranslation()
 
     useEffect(() => {
         const projection = useViewportProjection.getState()
@@ -51,6 +53,8 @@ const PinsLive: FC<{ imageId: string; pins: SamplerPin[] }> = ({ imageId, pins }
                         <button
                             type='button'
                             onClick={() => useSamplerPins.getState().cycleUnit(imageId, item.pin.id)}
+                            title={t('sampler.cycleUnit')}
+                            aria-label={t('sampler.cycleUnit')}
                             className='flex items-center gap-1.5'>
                             <span className='h-3 w-3 rounded-sm border border-white/40' style={{ backgroundColor: item.swatch }} />
                             <span className='tabular-nums'>{item.text}</span>
@@ -58,7 +62,9 @@ const PinsLive: FC<{ imageId: string; pins: SamplerPin[] }> = ({ imageId, pins }
                         <button
                             type='button'
                             onClick={() => useSamplerPins.getState().remove(imageId, item.pin.id)}
-                            className='px-0.5 text-neutral-400 hover:text-neutral-100'>
+                            title={t('sampler.remove')}
+                            aria-label={t('sampler.remove')}
+                            className='px-1 py-0.5 text-xs leading-none text-neutral-400 hover:text-neutral-100'>
                             ✕
                         </button>
                     </div>

@@ -47,6 +47,7 @@ export const AboutDialog: FC = () => {
                     <button
                         type='button'
                         onClick={close}
+                        title={t('about.close')}
                         aria-label={t('about.close')}
                         className='rounded px-2 py-0.5 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'>
                         ✕

@@ -103,15 +103,23 @@ export const Histogram: FC = () => {
             <button
                 type='button'
                 onClick={() => useUiStore.getState().toggleClipping('shadow')}
+                title={t('histogram.shadowClipAria')}
                 aria-label={t('histogram.shadowClipAria')}
-                className={`absolute left-1 top-1 z-10 h-0 w-0 border-b-8 border-r-8 border-b-transparent ${loActive ? 'border-r-blue-400' : 'border-r-neutral-600'}`}
-            />
+                className='absolute left-0 top-0 z-10 flex h-6 w-6 items-start justify-start p-1'>
+                <span
+                    className={`block h-0 w-0 border-b-8 border-r-8 border-b-transparent ${loActive ? 'border-r-blue-400' : 'border-r-neutral-600'}`}
+                />
+            </button>
             <button
                 type='button'
                 onClick={() => useUiStore.getState().toggleClipping('highlight')}
+                title={t('histogram.highlightClipAria')}
                 aria-label={t('histogram.highlightClipAria')}
-                className={`absolute right-1 top-1 z-10 h-0 w-0 border-b-8 border-l-8 border-b-transparent ${hiActive ? 'border-l-red-400' : 'border-l-neutral-600'}`}
-            />
+                className='absolute right-0 top-0 z-10 flex h-6 w-6 items-start justify-end p-1'>
+                <span
+                    className={`block h-0 w-0 border-b-8 border-l-8 border-b-transparent ${hiActive ? 'border-l-red-400' : 'border-l-neutral-600'}`}
+                />
+            </button>
             <canvas
                 ref={canvasRef}
                 onClick={() => useHistogram.getState().cycleMode()}

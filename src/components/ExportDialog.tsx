@@ -211,6 +211,8 @@ export const ExportDialog: FC = () => {
                         <button
                             type='button'
                             onClick={() => useExportStore.getState().close()}
+                            title={t('common.close')}
+                            aria-label={t('common.close')}
                             className='rounded px-2 py-0.5 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'>
                             ✕
                         </button>

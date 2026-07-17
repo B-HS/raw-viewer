@@ -76,6 +76,7 @@ export const ShortcutsSettings: FC = () => {
                                         type='button'
                                         disabled={!overridden}
                                         onClick={() => useSettings.getState().resetShortcutBinding(action.id)}
+                                        title={t('settings.shortcutsResetOne', { name: t(action.label) })}
                                         aria-label={t('settings.shortcutsResetOne', { name: t(action.label) })}
                                         className={`rounded px-1.5 py-0.5 text-xs ${overridden ? 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200' : 'cursor-default text-neutral-700'}`}>
                                         ↺
