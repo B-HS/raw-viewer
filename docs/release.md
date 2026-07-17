@@ -7,9 +7,9 @@
 | 워크플로 | 트리거 | 동작 |
 |----------|--------|------|
 | `.github/workflows/ci.yml` | dev/prod 대상 PR, 수동 실행 | prettier → tsc → clippy(-D warnings) → cargo test → 프론트 빌드 |
-| `.github/workflows/release.yml` | `v*` 태그 푸시, 수동 실행 | 태그=버전 일치 검증 → clippy·테스트 → `tauri build` → DMG + SHA256SUMS를 **draft 릴리스**로 업로드 |
+| `.github/workflows/release.yml` | `v*` 태그 푸시, 수동 실행 | 태그=버전 일치 검증 → `cargo test --release`(빌드와 release 프로필 컴파일 공유 — debug 중복 컴파일 제거) → `tauri build` → **자기완결성 가드**(번들 실행 파일에 `/opt/homebrew`·`/usr/local` dylib 링크가 있으면 실패) → DMG + SHA256SUMS를 **draft 릴리스**로 업로드 |
 
-비공개 저장소라 macOS 러너 분당 과금 가중치(10배)가 있어 CI는 push마다 돌리지 않고 PR·수동으로 한정했다. 릴리스 워크플로가 자체적으로 검증을 다시 수행하므로 태그 릴리스는 단독으로 안전하다.
+비공개 저장소라 macOS 러너 분당 과금 가중치(10배)가 있어 CI는 push마다 돌리지 않고 PR·수동으로 한정했다. 릴리스 워크플로가 자체적으로 검증을 다시 수행하므로 태그 릴리스는 단독으로 안전하다. clippy는 lint(정확성 아님)라 PR CI에만 두고 릴리스에서는 생략한다. 테스트를 release 프로필로 돌리는 이유: 뒤따르는 `tauri build`(release)와 의존성·LibRaw 컴파일을 공유해 전체 시간을 줄이고, 배포되는 것과 동일한 프로필을 검증하기 위함. 잡은 하나로 유지한다 — 분리하면 러너 셋업·캐시 복원을 이중 지불하고 테스트(debug)·빌드(release) 간 공유 산출물도 없다.
 
 ## 릴리스 절차
 
