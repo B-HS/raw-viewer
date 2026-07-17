@@ -1,13 +1,11 @@
 import { create } from 'zustand'
+import { sortEntries } from '../lib/sortEntries'
+import type { SortAux, SortKey, SortOrder } from '../lib/sortEntries'
 import type { ImageEntry } from '../types/ImageEntry'
 import type { LevelReadyPayload } from '../types/LevelReadyPayload'
 import type { ProxyLevel } from '../types/ProxyLevel'
 
 export const WINDOW_RADIUS = 3
-
-const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
-
-const sortEntries = (entries: ImageEntry[]) => [...entries].sort((a, b) => collator.compare(a.fileName, b.fileName))
 
 const sameNumbers = (a: number[], b: number[]) => a.length === b.length && a.every((value, index) => value === b[index])
 
@@ -38,6 +36,11 @@ type PlaylistState = {
     filteredIndices: number[]
     selection: string[]
     selectionAnchor: number | null
+    sortKey: SortKey
+    sortOrder: SortOrder
+    sortAux: SortAux
+    setSort: (key: SortKey, order: SortOrder) => void
+    mergeSortAux: (aux: SortAux) => void
     openWith: (entry: ImageEntry, dir: string) => void
     addEntries: (incoming: ImageEntry[], done: boolean) => void
     syncEntries: (incoming: ImageEntry[]) => void
@@ -46,6 +49,7 @@ type PlaylistState = {
     setScanTotal: (total: number) => void
     setCurrentIndex: (index: number) => void
     focusIndex: (index: number) => void
+    replaceEntryAt: (index: number, entry: ImageEntry) => void
     selectToggle: (index: number) => void
     selectRange: (imageIds: string[], index: number) => void
     selectAll: (imageIds: string[]) => void
@@ -68,6 +72,27 @@ export const usePlaylist = create<PlaylistState>((set) => ({
     filteredIndices: [],
     selection: [],
     selectionAnchor: null,
+    sortKey: 'name',
+    sortOrder: 'asc',
+    sortAux: {},
+    setSort: (key, order) =>
+        set((state) => {
+            const currentId = state.entries[state.currentIndex]?.imageId
+            const entries = sortEntries(state.entries, key, order, state.sortAux)
+            const relocated = currentId ? entries.findIndex((entry) => entry.imageId === currentId) : 0
+            return { sortKey: key, sortOrder: order, entries, currentIndex: relocated < 0 ? 0 : relocated }
+        }),
+    mergeSortAux: (aux) =>
+        set((state) => {
+            const sortAux: SortAux = {
+                captureMs: { ...state.sortAux.captureMs, ...aux.captureMs },
+                ratings: { ...state.sortAux.ratings, ...aux.ratings },
+            }
+            const currentId = state.entries[state.currentIndex]?.imageId
+            const entries = sortEntries(state.entries, state.sortKey, state.sortOrder, sortAux)
+            const relocated = currentId ? entries.findIndex((entry) => entry.imageId === currentId) : 0
+            return { sortAux, entries, currentIndex: relocated < 0 ? 0 : relocated }
+        }),
     openWith: (entry, dir) =>
         set({
             entries: [entry],
@@ -86,13 +111,13 @@ export const usePlaylist = create<PlaylistState>((set) => ({
             const currentId = state.entries[state.currentIndex]?.imageId
             const merged = new Map(state.entries.map((entry) => [entry.imageId, entry]))
             for (const entry of incoming) merged.set(entry.imageId, entry)
-            const entries = sortEntries([...merged.values()])
+            const entries = sortEntries([...merged.values()], state.sortKey, state.sortOrder, state.sortAux)
             const relocated = currentId ? entries.findIndex((entry) => entry.imageId === currentId) : 0
             return { entries, currentIndex: relocated < 0 ? 0 : relocated, scanning: !done }
         }),
     syncEntries: (incoming) =>
         set((state) => {
-            const entries = sortEntries(incoming)
+            const entries = sortEntries(incoming, state.sortKey, state.sortOrder, state.sortAux)
             const ids = new Set(entries.map((entry) => entry.imageId))
             const currentId = state.entries[state.currentIndex]?.imageId
             const best = Object.fromEntries(Object.entries(state.best).filter(([id]) => ids.has(id)))
@@ -145,6 +170,14 @@ export const usePlaylist = create<PlaylistState>((set) => ({
             if (max < 0) return { currentIndex: 0, selection: [], selectionAnchor: null }
             const clamped = index < 0 ? 0 : index > max ? max : index
             return { currentIndex: clamped, selection: [state.entries[clamped].imageId], selectionAnchor: clamped }
+        }),
+    replaceEntryAt: (index, entry) =>
+        set((state) => {
+            const previous = state.entries[index]
+            if (!previous) return state
+            const entries = state.entries.map((item, position) => (position === index ? entry : item))
+            const selection = state.selection.map((id) => (id === previous.imageId ? entry.imageId : id))
+            return { entries, selection }
         }),
     selectToggle: (index) =>
         set((state) => {

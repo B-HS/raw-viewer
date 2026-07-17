@@ -50,8 +50,14 @@ bash scripts/sync-vendor.sh && bash scripts/sync-lensfun.sh && bash scripts/fetc
 bun install && bun run tauri build
 ```
 
-## 미도입 (추후 결정)
+## 자동 업데이트 (2026-07-18 도입)
 
-- **자동 업데이트(tauri-plugin-updater)**: 플러그인 도입 + `TAURI_SIGNING_PRIVATE_KEY`/`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 시크릿 + `latest.json` 배포가 필요. 별도 지시 시 진행.
+- 플러그인: `tauri-plugin-updater` + `tauri-plugin-process`. 엔드포인트 = `https://github.com/B-HS/raw-viewer/releases/latest/download/latest.json`, 공개키는 tauri.conf.json에 커밋됨.
+- **서명 개인키**: `~/raw-viewer-updater.key` (이 머신, 비밀번호 없음 — **잃어버리면 기존 사용자에게 업데이트 배포 불가**이므로 안전한 곳에 백업할 것). 활성화하려면 시크릿 2개 등록: `TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용), `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`(빈 값). 시크릿이 없으면 릴리스는 updater 자산 없이 기존과 동일하게 성공한다.
+- 릴리스 워크플로가 `.app.tar.gz` + `.sig` + `latest.json`을 생성·첨부한다.
+- **주의(차단 요소)**: 저장소가 **비공개**인 동안에는 릴리스 자산 URL에 인증이 필요해 **앱의 자동 업데이트 확인이 실패한다**(조용히 무시됨). 저장소 공개 또는 별도 공개 배포 채널 전까지는 수동 DMG 설치가 실질 경로다.
+- 로컬 릴리스 빌드는 키 env가 없으면 `bun run tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'`로 실행한다.
+
+## 미도입 (추후 결정)
 - **Intel(x86_64)·유니버설 빌드**: dnglab x86_64 바이너리 확보와 매트릭스 빌드 필요.
 - **cargo deny** 라이선스 게이트: PROCESS.md 결정 로그 2번 참조.

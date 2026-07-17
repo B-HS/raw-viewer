@@ -104,6 +104,10 @@ impl EditService {
     pub fn flush_all(&self) {
         self.shared.flush(true, None);
     }
+
+    pub fn reassign_path(&self, old_path: &Path, new_path: &Path) -> AppResult<bool> {
+        self.shared.catalog.reassign_path(old_path, new_path, now_ms())
+    }
 }
 
 impl Drop for EditService {

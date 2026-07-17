@@ -347,6 +347,15 @@ export const useRenderEngine = () => {
     }, [])
 
     useEffect(() => {
+        const unsubscribe = useUiStore.subscribe((state, previous) => {
+            if (!state.zoomRequest || state.zoomRequest.nonce === previous.zoomRequest?.nonce) return
+            viewRef.current = state.zoomRequest.preset === 'actual' ? zoomTo(1) : { fit: true, zoom: viewRef.current.zoom, pan: { x: 0, y: 0 } }
+            scheduleRender()
+        })
+        return unsubscribe
+    }, [])
+
+    useEffect(() => {
         const renderer = rendererRef.current
         if (!renderer) return
         renderer.setCurrent(entries[currentIndex]?.imageId ?? null)

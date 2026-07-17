@@ -35,15 +35,43 @@ fn is_excluded_name(name: &str) -> bool {
     name.starts_with('.') || name == "Thumbs.db" || name == "@eaDir"
 }
 
+fn is_animated_file(path: &Path) -> bool {
+    let Some(ext) = ext_lower(path) else { return false };
+    if ext == "gif" {
+        return true;
+    }
+    if ext != "webp" {
+        return false;
+    }
+    use std::io::Read;
+    let Ok(mut file) = std::fs::File::open(path) else { return false };
+    let mut header = [0u8; 21];
+    if file.read_exact(&mut header).is_err() {
+        return false;
+    }
+    &header[0..4] == b"RIFF" && &header[8..16] == b"WEBPVP8X" && header[20] & 0x02 != 0
+}
+
 pub fn make_entry(abs_path: PathBuf) -> ImageEntry {
     let file_name = abs_path.file_name().and_then(|value| value.to_str()).unwrap_or_default().to_owned();
     let is_raw = is_raw_ext(&abs_path);
     let id = image_id(&abs_path);
+    let metadata = std::fs::metadata(&abs_path).ok();
+    let modified_ms = metadata
+        .as_ref()
+        .and_then(|meta| meta.modified().ok())
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as f64);
+    let file_size = metadata.map(|meta| meta.len() as f64);
+    let is_animated = is_animated_file(&abs_path);
     ImageEntry {
         image_id: id,
         path: abs_path,
         file_name,
         is_raw,
+        modified_ms,
+        file_size,
+        is_animated,
     }
 }
 
@@ -223,6 +251,44 @@ mod tests {
         assert_eq!(sizes.get(1), Some(&100));
         assert_eq!(done_flags.last(), Some(&true));
         assert_eq!(done_flags.iter().filter(|done| **done).count(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod animated_tests {
+    use super::*;
+
+    #[test]
+    fn gif_is_always_treated_as_animated() {
+        let dir = std::env::temp_dir().join(format!("raw-viewer-anim-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let gif = dir.join("a.gif");
+        let _ = std::fs::write(&gif, b"GIF89a");
+        assert!(is_animated_file(&gif));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn webp_animation_flag_is_detected() {
+        let dir = std::env::temp_dir().join(format!("raw-viewer-anim-webp-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let animated = dir.join("anim.webp");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"RIFF");
+        bytes.extend_from_slice(&24u32.to_le_bytes());
+        bytes.extend_from_slice(b"WEBPVP8X");
+        bytes.extend_from_slice(&10u32.to_le_bytes());
+        bytes.push(0x02);
+        bytes.extend_from_slice(&[0u8; 9]);
+        let _ = std::fs::write(&animated, &bytes);
+        assert!(is_animated_file(&animated));
+
+        let still = dir.join("still.webp");
+        let mut still_bytes = bytes.clone();
+        still_bytes[20] = 0x00;
+        let _ = std::fs::write(&still, &still_bytes);
+        assert!(!is_animated_file(&still));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

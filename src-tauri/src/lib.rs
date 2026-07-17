@@ -53,6 +53,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol("aether", protocol::handle)
@@ -179,6 +181,13 @@ pub fn run() {
             commands::export_preset,
             commands::import_preset,
             commands::copy_settings,
+            commands::toggle_fullscreen,
+            commands::fullscreen_state,
+            commands::register_image,
+            commands::probe_capture_dates,
+            commands::rename_image,
+            commands::move_images,
+            commands::copy_images,
             exiftool::detect_exiftool,
             exiftool::get_deep_metadata,
             lens::find_lens_profile,

@@ -2,8 +2,10 @@ import { load } from '@tauri-apps/plugin-store'
 import { create } from 'zustand'
 import { applyLanguage } from '../i18n/i18n'
 import { setPerformanceSettings } from '../ipc/performance'
+import { SORT_KEYS } from '../lib/sortEntries'
 import { sanitizeOverrides } from '../shortcuts/keymap'
 import type { AppLanguage } from '../i18n/i18n'
+import type { SortKey, SortOrder } from '../lib/sortEntries'
 import type { Binding } from '../shortcuts/keymap'
 
 export type AppTheme = 'system' | 'dark' | 'light'
@@ -23,6 +25,10 @@ export type SettingsValues = {
     recentApps: string[]
     filmstripHeight: number
     gridCellSize: number
+    slideshowIntervalMs: number
+    sortKey: SortKey
+    sortOrder: SortOrder
+    autoUpdateCheck: boolean
     shortcutOverrides: Record<string, Binding>
 }
 
@@ -30,6 +36,9 @@ const RECENT_APPS_MAX = 6
 
 const FILMSTRIP_MIN = 60
 const FILMSTRIP_MAX = 200
+
+const SLIDESHOW_MIN_MS = 1000
+const SLIDESHOW_MAX_MS = 30000
 
 export const GRID_CELL_MIN = 90
 export const GRID_CELL_MAX = 260
@@ -53,8 +62,14 @@ const DEFAULTS: SettingsValues = {
     recentApps: [],
     filmstripHeight: 96,
     gridCellSize: 140,
+    slideshowIntervalMs: 3000,
+    sortKey: 'name',
+    sortOrder: 'asc',
+    autoUpdateCheck: true,
     shortcutOverrides: {},
 }
+
+const clampSlideshowInterval = (value: number) => Math.max(SLIDESHOW_MIN_MS, Math.min(SLIDESHOW_MAX_MS, Math.round(value)))
 
 const pushPerformance = (values: Pick<SettingsValues, 'preloadRadius' | 'l2Policy' | 'isolatedDecode'>) =>
     setPerformanceSettings(values.preloadRadius, values.l2Policy, values.isolatedDecode).catch(() => undefined)
@@ -85,6 +100,9 @@ const applyTheme = (theme: AppTheme) => {
 
 const applyViewportBackground = (color: string) => document.documentElement.style.setProperty('--viewport-bg', color)
 
+const isSortKey = (value: unknown): value is SortKey => (SORT_KEYS as readonly unknown[]).includes(value)
+const isSortOrder = (value: unknown): value is SortOrder => value === 'asc' || value === 'desc'
+
 const isLanguage = (value: unknown): value is AppLanguage => value === 'system' || value === 'ko' || value === 'en'
 const isTheme = (value: unknown): value is AppTheme => value === 'system' || value === 'dark' || value === 'light'
 const isL2Policy = (value: unknown): value is L2Policy => value === 'always' || value === 'idle' || value === 'zoom'
@@ -106,6 +124,9 @@ type SettingsStore = SettingsValues & {
     commitFilmstripHeight: () => void
     setGridCellSize: (size: number) => void
     commitGridCellSize: () => void
+    setSlideshowInterval: (ms: number) => void
+    setSort: (key: SortKey, order: SortOrder) => void
+    setAutoUpdateCheck: (enabled: boolean) => void
     setShortcutBinding: (id: string, binding: Binding) => void
     resetShortcutBinding: (id: string) => void
     resetShortcutBindings: () => void
@@ -130,6 +151,10 @@ export const useSettings = create<SettingsStore>((set, get) => ({
             const recentApps = await store.get('recentApps')
             const filmstripHeight = await store.get('filmstripHeight')
             const gridCellSize = await store.get('gridCellSize')
+            const slideshowIntervalMs = await store.get('slideshowIntervalMs')
+            const sortKey = await store.get('sortKey')
+            const sortOrder = await store.get('sortOrder')
+            const autoUpdateCheck = await store.get('autoUpdateCheck')
             const shortcutOverrides = await store.get('shortcutOverrides')
             values = {
                 language: isLanguage(language) ? language : DEFAULTS.language,
@@ -144,6 +169,11 @@ export const useSettings = create<SettingsStore>((set, get) => ({
                 recentApps: Array.isArray(recentApps) ? recentApps.filter((item): item is string => typeof item === 'string') : DEFAULTS.recentApps,
                 filmstripHeight: typeof filmstripHeight === 'number' ? clampFilmstripHeight(filmstripHeight) : DEFAULTS.filmstripHeight,
                 gridCellSize: typeof gridCellSize === 'number' ? clampGridCellSize(gridCellSize) : DEFAULTS.gridCellSize,
+                slideshowIntervalMs:
+                    typeof slideshowIntervalMs === 'number' ? clampSlideshowInterval(slideshowIntervalMs) : DEFAULTS.slideshowIntervalMs,
+                sortKey: isSortKey(sortKey) ? sortKey : DEFAULTS.sortKey,
+                sortOrder: isSortOrder(sortOrder) ? sortOrder : DEFAULTS.sortOrder,
+                autoUpdateCheck: typeof autoUpdateCheck === 'boolean' ? autoUpdateCheck : DEFAULTS.autoUpdateCheck,
                 shortcutOverrides: sanitizeOverrides(shortcutOverrides),
             }
         } catch {}
@@ -208,6 +238,20 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     commitFilmstripHeight: () => persist('filmstripHeight', get().filmstripHeight),
     setGridCellSize: (size) => set({ gridCellSize: clampGridCellSize(size) }),
     commitGridCellSize: () => persist('gridCellSize', get().gridCellSize),
+    setSlideshowInterval: (ms) => {
+        const clamped = clampSlideshowInterval(ms)
+        set({ slideshowIntervalMs: clamped })
+        persist('slideshowIntervalMs', clamped)
+    },
+    setAutoUpdateCheck: (enabled) => {
+        set({ autoUpdateCheck: enabled })
+        persist('autoUpdateCheck', enabled)
+    },
+    setSort: (key, order) => {
+        set({ sortKey: key, sortOrder: order })
+        persist('sortKey', key)
+        persist('sortOrder', order)
+    },
     setShortcutBinding: (id, binding) => {
         const shortcutOverrides = { ...get().shortcutOverrides, [id]: binding }
         set({ shortcutOverrides })

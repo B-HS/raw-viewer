@@ -40,15 +40,13 @@ export const buildModelMatrix = (view: ViewState, m: Metrics, imgW: number, imgH
     let b = sin * hx
     let c = -sin * hy
     let d = cos * hy
-    let e = 0
-    let f = 0
 
     a *= scale
     b *= scale
     c *= scale
     d *= scale
-    e = view.fit ? 0 : view.pan.x
-    f = view.fit ? 0 : view.pan.y
+    const e = view.fit ? 0 : view.pan.x
+    const f = view.fit ? 0 : view.pan.y
 
     const ox = 2 / m.cw
     const oy = 2 / m.ch
@@ -76,3 +74,6 @@ export const toggleFit = (view: ViewState, m: Metrics, cursor: Point) => {
 }
 
 export const zoomTo = (zoom: number) => ({ fit: false, zoom: clamp(zoom, MIN_ZOOM, MAX_ZOOM), pan: { x: 0, y: 0 } })
+
+export const zoomRatio = (model: Float32Array, clientW: number, clientH: number, sourceWidth: number) =>
+    sourceWidth > 0 ? Math.hypot(model[0] * clientW, model[1] * clientH) / sourceWidth : 0

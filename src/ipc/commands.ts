@@ -2,6 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import type { CpuFrameReadyPayload } from '../types/CpuFrameReadyPayload'
 import type { EditState } from '../types/EditState'
 import type { EditStateEnvelope } from '../types/EditStateEnvelope'
+import type { ImageEntry } from '../types/ImageEntry'
 import type { OpenResult } from '../types/OpenResult'
 import type { PendingOpenRequest } from '../types/PendingOpenRequest'
 import type { ScanBatch } from '../types/ScanBatch'
@@ -29,6 +30,20 @@ export const setEditStateCommand = (imageId: string, state: EditState, editVersi
 export const resetEditState = (imageId: string) => invoke<EditStateEnvelope>('reset_edit_state', { imageId })
 
 export const flushEdits = () => invoke<void>('flush_edits')
+
+export const toggleFullscreen = () => invoke<boolean>('toggle_fullscreen')
+
+export const registerImage = (path: string) => invoke<ImageEntry>('register_image', { path })
+
+export const probeCaptureDates = (imageIds: string[]) => invoke<Record<string, number | null>>('probe_capture_dates', { imageIds })
+
+export const renameImage = (imageId: string, newName: string) => invoke<ImageEntry>('rename_image', { imageId, newName })
+
+export const moveImages = (imageIds: string[], destDir: string) => invoke<string[]>('move_images', { imageIds, destDir })
+
+export const copyImages = (imageIds: string[], destDir: string) => invoke<number>('copy_images', { imageIds, destDir })
+
+export const fullscreenState = () => invoke<boolean>('fullscreen_state')
 
 export const renderCpuFrame = (imageId: string, maxEdge: number) => invoke<CpuFrameReadyPayload>('render_cpu_frame', { imageId, maxEdge })
 

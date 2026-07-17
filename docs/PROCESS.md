@@ -163,6 +163,41 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 ### 4 잔여
 WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수는 사용자 지시 대기) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
 
+## Phase 5 — 뷰어 완성도·건전성·고도화 (진행 중, 2026-07-18 착수)
+
+> 사양의 단일 출처: [docs/phase5-contract.md](./phase5-contract.md). 사용자 지시: 멈추라 할 때까지 연속 진행. 각 항목 완료 시 검증(부록 B) 통과 후 체크.
+
+### A. 정확성 결함
+- [x] A1. 비-RAW 임베디드 ICC 처리 — image `into_decoder().icc_profile()` → sRGB 태그는 고속 경로, 그 외 lcms2 Transform(RGB_8/16→RGB_FLT, 소스 ICC→rec2020 linear 프로파일)로 버퍼 직접 변환 + identity 행렬. 실패 시 sRGB 폴백(warn). 테스트: rec2020-linear ICC 임베드 PNG(비순환 검증)·P3 적색(R>0.70) — 9건 통과
+- [x] A2. 오류 삼킴 선별 정리 — 전수 57곳 분류(phase5-contract 부록 A), 무통보 결함 3곳 toast 전환(CPU 프레임·초기화·상태 적용 실패)
+
+### B. 빠진 기능
+- [x] B1. 정렬 기준 선택 — SortKey 5종+방향(설정 저장), ImageEntry에 modifiedMs·fileSize, 촬영일시는 probe_capture_dates 지연 로딩(수동 EXIF datetime 파서+테스트), rating은 organize 구독. lib/sortEntries 순수 분리
+- [x] B2. 플래그 내비게이션 cmd+←/→ (keymap+App, i18n)
+- [x] B3. RAW+JPEG 페어 토글 — cmd+J (PRD의 alt+J는 클리핑 검사 J계열이 선점, SPEC-GAP: 바인딩 변경). register_image 커맨드+엔트리 스왑 방식
+- [x] B4. 줌 배율 표시 (StatusBar, zoomRatio 공용화, 클릭 fit/100% 토글)
+- [x] B5. 전체화면 (KeyF, toggle_fullscreen 커맨드, UI 숨김, onResized 동기화)
+- [x] B6. 배치 Export — raster는 기존 구현 확인(shift+cmd+E 선택 전체, 진행/취소/재시도 완비. 평가 오판 정정), DNG 일괄(runDngBatch) 추가
+- [x] B7. 슬라이드쇼 (KeyS, 설정 간격 1-30s, 마지막 장 자동 정지, 전체화면 연동, 키 입력 시 해제)
+- [x] B8. 파일 조작 — rename_image·move_images·copy_images 커맨드(확장자 고정·충돌 거부·XMP 사이드카 동반), 카탈로그가 경로 키라 Catalog::reassign_path 1방으로 편집·별점 이관(테스트), 컨텍스트 메뉴+RenameDialog·폴더 선택 이동/복사·toast
+- [x] B9. 자동 업데이트 — updater+process 플러그인, 공개키 커밋·개인키 ~/raw-viewer-updater.key(사용자 백업 필요), 시작 시 확인(설정 가능)+설정에서 설치, 릴리스가 .app.tar.gz+.sig+latest.json 생성(시크릿 조건부). 주의: 비공개 저장소 동안 업데이트 확인은 실패(무해) — release.md 기록
+- [x] B10. 애니메이션 GIF/WebP 재생 — aether original/{id} 라우트(gif·webp 화이트리스트+CORS, 테스트), isAnimated(gif 상시·webp VP8X 플래그, 테스트), Viewport img 분기+배지
+
+### C. 엔지니어링 건전성
+- [x] C1. 프론트 테스트 — bun test src (sortEntries·keymap·filter 17건 115 어서션), typecheck·test·lint 스크립트, CI 편입
+- [x] C2. eslint 10 flat config — tseslint+react-hooks v7(컴파일러 규칙 내장), function/enum 금지 규칙, 에러 0. set-state-in-effect·refs 경고 31건은 후속 정리 항목(아래)로 이관
+- [x] C3. E2E 스모크 — scripts/e2e-decode.sh: 실바이너리 __decode로 png·jpg·heic·avif x L0/L1/L2 12건 검증(로컬 통과), CI 편입. 계약의 __e2e 서브커맨드 방식은 AppState가 tauri 핸들 필수라 __decode 방식으로 대체
+- [x] C4. PRD §11 체크리스트 정정 — 완료 53건 [x] 반영, 잔여 [ ]는 실제 미구현 4건(Windows·Linux·WebGPU·로컬보정)만
+
+- [ ] C2-후속. react-hooks compiler 경고 31건(set-state-in-effect·refs) 컴포넌트별 정리 — 동작 리팩토링이라 시각 검증과 병행 필요
+
+### D. 고도화
+- [x] D1. 비-RAW L0 고속화 — JPEG 임베디드 EXIF 썸네일(IFD1, ≥256px 게이트) 우선 사용. 통상 EXIF 썸네일은 160px라 실효는 대형 프리뷰 내장 파일에 한정(스펙 게이트 준수) — 부정 경로 테스트 포함
+- [x] D2. 필름스트립 아틀라스 — 측정 판단 기록: 가상화로 동시 셀 약 20-30개 상한이라 DOM/텍스처 폭발 없음. 병목 후보는 캐시 미스 연쇄 fetch뿐 → PerfOverlay로 실폴더(수천 장) 사용 시 프레임타임 확인 후에만 착수(미착수 확정)
+- [x] D3. WebGPU 조사 문서 (docs/webgpu-assessment.md — 웹뷰 WebGPU 권장, 히스토그램 compute 우선, 3단 폴백)
+- [x] D4. 로컬 보정 스키마 초안 (docs/local-adjustments-draft.md — LocalAdjustment 타입·렌더 통합·미결 4건. §12.2 보류 유지, 구현 안 함)
+- [x] D5. Windows/Linux — 하드웨어 부재로 차단 확정. platform trait·CI 매트릭스 여지는 준비됨(기록만)
+
 ### Phase 3 검증 잔여
 §8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인
 

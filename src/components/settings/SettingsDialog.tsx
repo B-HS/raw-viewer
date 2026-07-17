@@ -4,6 +4,7 @@ import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { clearCache, getCacheStats } from '../../ipc/about'
 import { hasDisplayIccProfile } from '../../ipc/display'
+import { checkForUpdate, installUpdateAndRelaunch } from '../../ipc/updater'
 import { useModalDismiss } from '../../lib/useModalDismiss'
 import { useOverlays } from '../../store/overlays'
 import { useSettings } from '../../store/settings'
@@ -77,6 +78,27 @@ export const SettingsDialog: FC = () => {
     const isolatedDecode = useSettings((state) => state.isolatedDecode)
     const showAddress = useSettings((state) => state.showAddress)
     const openInNewWindow = useSettings((state) => state.openInNewWindow)
+    const slideshowIntervalMs = useSettings((state) => state.slideshowIntervalMs)
+    const sortKey = useSettings((state) => state.sortKey)
+    const sortOrder = useSettings((state) => state.sortOrder)
+    const autoUpdateCheck = useSettings((state) => state.autoUpdateCheck)
+    const [updateState, setUpdateState] = useState<'idle' | 'checking' | 'none' | 'installing'>('idle')
+
+    const runUpdateCheck = async () => {
+        setUpdateState('checking')
+        try {
+            const update = await checkForUpdate()
+            if (!update) {
+                setUpdateState('none')
+                return
+            }
+            setUpdateState('installing')
+            await installUpdateAndRelaunch(update)
+        } catch {
+            setUpdateState('idle')
+            useToast.getState().show(t('toast.updateFailed'))
+        }
+    }
     const tab = useSettingsTab((state) => state.tab)
     const [version, setVersion] = useState('')
     const [stats, setStats] = useState<CacheStats | null>(null)
@@ -200,6 +222,64 @@ export const SettingsDialog: FC = () => {
                                     />
                                 </Field>
                                 <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.openInNewWindowNote')}</p>
+                                <Field label={t('settings.sort')}>
+                                    <Segmented
+                                        value={sortKey}
+                                        onChange={(value) => useSettings.getState().setSort(value, sortOrder)}
+                                        options={[
+                                            ['name', t('settings.sortName')],
+                                            ['captureDate', t('settings.sortCaptureDate')],
+                                            ['modifiedDate', t('settings.sortModifiedDate')],
+                                            ['fileSize', t('settings.sortFileSize')],
+                                            ['rating', t('settings.sortRating')],
+                                        ]}
+                                    />
+                                </Field>
+                                <Field label={t('settings.sortOrder')}>
+                                    <Segmented
+                                        value={sortOrder}
+                                        onChange={(value) => useSettings.getState().setSort(sortKey, value)}
+                                        options={[
+                                            ['asc', t('settings.sortAsc')],
+                                            ['desc', t('settings.sortDesc')],
+                                        ]}
+                                    />
+                                </Field>
+                                <Field label={`${t('settings.slideshowInterval')} ${slideshowIntervalMs / 1000}s`}>
+                                    <input
+                                        type='range'
+                                        min={1000}
+                                        max={30000}
+                                        step={1000}
+                                        value={slideshowIntervalMs}
+                                        onChange={(event) => useSettings.getState().setSlideshowInterval(Number(event.target.value))}
+                                        aria-label={t('settings.slideshowInterval')}
+                                        className='w-40 accent-neutral-300'
+                                    />
+                                </Field>
+                                <SectionTitle>{t('settings.update')}</SectionTitle>
+                                <Field label={t('settings.autoUpdateCheck')}>
+                                    <Toggle
+                                        checked={autoUpdateCheck}
+                                        onChange={(value) => useSettings.getState().setAutoUpdateCheck(value)}
+                                        label={t('settings.autoUpdateCheck')}
+                                    />
+                                </Field>
+                                <Field label={t('settings.checkUpdateNow')}>
+                                    <button
+                                        type='button'
+                                        disabled={updateState === 'checking' || updateState === 'installing'}
+                                        onClick={runUpdateCheck}
+                                        className='rounded border border-neutral-600 px-3 py-1 text-xs text-neutral-200 hover:bg-neutral-800 disabled:text-neutral-500'>
+                                        {updateState === 'checking'
+                                            ? t('settings.updateChecking')
+                                            : updateState === 'installing'
+                                              ? t('settings.updateInstalling')
+                                              : updateState === 'none'
+                                                ? t('settings.updateNone')
+                                                : t('settings.checkUpdateNow')}
+                                    </button>
+                                </Field>
                                 {monitorAvailable && (
                                     <>
                                         <SectionTitle>{t('settings.color')}</SectionTitle>

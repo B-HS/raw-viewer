@@ -9,6 +9,7 @@ import { AboutDialog } from './components/AboutDialog'
 import { CommandPalette } from './components/CommandPalette'
 import { SettingsDialog } from './components/settings/SettingsDialog'
 import { ContextMenu } from './components/ContextMenu'
+import { RenameDialog } from './components/RenameDialog'
 import { ExportDialog } from './components/ExportDialog'
 import { Filmstrip } from './components/filmstrip/Filmstrip'
 import { FilmstripResizer } from './components/filmstrip/FilmstripResizer'
@@ -22,7 +23,17 @@ import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
 import { Viewport } from './components/viewport/Viewport'
 import { useSettingsTab } from './components/settings/settingsTab'
-import { frontendReady, navigate, openInNewWindow, openPath, scanDirectory } from './ipc/commands'
+import {
+    frontendReady,
+    fullscreenState,
+    navigate,
+    openInNewWindow,
+    openPath,
+    probeCaptureDates,
+    registerImage,
+    scanDirectory,
+    toggleFullscreen,
+} from './ipc/commands'
 import { onDecodeCrashLoop, onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
 import { requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
@@ -30,6 +41,9 @@ import { flushOrganize } from './ipc/organize'
 import { copyFilesToClipboard, noteRecent } from './ipc/platform'
 import { smartCopyCurrent } from './actions/smartCopy'
 import { confirmAndTrash } from './actions/trash'
+import { i18n } from './i18n/i18n'
+import { checkForUpdate } from './ipc/updater'
+import { zoomRatio } from './gl/viewTransform'
 import { digitValue, isEditableTarget, KEYMAP, PAGE_STEP } from './shortcuts/keymap'
 import { matchAction, resolveBinding } from './shortcuts/resolve'
 import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from './store/crop'
@@ -118,6 +132,38 @@ const advanceToNextFiltered = () => {
     if (target != null) usePlaylist.getState().focusIndex(target)
 }
 
+const togglePairJpeg = async () => {
+    const state = usePlaylist.getState()
+    const current = state.entries[state.currentIndex]
+    if (!current) return
+    const original = useUiStore.getState().pairSwap[current.imageId]
+    if (original) {
+        usePlaylist.getState().replaceEntryAt(state.currentIndex, original)
+        useUiStore.getState().clearPairSwap(current.imageId)
+        return
+    }
+    if (!current.isRaw) return
+    const jpegPath = usePairs.getState().jpegByRaw[current.imageId]
+    if (!jpegPath) return
+    try {
+        const jpegEntry = await registerImage(jpegPath)
+        useUiStore.getState().setPairSwap(jpegEntry.imageId, current)
+        usePlaylist.getState().replaceEntryAt(usePlaylist.getState().currentIndex, jpegEntry)
+    } catch {
+        useToast.getState().show(i18n.t('toast.pairJpegFailed'))
+    }
+}
+
+const navigateFlagged = (direction: 'prev' | 'next') => {
+    const state = usePlaylist.getState()
+    const organize = useOrganize.getState().entries
+    const flagged = activeFilteredList().filter((index) => organize[state.entries[index].imageId]?.flag === 'pick')
+    if (flagged.length === 0) return
+    const current = state.currentIndex
+    const target = direction === 'next' ? flagged.find((index) => index > current) : [...flagged].reverse().find((index) => index < current)
+    if (target != null) state.focusIndex(target)
+}
+
 const selectAllFiltered = () => {
     const state = usePlaylist.getState()
     usePlaylist.getState().selectAll(activeFilteredList().map((index) => state.entries[index].imageId))
@@ -151,6 +197,10 @@ export const App: FC = () => {
     const currentName = usePlaylist((state) => state.entries[state.currentIndex]?.fileName ?? '')
     const currentPosition = usePlaylist((state) => state.currentIndex)
     const gridActive = useGridView((state) => state.active)
+    const isFullscreen = useUiStore((state) => state.isFullscreen)
+    const slideshowActive = useUiStore((state) => state.slideshowActive)
+    const sortKey = useSettings((state) => state.sortKey)
+    const sortOrder = useSettings((state) => state.sortOrder)
     const { t } = useTranslation()
 
     const handleOpen = async (path: string) => {
@@ -366,6 +416,12 @@ export const App: FC = () => {
             if (matchAction(event, 'view.history')) {
                 event.preventDefault()
                 useLayout.getState().selectRightPanel('history')
+            } else if (matchAction(event, 'nav.previousFlagged')) {
+                event.preventDefault()
+                navigateFlagged('prev')
+            } else if (matchAction(event, 'nav.nextFlagged')) {
+                event.preventDefault()
+                navigateFlagged('next')
             } else if (matchAction(event, 'edit.undo')) {
                 event.preventDefault()
                 useHistoryStore.getState().undo()
@@ -395,6 +451,17 @@ export const App: FC = () => {
             } else if (matchAction(event, 'file.open')) {
                 event.preventDefault()
                 pickAndOpen()
+            } else if (matchAction(event, 'view.fullscreen')) {
+                event.preventDefault()
+                toggleFullscreen()
+                    .then((on) => useUiStore.getState().setFullscreen(on))
+                    .catch(() => undefined)
+            } else if (matchAction(event, 'view.togglePairJpeg')) {
+                event.preventDefault()
+                togglePairJpeg()
+            } else if (matchAction(event, 'view.slideshow')) {
+                event.preventDefault()
+                useUiStore.getState().setSlideshow(!useUiStore.getState().slideshowActive)
             } else if (matchAction(event, 'view.settings')) {
                 event.preventDefault()
                 useOverlays.getState().openSettings()
@@ -436,7 +503,13 @@ export const App: FC = () => {
                 event.preventDefault()
                 const playlist = usePlaylist.getState()
                 const current = playlist.entries[playlist.currentIndex]
-                if (current) useExportStore.getState().runDng(current.imageId, current.fileName, current)
+                if (!current) return
+                if (playlist.selection.length > 1) {
+                    const items = playlist.selection.map((id) => ({ imageId: id, entry: playlist.entries.find((e) => e.imageId === id) }))
+                    useExportStore.getState().runDngBatch(items)
+                } else {
+                    useExportStore.getState().runDng(current.imageId, current.fileName, current)
+                }
             } else if (matchAction(event, 'file.selectAll')) {
                 event.preventDefault()
                 selectAllFiltered()
@@ -567,6 +640,85 @@ export const App: FC = () => {
     }, [currentImageId, scanning])
 
     useEffect(() => {
+        if (!useSettings.getState().autoUpdateCheck) return
+        checkForUpdate()
+            .then((update) => {
+                if (update) useToast.getState().show(i18n.t('toast.updateAvailable', { version: update.version }))
+            })
+            .catch(() => undefined)
+    }, [])
+
+    useEffect(() => {
+        usePlaylist.getState().setSort(sortKey, sortOrder)
+        if (sortKey !== 'captureDate') return
+        const known = usePlaylist.getState().sortAux.captureMs ?? {}
+        const missing = usePlaylist
+            .getState()
+            .entries.filter((entry) => known[entry.imageId] === undefined)
+            .map((entry) => entry.imageId)
+        if (missing.length === 0) return
+        probeCaptureDates(missing)
+            .then((captureMs) => usePlaylist.getState().mergeSortAux({ captureMs }))
+            .catch(() => undefined)
+    }, [sortKey, sortOrder, entryCount])
+
+    useEffect(() => {
+        if (sortKey !== 'rating') return
+        const sync = () => {
+            const ratings = Object.fromEntries(Object.entries(useOrganize.getState().entries).map(([id, entry]) => [id, entry.rating]))
+            usePlaylist.getState().mergeSortAux({ ratings })
+        }
+        sync()
+        return useOrganize.subscribe(sync)
+    }, [sortKey])
+
+    useEffect(() => {
+        if (!slideshowActive) return
+        const enteredFullscreen = !useUiStore.getState().isFullscreen
+        if (enteredFullscreen)
+            toggleFullscreen()
+                .then((on) => useUiStore.getState().setFullscreen(on))
+                .catch(() => undefined)
+        const advance = () => {
+            const list = activeFilteredList()
+            const position = list.indexOf(usePlaylist.getState().currentIndex)
+            if (position < 0 || position >= list.length - 1) {
+                useUiStore.getState().setSlideshow(false)
+                return
+            }
+            usePlaylist.getState().focusIndex(list[position + 1])
+        }
+        const timer = setInterval(advance, useSettings.getState().slideshowIntervalMs)
+        const stopOnKey = () => useUiStore.getState().setSlideshow(false)
+        window.addEventListener('keydown', stopOnKey)
+        return () => {
+            clearInterval(timer)
+            window.removeEventListener('keydown', stopOnKey)
+            if (enteredFullscreen && useUiStore.getState().isFullscreen)
+                toggleFullscreen()
+                    .then((on) => useUiStore.getState().setFullscreen(on))
+                    .catch(() => undefined)
+        }
+    }, [slideshowActive])
+
+    useEffect(() => {
+        let disposed = false
+        let unlisten: (() => void) | null = null
+        const sync = () =>
+            fullscreenState()
+                .then((on) => useUiStore.getState().setFullscreen(on))
+                .catch(() => undefined)
+        getCurrentWindow()
+            .onResized(() => sync())
+            .then((dispose) => (disposed ? dispose() : (unlisten = dispose)))
+            .catch(() => undefined)
+        return () => {
+            disposed = true
+            unlisten?.()
+        }
+    }, [])
+
+    useEffect(() => {
         let disposed = false
         let unlisten: (() => void) | null = null
         onDecodeCrashLoop(() => {
@@ -590,7 +742,7 @@ export const App: FC = () => {
             }
             const best = usePlaylist.getState().best[imageId]
             if (!best || best.level === 'l2' || best.width <= 0) return
-            const percent = Math.hypot(model[0] * clientW, model[1] * clientH) / best.width
+            const percent = zoomRatio(model, clientW, clientH, best.width)
             if (percent >= L2_ZOOM_ENTER_RATIO) {
                 if (l2ZoomRef.current !== imageId) {
                     l2ZoomRef.current = imageId
@@ -658,7 +810,7 @@ export const App: FC = () => {
                     <PerfOverlay visible={false} />
                     {gridActive && <GridView />}
                 </div>
-                {rightPanel !== 'none' && (
+                {rightPanel !== 'none' && !isFullscreen && (
                     <div className='flex h-full w-80 shrink-0 flex-col'>
                         <div className='flex shrink-0 border-b border-l border-neutral-800 bg-neutral-900 text-[11px]'>
                             {PANEL_TABS.map((id) => (
@@ -680,7 +832,7 @@ export const App: FC = () => {
                     </div>
                 )}
             </div>
-            {filmstripVisible && (
+            {filmstripVisible && !isFullscreen && (
                 <div className='flex shrink-0 flex-col'>
                     <FilmstripResizer />
                     <FilterBar />
@@ -689,7 +841,7 @@ export const App: FC = () => {
                     </div>
                 </div>
             )}
-            <StatusBar />
+            {!isFullscreen && <StatusBar />}
             {crashLoopVisible && (
                 <div
                     role='alert'
@@ -718,6 +870,7 @@ export const App: FC = () => {
                 {currentName ? t('app.ariaPosition', { position: currentPosition + 1, total: entryCount, name: currentName }) : ''}
             </div>
             <ContextMenu />
+            <RenameDialog />
             <ExportDialog />
             <SettingsDialog />
             <AboutDialog />

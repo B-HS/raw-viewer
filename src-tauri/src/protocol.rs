@@ -31,8 +31,11 @@ enum RouteKind {
     Ping,
     Pixels(String, ProxyLevel),
     CpuFrame(String),
+    Original(String),
     NotFound,
 }
+
+const ORIGINAL_EXT_CONTENT_TYPES: &[(&str, &str)] = &[("gif", "image/gif"), ("webp", "image/webp")];
 
 pub fn handle<R: Runtime>(context: UriSchemeContext<'_, R>, request: Request<Vec<u8>>, responder: UriSchemeResponder) {
     let app = context.app_handle().clone();
@@ -87,6 +90,14 @@ fn classify(path: &str) -> RouteKind {
                 RouteKind::NotFound
             }
         }
+        "original" => {
+            let mut parts = path.split('/');
+            parts.next();
+            match (parts.next(), parts.next()) {
+                (Some(image_id), None) if !image_id.is_empty() => RouteKind::Original(image_id.to_owned()),
+                _ => RouteKind::NotFound,
+            }
+        }
         _ => RouteKind::NotFound,
     }
 }
@@ -96,8 +107,34 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> Response<Cow<'static, [u
         RouteKind::Ping => ping_response(),
         RouteKind::Pixels(image_id, level) => serve_pixels(app, &image_id, level),
         RouteKind::CpuFrame(image_id) => serve_cpu_frame(app, &image_id),
+        RouteKind::Original(image_id) => serve_original(app, &image_id),
         RouteKind::NotFound => not_found(),
     }
+}
+
+fn original_content_type(path: &std::path::Path) -> Option<&'static str> {
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    ORIGINAL_EXT_CONTENT_TYPES.iter().find(|(name, _)| *name == ext).map(|(_, mime)| *mime)
+}
+
+fn serve_original<R: Runtime>(app: &AppHandle<R>, image_id: &str) -> Response<Cow<'static, [u8]>> {
+    let state = app.state::<AppState>();
+    let Some(path) = state.services.registry.resolve(image_id) else {
+        return not_found();
+    };
+    let Some(content_type) = original_content_type(&path) else {
+        return not_found();
+    };
+    let Ok(body) = std::fs::read(&path) else {
+        return not_found();
+    };
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, content_type)
+        .header(ACCESS_CONTROL_ALLOW_ORIGIN, webview_origin())
+        .header(CACHE_CONTROL, "no-cache")
+        .body(Cow::Owned(body))
+        .unwrap_or_else(|_| Response::new(Cow::Borrowed(b"".as_slice())))
 }
 
 fn serve_cpu_frame<R: Runtime>(app: &AppHandle<R>, image_id: &str) -> Response<Cow<'static, [u8]>> {
@@ -199,6 +236,21 @@ mod tests {
         assert_eq!(classify("pixels/abc/l9"), RouteKind::NotFound);
         assert_eq!(classify("pixels//l0"), RouteKind::NotFound);
         assert_eq!(classify("pixels/abc/l0/0_0"), RouteKind::NotFound);
+    }
+
+    #[test]
+    fn classify_original_route() {
+        assert_eq!(classify("original/abc"), RouteKind::Original("abc".to_owned()));
+        assert_eq!(classify("original/"), RouteKind::NotFound);
+        assert_eq!(classify("original/abc/extra"), RouteKind::NotFound);
+    }
+
+    #[test]
+    fn original_content_type_whitelists_animated_formats() {
+        assert_eq!(original_content_type(std::path::Path::new("/a/x.gif")), Some("image/gif"));
+        assert_eq!(original_content_type(std::path::Path::new("/a/x.WEBP")), Some("image/webp"));
+        assert_eq!(original_content_type(std::path::Path::new("/a/x.jpg")), None);
+        assert_eq!(original_content_type(std::path::Path::new("/a/x.cr2")), None);
     }
 
     #[test]

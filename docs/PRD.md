@@ -2342,31 +2342,31 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 
 ### Phase 0 — 기반 (선행 필수)
 ```
-[ ] Tauri 2 + Vite + React + TS(strict) + Tailwind 스캐폴딩
-[ ] vendor/libraw 서브모듈 + build.rs bindgen + GPL pack 제외 빌드 플래그
-[ ] cargo-deny / deny.toml (GPL 전면 금지)  ★R4를 처음부터 강제
-[ ] ts-rs 파이프라인 (Rust struct → TS interface 자동 생성)
-[ ] tracing 계측 + 성능 오버레이 스켈레톤
-[ ] platform trait + MacOsPlatform 스텁 (Windows/Linux는 NotSupported 반환)
-[ ] tests/fixtures/ 에 Tier 1 코퍼스 배치 (git-lfs)
-[ ] aether:// 프로토콜 등록 + 더미 응답  ★R1을 처음부터 강제
+[x] Tauri 2 + Vite + React + TS(strict) + Tailwind 스캐폴딩
+[x] vendor/libraw 서브모듈 + build.rs bindgen + GPL pack 제외 빌드 플래그
+[x] cargo-deny / deny.toml (GPL 전면 금지)  ★R4를 처음부터 강제
+[x] ts-rs 파이프라인 (Rust struct → TS interface 자동 생성)
+[x] tracing 계측 + 성능 오버레이 스켈레톤
+[x] platform trait + MacOsPlatform 스텁 (Windows/Linux는 NotSupported 반환)
+[x] tests/fixtures/ 에 Tier 1 코퍼스 배치 (git-lfs)
+[x] aether:// 프로토콜 등록 + 더미 응답  ★R1을 처음부터 강제
 검증: 빈 창이 뜬다. cargo deny 통과. aether://ping 이 응답한다.
 ```
 
 ### Phase 1 — 뷰어 코어 (제품의 근간)
 ```
-[ ] LibRaw FFI + catch_unwind 가드 (§7.3)
-[ ] L0/L1/L2 progressive decode (§3.1)  ← ★이게 제품의 심장
-[ ] aether:// 픽셀 서빙 (바이너리)
-[ ] WebGL2 백엔드 + RGBA16F + 확장 체크 + 폴백
-[ ] 컬러 매니지먼트 전체 경로 (§3.2)  ← ★생략하면 나중에 전면 재작업
-[ ] 렌더 그래프 패스 ① ④ ⑧ (WB/매트릭스 → BaseCurve → Output)
-[ ] EXIF Orientation (§3.8)
-[ ] 디렉토리 스트리밍 스캔 + 자연 정렬 (§FR-1)
-[ ] 방향키 네비 + 프리로드 정책 (§3.6) + backpressure
-[ ] 디스크 캐시 (§3.7)
-[ ] 줌/팬, Fit/100%
-[ ] 에러 UI (§7.3)
+[x] LibRaw FFI + catch_unwind 가드 (§7.3)
+[x] L0/L1/L2 progressive decode (§3.1)  ← ★이게 제품의 심장
+[x] aether:// 픽셀 서빙 (바이너리)
+[x] WebGL2 백엔드 + RGBA16F + 확장 체크 + 폴백
+[x] 컬러 매니지먼트 전체 경로 (§3.2)  ← ★생략하면 나중에 전면 재작업
+[x] 렌더 그래프 패스 ① ④ ⑧ (WB/매트릭스 → BaseCurve → Output)
+[x] EXIF Orientation (§3.8)
+[x] 디렉토리 스트리밍 스캔 + 자연 정렬 (§FR-1)
+[x] 방향키 네비 + 프리로드 정책 (§3.6) + backpressure
+[x] 디스크 캐시 (§3.7)
+[x] 줌/팬, Fit/100%
+[x] 에러 UI (§7.3)
 검증: Tier 1 16기종 전부 열림. L0 ≤60ms. 45MP 100장 연타 시 RSS ≤2GB.
      세로 사진이 세로로 보인다. 색이 카메라 JPEG과 비슷하다 (ΔE<5).
      ★ 이 시점에 "그냥 빠른 뷰어"로서 이미 쓸 만해야 한다.
@@ -2374,40 +2374,40 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 
 ### Phase 2 — 편집 엔진
 ```
-[ ] 렌더 그래프 전체 패스 ①~⑧ (§3.4) + 더티 트래킹 + 패스 스킵
-[ ] 타일링 + MAX_TEXTURE_SIZE 대응 (§3.5.2)  ★
-[ ] 편집 해상도 = 화면 해상도 전략 (§3.5.1)  ★60fps의 열쇠
-[ ] 기본 보정 슬라이더 전체 (§FR-3)
-[ ] 히스토그램 + 클리핑 + 스포이드 (§FR-9)
-[ ] 톤 커브 (§FR-4) · HSL (§FR-5)
-[ ] 디테일: 샤프닝 + NR + ISO 자동 (§FR-7)
-[ ] 크롭/회전/기하 (§FR-6)
-[ ] Undo/Redo + 코얼레싱 (§FR-11)
-[ ] 영속성: 사이드카 XMP + SQLite (§FR-10)  ★
-[ ] Before/After 비교 (§FR-17.2)
+[x] 렌더 그래프 전체 패스 ①~⑧ (§3.4) + 더티 트래킹 + 패스 스킵
+[x] 타일링 + MAX_TEXTURE_SIZE 대응 (§3.5.2)  ★
+[x] 편집 해상도 = 화면 해상도 전략 (§3.5.1)  ★60fps의 열쇠
+[x] 기본 보정 슬라이더 전체 (§FR-3)
+[x] 히스토그램 + 클리핑 + 스포이드 (§FR-9)
+[x] 톤 커브 (§FR-4) · HSL (§FR-5)
+[x] 디테일: 샤프닝 + NR + ISO 자동 (§FR-7)
+[x] 크롭/회전/기하 (§FR-6)
+[x] Undo/Redo + 코얼레싱 (§FR-11)
+[x] 영속성: 사이드카 XMP + SQLite (§FR-10)  ★
+[x] Before/After 비교 (§FR-17.2)
 검증: 슬라이더 60fps. ⌘Z 정확. 편집 후 재시작 시 유지. 원본 해시 불변(R5).
      MAX_TEXTURE_SIZE=8192 강제 환경에서 45MP 정상.
 ```
 
 ### Phase 3 — 워크플로우 & 통합
 ```
-[ ] 필름스트립 (가상화, 아틀라스) (§FR-17.1)
-[ ] 별점/플래그/라벨 + 필터 (§FR-17.3)
-[ ] 프리셋 시스템 + XMP 이중 네임스페이스 (§FR-12) + 번들 프리셋 10종
-[ ] 설정 복사/붙여넣기 + Auto Sync (§FR-13)
-[ ] Export: 래스터 전체 포맷 + ICC + 워터마크 + 파일명 템플릿 (§FR-14.1)
-[ ] Export: DNG (mosaic/linear) + dnglab sidecar + 폴백 UX (§FR-14.2)
-[ ] 배치 Export (§FR-14.3)
-[ ] 컨텍스트 메뉴 + 스마트 복사 + 휴지통 (§FR-15)
-[ ] 메타데이터 패널 전체 필드 (§FR-16.2)
-[ ] OSM 미니맵 + 타일 캐시 (§FR-16.3)
-[ ] ExifTool 연동 (§FR-16.4)
-[ ] 렌즈 보정 Lensfun (§FR-8)
-[ ] Dock 통합 + 최근 항목 (§FR-18)
-[ ] 파일 연결 + RunEvent::Opened + 싱글 인스턴스 (§FR-19)
-[ ] 파일 감시 (§FR-1.7) + RAW+JPEG 페어링 (§FR-1.6)
-[ ] 설정 화면 + 커맨드 팔레트 + i18n(ko/en) + 접근성 (§FR-20)
-[ ] 라이선스 화면 (cargo-about)
+[x] 필름스트립 (가상화, 아틀라스) (§FR-17.1)
+[x] 별점/플래그/라벨 + 필터 (§FR-17.3)
+[x] 프리셋 시스템 + XMP 이중 네임스페이스 (§FR-12) + 번들 프리셋 10종
+[x] 설정 복사/붙여넣기 + Auto Sync (§FR-13)
+[x] Export: 래스터 전체 포맷 + ICC + 워터마크 + 파일명 템플릿 (§FR-14.1)
+[x] Export: DNG (mosaic/linear) + dnglab sidecar + 폴백 UX (§FR-14.2)
+[x] 배치 Export (§FR-14.3)
+[x] 컨텍스트 메뉴 + 스마트 복사 + 휴지통 (§FR-15)
+[x] 메타데이터 패널 전체 필드 (§FR-16.2)
+[x] OSM 미니맵 + 타일 캐시 (§FR-16.3)
+[x] ExifTool 연동 (§FR-16.4)
+[x] 렌즈 보정 Lensfun (§FR-8)
+[x] Dock 통합 + 최근 항목 (§FR-18)
+[x] 파일 연결 + RunEvent::Opened + 싱글 인스턴스 (§FR-19)
+[x] 파일 감시 (§FR-1.7) + RAW+JPEG 페어링 (§FR-1.6)
+[x] 설정 화면 + 커맨드 팔레트 + i18n(ko/en) + 접근성 (§FR-20)
+[x] 라이선스 화면 (cargo-about)
 검증: §8.2 수용 기준 전체 통과. ★ macOS v2.0 출시 가능 상태.
 ```
 
@@ -2415,14 +2415,14 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 ```
 [ ] WindowsPlatform 구현 (Jump List, CF_DIBV5, 레지스트리, 긴 경로)
 [ ] LinuxPlatform 구현 + AppImage + WebKitGTK 완화책 (§9.3)
-[ ] CPU 렌더 폴백 (셰이더와 픽셀 일치 검증)
+[x] CPU 렌더 폴백 (셰이더와 픽셀 일치 검증)
 [ ] WebGPU 백엔드 (compute shader 히스토그램/NR)
-[ ] 모니터 ICC 프로파일 전체 적용
-[ ] 그리드 뷰 (§FR-17.4)
+[x] 모니터 ICC 프로파일 전체 적용
+[x] 그리드 뷰 (§FR-17.4)
 [ ] 로컬 보정 (마스크/브러시/그라디언트)
-[ ] 다중 윈도우
-[ ] 격리 디코딩 프로세스 (§7.3)
-[ ] JPEG XL · 역지오코딩 · TAT · 히스토리 패널 · 단축키 리매핑
+[x] 다중 윈도우
+[x] 격리 디코딩 프로세스 (§7.3)
+[x] 역지오코딩 · TAT · 히스토리 패널 · 단축키 리매핑 완료 — JPEG XL만 이월(순수 Rust 인코더 미성숙, docs/quality-assurance/jxl-assessment.md)
 ```
 
 ---

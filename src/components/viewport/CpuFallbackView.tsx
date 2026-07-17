@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { dispDims } from '../../gl/viewTransform'
+import { i18n } from '../../i18n/i18n'
 import { renderCpuFrame } from '../../ipc/commands'
 import { onCpuFrameReady } from '../../ipc/events'
 import { fetchCpuFrame } from '../../ipc/pixels'
 import { useEditStore } from '../../store/editStore'
 import { usePlaylist } from '../../store/playlist'
+import { useToast } from '../../store/toast'
 import { flipDegrees } from './projection'
 
 const EDIT_DEBOUNCE_MS = 300
@@ -30,6 +32,7 @@ export const CpuFallbackView: FC = () => {
     const lastStateRef = useRef<unknown>(null)
     const editTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const dragRef = useRef<{ x: number; y: number } | null>(null)
+    const failedIdRef = useRef<string | null>(null)
     const [container, setContainer] = useState({ w: 0, h: 0 })
     const [frame, setFrame] = useState<Frame | null>(null)
     const [view, setView] = useState<View>(FIT_VIEW)
@@ -70,7 +73,12 @@ export const CpuFallbackView: FC = () => {
             canvas.height = decoded.height
             ctx.putImageData(new ImageData(decoded.data, decoded.width, decoded.height), 0, 0)
             setFrame({ w: decoded.width, h: decoded.height, flip })
-        } catch {}
+        } catch {
+            if (imageIdForFrame === currentIdRef.current && failedIdRef.current !== imageIdForFrame) {
+                failedIdRef.current = imageIdForFrame
+                useToast.getState().show(i18n.t('toast.cpuFrameFailed'))
+            }
+        }
     }
     const drawRef = useRef(draw)
     drawRef.current = draw

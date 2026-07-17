@@ -61,13 +61,79 @@ fn exif_flip(path: &Path) -> u8 {
     }
 }
 
-struct SrgbPixels {
+struct LinearPixels {
     width: u32,
     height: u32,
     rgb_linear: Vec<f16>,
+    rec2020_matrix: [f32; 9],
 }
 
-fn linearize_rgba8(width: u32, height: u32, rgba: &[u8]) -> SrgbPixels {
+const IDENTITY_MATRIX: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+
+fn icc_is_srgb(icc: &[u8]) -> bool {
+    let Ok(profile) = lcms2::Profile::new_icc(icc) else { return false };
+    profile
+        .info(lcms2::InfoType::Description, lcms2::Locale::none())
+        .is_some_and(|description| description.to_ascii_lowercase().contains("srgb"))
+}
+
+fn linearize_with_icc_u8(width: u32, height: u32, rgba: &[u8], icc: &[u8]) -> Option<LinearPixels> {
+    let source = lcms2::Profile::new_icc(icc).ok()?;
+    let dest = crate::color::display_lut::rec2020_linear_profile()?;
+    let transform: lcms2::Transform<[u8; 3], [f32; 3]> =
+        lcms2::Transform::new(&source, lcms2::PixelFormat::RGB_8, &dest, lcms2::PixelFormat::RGB_FLT, lcms2::Intent::RelativeColorimetric).ok()?;
+    let pixel_count = width as usize * height as usize;
+    let mut rgb_input = Vec::with_capacity(pixel_count);
+    let mut alphas = Vec::with_capacity(pixel_count);
+    for pixel in rgba.chunks_exact(4) {
+        rgb_input.push([pixel[0], pixel[1], pixel[2]]);
+        alphas.push(pixel[3] as f32 / 255.0);
+    }
+    let mut rgb_output = vec![[0.0f32; 3]; pixel_count];
+    transform.transform_pixels(&rgb_input, &mut rgb_output);
+    let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
+    for (pixel, alpha) in rgb_output.iter().zip(alphas) {
+        rgb_linear.push(f16::from_f32(pixel[0] * alpha));
+        rgb_linear.push(f16::from_f32(pixel[1] * alpha));
+        rgb_linear.push(f16::from_f32(pixel[2] * alpha));
+    }
+    Some(LinearPixels {
+        width,
+        height,
+        rgb_linear,
+        rec2020_matrix: IDENTITY_MATRIX,
+    })
+}
+
+fn linearize_with_icc_u16(width: u32, height: u32, rgba: &[u16], icc: &[u8]) -> Option<LinearPixels> {
+    let source = lcms2::Profile::new_icc(icc).ok()?;
+    let dest = crate::color::display_lut::rec2020_linear_profile()?;
+    let transform: lcms2::Transform<[u16; 3], [f32; 3]> =
+        lcms2::Transform::new(&source, lcms2::PixelFormat::RGB_16, &dest, lcms2::PixelFormat::RGB_FLT, lcms2::Intent::RelativeColorimetric).ok()?;
+    let pixel_count = width as usize * height as usize;
+    let mut rgb_input = Vec::with_capacity(pixel_count);
+    let mut alphas = Vec::with_capacity(pixel_count);
+    for pixel in rgba.chunks_exact(4) {
+        rgb_input.push([pixel[0], pixel[1], pixel[2]]);
+        alphas.push(pixel[3] as f32 / 65535.0);
+    }
+    let mut rgb_output = vec![[0.0f32; 3]; pixel_count];
+    transform.transform_pixels(&rgb_input, &mut rgb_output);
+    let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
+    for (pixel, alpha) in rgb_output.iter().zip(alphas) {
+        rgb_linear.push(f16::from_f32(pixel[0] * alpha));
+        rgb_linear.push(f16::from_f32(pixel[1] * alpha));
+        rgb_linear.push(f16::from_f32(pixel[2] * alpha));
+    }
+    Some(LinearPixels {
+        width,
+        height,
+        rgb_linear,
+        rec2020_matrix: IDENTITY_MATRIX,
+    })
+}
+
+fn linearize_rgba8(width: u32, height: u32, rgba: &[u8]) -> LinearPixels {
     let lut = srgb_u8_to_linear();
     let pixel_count = width as usize * height as usize;
     let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
@@ -77,10 +143,15 @@ fn linearize_rgba8(width: u32, height: u32, rgba: &[u8]) -> SrgbPixels {
         rgb_linear.push(f16::from_f32(lut[pixel[1] as usize] * alpha));
         rgb_linear.push(f16::from_f32(lut[pixel[2] as usize] * alpha));
     }
-    SrgbPixels { width, height, rgb_linear }
+    LinearPixels {
+        width,
+        height,
+        rgb_linear,
+        rec2020_matrix: color::rec2020_from_srgb_linear_matrix(),
+    }
 }
 
-fn linearize_premultiplied_rgba8(width: u32, height: u32, rgba: &[u8]) -> SrgbPixels {
+fn linearize_premultiplied_rgba8(width: u32, height: u32, rgba: &[u8]) -> LinearPixels {
     let lut = srgb_u8_to_linear();
     let pixel_count = width as usize * height as usize;
     let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
@@ -89,10 +160,15 @@ fn linearize_premultiplied_rgba8(width: u32, height: u32, rgba: &[u8]) -> SrgbPi
         rgb_linear.push(f16::from_f32(lut[pixel[1] as usize]));
         rgb_linear.push(f16::from_f32(lut[pixel[2] as usize]));
     }
-    SrgbPixels { width, height, rgb_linear }
+    LinearPixels {
+        width,
+        height,
+        rgb_linear,
+        rec2020_matrix: color::rec2020_from_srgb_linear_matrix(),
+    }
 }
 
-fn linearize_rgba16(width: u32, height: u32, rgba: &[u16]) -> SrgbPixels {
+fn linearize_rgba16(width: u32, height: u32, rgba: &[u16]) -> LinearPixels {
     let pixel_count = width as usize * height as usize;
     let mut rgb_linear = Vec::with_capacity(pixel_count * 3);
     for pixel in rgba.chunks_exact(4) {
@@ -101,7 +177,12 @@ fn linearize_rgba16(width: u32, height: u32, rgba: &[u16]) -> SrgbPixels {
         rgb_linear.push(f16::from_f32(color::srgb_eotf(pixel[1] as f32 / 65535.0) * alpha));
         rgb_linear.push(f16::from_f32(color::srgb_eotf(pixel[2] as f32 / 65535.0) * alpha));
     }
-    SrgbPixels { width, height, rgb_linear }
+    LinearPixels {
+        width,
+        height,
+        rgb_linear,
+        rec2020_matrix: color::rec2020_from_srgb_linear_matrix(),
+    }
 }
 
 fn is_deep_color(image: &DynamicImage) -> bool {
@@ -115,7 +196,40 @@ fn load_image_crate(bytes: &[u8]) -> Result<DynamicImage, DecodeError> {
     image::load_from_memory(bytes).map_err(|error| DecodeError::Image(error.to_string()))
 }
 
-fn decode_pixels(path: &Path, cancel: &CancelFlag) -> Result<(SrgbPixels, u8), DecodeError> {
+fn load_image_with_icc(bytes: &[u8]) -> Result<(DynamicImage, Option<Vec<u8>>), DecodeError> {
+    let reader = image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|error| DecodeError::Image(error.to_string()))?;
+    let mut decoder = reader.into_decoder().map_err(|error| DecodeError::Image(error.to_string()))?;
+    let icc = image::ImageDecoder::icc_profile(&mut decoder).ok().flatten();
+    let image = DynamicImage::from_decoder(decoder).map_err(|error| DecodeError::Image(error.to_string()))?;
+    Ok((image, icc))
+}
+
+fn linearize_image(image: &DynamicImage, icc: Option<&[u8]>) -> LinearPixels {
+    let embedded = icc.filter(|profile| !icc_is_srgb(profile));
+    if is_deep_color(image) {
+        let rgba = image.to_rgba16();
+        if let Some(profile) = embedded {
+            if let Some(pixels) = linearize_with_icc_u16(rgba.width(), rgba.height(), rgba.as_raw(), profile) {
+                return pixels;
+            }
+            tracing::warn!("embedded ICC transform failed (16bpc); falling back to sRGB assumption");
+        }
+        linearize_rgba16(rgba.width(), rgba.height(), rgba.as_raw())
+    } else {
+        let rgba = image.to_rgba8();
+        if let Some(profile) = embedded {
+            if let Some(pixels) = linearize_with_icc_u8(rgba.width(), rgba.height(), rgba.as_raw(), profile) {
+                return pixels;
+            }
+            tracing::warn!("embedded ICC transform failed (8bpc); falling back to sRGB assumption");
+        }
+        linearize_rgba8(rgba.width(), rgba.height(), rgba.as_raw())
+    }
+}
+
+fn decode_pixels(path: &Path, cancel: &CancelFlag) -> Result<(LinearPixels, u8), DecodeError> {
     let bytes = std::fs::read(path).map_err(|error| DecodeError::Image(error.to_string()))?;
     check_cancel(cancel)?;
     if is_platform_ext(path) {
@@ -124,15 +238,9 @@ fn decode_pixels(path: &Path, cancel: &CancelFlag) -> Result<(SrgbPixels, u8), D
         let pixels = linearize_premultiplied_rgba8(decoded.width, decoded.height, &decoded.rgba);
         return Ok((pixels, 0));
     }
-    let image = load_image_crate(&bytes)?;
+    let (image, icc) = load_image_with_icc(&bytes)?;
     check_cancel(cancel)?;
-    let pixels = if is_deep_color(&image) {
-        let rgba = image.to_rgba16();
-        linearize_rgba16(rgba.width(), rgba.height(), rgba.as_raw())
-    } else {
-        let rgba = image.to_rgba8();
-        linearize_rgba8(rgba.width(), rgba.height(), rgba.as_raw())
-    };
+    let pixels = linearize_image(&image, icc.as_deref());
     Ok((pixels, exif_flip(path)))
 }
 
@@ -149,6 +257,7 @@ fn platform_decode(_bytes: &[u8], _max_pixel_size: Option<u32>) -> Result<crate:
 pub fn decode_common(path: &Path, half: bool, cancel: &CancelFlag) -> Result<DecodedRaw, DecodeError> {
     let (pixels, flip) = decode_pixels(path, cancel)?;
     check_cancel(cancel)?;
+    let matrix = pixels.rec2020_matrix;
     let (width, height, rgb_f16) = if half && pixels.width >= 2 && pixels.height >= 2 {
         let (w, h, data) = super::libraw_ffi::downsample_half(&pixels.rgb_linear, pixels.width as usize, pixels.height as usize);
         (w as u32, h as u32, data)
@@ -159,7 +268,7 @@ pub fn decode_common(path: &Path, half: bool, cancel: &CancelFlag) -> Result<Dec
         width,
         height,
         rgb_f16,
-        cam_to_rec2020: Some(color::rec2020_from_srgb_linear_matrix()),
+        cam_to_rec2020: Some(matrix),
         flip,
     })
 }
@@ -187,8 +296,34 @@ fn encode_thumb_jpeg(image: &DynamicImage) -> Result<ThumbData, DecodeError> {
     Ok(ThumbData { jpeg, width, height })
 }
 
+const EXIF_THUMB_MIN_EDGE: u32 = 256;
+
+fn embedded_exif_thumbnail(bytes: &[u8], flip: u8) -> Option<ThumbData> {
+    let parsed = exif::Reader::new().read_from_container(&mut Cursor::new(bytes)).ok()?;
+    let offset = parsed
+        .get_field(exif::Tag::JPEGInterchangeFormat, exif::In::THUMBNAIL)?
+        .value
+        .get_uint(0)? as usize;
+    let length = parsed
+        .get_field(exif::Tag::JPEGInterchangeFormatLength, exif::In::THUMBNAIL)?
+        .value
+        .get_uint(0)? as usize;
+    let jpeg = parsed.buf().get(offset..offset.checked_add(length)?)?;
+    let thumb = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg).ok()?;
+    if thumb.width().max(thumb.height()) < EXIF_THUMB_MIN_EDGE {
+        return None;
+    }
+    encode_thumb_jpeg(&oriented_thumbnail(&thumb, flip)).ok()
+}
+
 pub fn extract_common_thumb(path: &Path) -> Result<ThumbData, DecodeError> {
     let bytes = std::fs::read(path).map_err(|error| DecodeError::Image(error.to_string()))?;
+    let ext_is_jpeg = ext_lower(path).is_some_and(|ext| ext == "jpg" || ext == "jpeg");
+    if ext_is_jpeg {
+        if let Some(thumb) = embedded_exif_thumbnail(&bytes, exif_flip(path)) {
+            return Ok(thumb);
+        }
+    }
     if is_platform_ext(path) {
         let decoded = platform_decode(&bytes, Some(THUMB_MAX_EDGE))?;
         let rgba = image::RgbaImage::from_raw(decoded.width, decoded.height, decoded.rgba)
@@ -291,6 +426,57 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
+    fn linear_profile_icc(red: (f64, f64), green: (f64, f64), blue: (f64, f64)) -> Vec<u8> {
+        let white = lcms2::CIExyY { x: 0.312_7, y: 0.329_0, Y: 1.0 };
+        let prims = lcms2::CIExyYTRIPLE {
+            Red: lcms2::CIExyY { x: red.0, y: red.1, Y: 1.0 },
+            Green: lcms2::CIExyY { x: green.0, y: green.1, Y: 1.0 },
+            Blue: lcms2::CIExyY { x: blue.0, y: blue.1, Y: 1.0 },
+        };
+        let linear = lcms2::ToneCurve::new(1.0);
+        lcms2::Profile::new_rgb(&white, &prims, &[&linear, &linear, &linear])
+            .expect("profile")
+            .icc()
+            .expect("icc bytes")
+    }
+
+    fn write_png_with_icc(path: &Path, rgba: [u8; 4], icc: Vec<u8>) {
+        let image = image::RgbaImage::from_pixel(4, 4, image::Rgba(rgba));
+        let file = std::fs::File::create(path).expect("create");
+        let mut encoder = image::codecs::png::PngEncoder::new(std::io::BufWriter::new(file));
+        image::ImageEncoder::set_icc_profile(&mut encoder, icc).expect("icc supported");
+        image
+            .write_with_encoder(encoder)
+            .expect("png with icc");
+    }
+
+    #[test]
+    fn embedded_rec2020_linear_icc_bypasses_srgb_assumption() {
+        let path = temp_dir().join("icc-rec2020.png");
+        let icc = linear_profile_icc((0.708, 0.292), (0.170, 0.797), (0.131, 0.046));
+        write_png_with_icc(&path, [128, 128, 128, 255], icc);
+        let decoded = decode_common(&path, false, &no_cancel()).expect("decode");
+        let expected = 128.0 / 255.0;
+        let sample = decoded.rgb_f16[0].to_f32();
+        assert!((sample - expected).abs() < 2e-2, "expected linear {expected}, got {sample}");
+        let matrix = decoded.cam_to_rec2020.expect("matrix");
+        assert!((matrix[0] - 1.0).abs() < 1e-6 && matrix[1].abs() < 1e-6, "identity matrix expected, got {matrix:?}");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn embedded_p3_icc_red_exceeds_srgb_assumption() {
+        let path = temp_dir().join("icc-p3.png");
+        let icc = linear_profile_icc((0.680, 0.320), (0.265, 0.690), (0.150, 0.060));
+        write_png_with_icc(&path, [255, 0, 0, 255], icc);
+        let decoded = decode_common(&path, false, &no_cancel()).expect("decode");
+        let red = decoded.rgb_f16[0].to_f32();
+        assert!(red > 0.70, "P3 red in Rec2020 should exceed sRGB-assumed 0.627, got {red}");
+        let matrix = decoded.cam_to_rec2020.expect("matrix");
+        assert!((matrix[0] - 1.0).abs() < 1e-6, "identity matrix expected under ICC path");
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn imageio_decodes_heic_via_sips() {
@@ -313,5 +499,27 @@ mod tests {
         assert_eq!((thumb.width, thumb.height), (12, 10));
         let _ = std::fs::remove_file(&png);
         let _ = std::fs::remove_file(&heic);
+    }
+}
+
+#[cfg(test)]
+mod exif_thumb_tests {
+    use super::*;
+
+    #[test]
+    fn plain_jpeg_without_exif_thumbnail_falls_back() {
+        let image = image::RgbImage::from_pixel(600, 400, image::Rgb([10, 20, 30]));
+        let mut bytes = Vec::new();
+        image
+            .write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(std::io::Cursor::new(&mut bytes), 90))
+            .expect("encode");
+        assert!(embedded_exif_thumbnail(&bytes, 0).is_none());
+        let dir = std::env::temp_dir().join(format!("raw-viewer-exifthumb-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("plain.jpg");
+        let _ = std::fs::write(&path, &bytes);
+        let thumb = extract_common_thumb(&path).expect("fallback thumb");
+        assert_eq!((thumb.width, thumb.height), (512, 341));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

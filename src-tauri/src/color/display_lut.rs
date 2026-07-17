@@ -14,7 +14,7 @@ fn xy(x: f64, y: f64) -> CIExyY {
     CIExyY { x, y, Y: 1.0 }
 }
 
-fn rec2020_linear_profile() -> Option<Profile> {
+pub(crate) fn rec2020_linear_profile() -> Option<Profile> {
     let white = xy(0.312_7, 0.329_0);
     let prims = CIExyYTRIPLE {
         Red: xy(0.708, 0.292),

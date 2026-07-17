@@ -18,6 +18,9 @@ pub struct ImageEntry {
     pub path: PathBuf,
     pub file_name: String,
     pub is_raw: bool,
+    pub modified_ms: Option<f64>,
+    pub file_size: Option<f64>,
+    pub is_animated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

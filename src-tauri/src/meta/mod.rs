@@ -378,3 +378,57 @@ fn compute_dof(focal_mm: f64, f_number: f64, distance_m: f64, crop_factor: f64) 
         hyperfocal: hyperfocal / 1000.0,
     })
 }
+
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let adjusted_year = if month <= 2 { year - 1 } else { year };
+    let era = (if adjusted_year >= 0 { adjusted_year } else { adjusted_year - 399 }) / 400;
+    let year_of_era = adjusted_year - era * 400;
+    let day_of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146097 + day_of_era - 719468
+}
+
+pub fn exif_datetime_to_ms(text: &str) -> Option<i64> {
+    let mut date_time = text.trim().splitn(2, ' ');
+    let date = date_time.next()?;
+    let time = date_time.next()?;
+    let mut date_parts = date.split(':');
+    let year: i64 = date_parts.next()?.parse().ok()?;
+    let month: i64 = date_parts.next()?.parse().ok()?;
+    let day: i64 = date_parts.next()?.parse().ok()?;
+    let mut time_parts = time.split(':');
+    let hour: i64 = time_parts.next()?.parse().ok()?;
+    let minute: i64 = time_parts.next()?.parse().ok()?;
+    let second: i64 = time_parts.next()?.trim().parse().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || !(0..24).contains(&hour) || !(0..60).contains(&minute) || !(0..61).contains(&second)
+    {
+        return None;
+    }
+    Some((days_from_civil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second) * 1000)
+}
+
+pub fn capture_ms(path: &Path) -> Option<i64> {
+    let exif = ExifData::read(path);
+    exif.string(Tag::DateTimeOriginal)
+        .or_else(|| exif.string(Tag::DateTimeDigitized))
+        .and_then(|text| exif_datetime_to_ms(&text))
+}
+
+#[cfg(test)]
+mod capture_tests {
+    use super::exif_datetime_to_ms;
+
+    #[test]
+    fn parses_exif_datetime_to_epoch_ms() {
+        assert_eq!(exif_datetime_to_ms("1970:01:01 00:00:00"), Some(0));
+        assert_eq!(exif_datetime_to_ms("1970:01:02 00:00:01"), Some(86_401_000));
+        assert_eq!(exif_datetime_to_ms("2020:02:29 12:00:00"), Some(1_582_977_600_000));
+    }
+
+    #[test]
+    fn rejects_malformed_datetime() {
+        assert_eq!(exif_datetime_to_ms(""), None);
+        assert_eq!(exif_datetime_to_ms("2020-01-01 00:00:00"), None);
+        assert_eq!(exif_datetime_to_ms("2020:13:01 00:00:00"), None);
+    }
+}

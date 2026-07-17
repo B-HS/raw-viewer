@@ -237,6 +237,7 @@ type ExportStoreState = {
     retryFailed: () => void
     cancel: () => void
     runDng: (imageId: string, name: string, entry: ImageEntry | undefined) => Promise<void>
+    runDngBatch: (items: { imageId: string; entry: ImageEntry | undefined }[]) => Promise<void>
     runEditedHandoff: (imageId: string, name: string, entry: ImageEntry | undefined, appPath: string) => Promise<void>
     dismissDng: () => void
     dngToTiff: () => void
@@ -387,6 +388,25 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             set({ dngPrompt: { imageId, name, message } })
+        }
+    },
+    runDngBatch: async (items) => {
+        let failed = 0
+        let lastPath: string | null = null
+        for (const item of items) {
+            const outDir = resolveOutputDir(get().settings, item.entry)
+            try {
+                const result = await exportDng(item.imageId, outDir)
+                lastPath = result.path
+            } catch {
+                failed += 1
+            }
+        }
+        if (failed === 0) {
+            useToast.getState().show(i18n.t('toast.dngBatchDone', { count: items.length }))
+            if (lastPath) revealItemInDir(lastPath).catch(() => undefined)
+        } else {
+            useToast.getState().show(i18n.t('toast.dngBatchFailed', { failed, count: items.length }))
         }
     },
     runEditedHandoff: async (imageId, name, entry, appPath) => {
