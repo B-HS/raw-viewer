@@ -187,16 +187,16 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 - [x] C1. 프론트 테스트 — bun test src (sortEntries·keymap·filter 17건 115 어서션), typecheck·test·lint 스크립트, CI 편입
 - [x] C2. eslint 10 flat config — tseslint+react-hooks v7(컴파일러 규칙 내장), function/enum 금지 규칙, 에러 0. set-state-in-effect·refs 경고 31건은 후속 정리 항목(아래)로 이관
 - [ ] C3. E2E 스모크 (__e2e 서브커맨드, CI 편입)
-- [ ] C4. PRD §11 체크리스트 정정 (실제 상태 반영)
+- [x] C4. PRD §11 체크리스트 정정 — 완료 53건 [x] 반영, 잔여 [ ]는 실제 미구현 4건(Windows·Linux·WebGPU·로컬보정)만
 
 - [ ] C2-후속. react-hooks compiler 경고 31건(set-state-in-effect·refs) 컴포넌트별 정리 — 동작 리팩토링이라 시각 검증과 병행 필요
 
 ### D. 고도화
 - [ ] D1. 비-RAW L0 고속화 (JPEG EXIF 썸네일 우선)
 - [ ] D2. 필름스트립 아틀라스 — 측정 선행, 병목일 때만 구현 (측정 결과 기록)
-- [ ] D3. WebGPU 조사 문서 (docs/webgpu-assessment.md)
-- [ ] D4. 로컬 보정 스키마 초안 (docs/local-adjustments-draft.md)
-- [ ] D5. Windows/Linux — 차단(하드웨어), 기록만
+- [x] D3. WebGPU 조사 문서 (docs/webgpu-assessment.md — 웹뷰 WebGPU 권장, 히스토그램 compute 우선, 3단 폴백)
+- [x] D4. 로컬 보정 스키마 초안 (docs/local-adjustments-draft.md — LocalAdjustment 타입·렌더 통합·미결 4건. §12.2 보류 유지, 구현 안 함)
+- [x] D5. Windows/Linux — 하드웨어 부재로 차단 확정. platform trait·CI 매트릭스 여지는 준비됨(기록만)
 
 ### Phase 3 검증 잔여
 §8.2 수동 35항목(사용자 재석 — quality-assurance 문서 참조) · Z8 고효율 NEF 육안 검증 · CPU 폴백·그리드·TAT 등 신규 UI 시각 확인
