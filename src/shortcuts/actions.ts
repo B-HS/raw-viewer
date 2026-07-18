@@ -7,6 +7,7 @@ import { useGridView } from '../store/gridView'
 import { useLayout } from '../store/layout'
 import { useOrganize } from '../store/organize'
 import { useOverlays } from '../store/overlays'
+import { useUiStore } from '../store/uiStore'
 import { usePlaylist } from '../store/playlist'
 import { usePresetStore } from '../store/presetStore'
 import { useToast } from '../store/toast'
@@ -125,6 +126,7 @@ export const buildActions = (t: TFunction, ctx: { openFile: () => void }): Palet
         { id: 'file.open', group: file, title: t('palette.action.openFile'), run: () => ctx.openFile() },
         { id: 'settings.open', group: settings, title: t('palette.action.openSettings'), run: () => useOverlays.getState().openSettings() },
         { id: 'settings.about', group: settings, title: t('palette.action.openAbout'), run: () => useOverlays.getState().openAbout() },
+        { id: 'settings.perf', group: settings, title: t('palette.action.togglePerfOverlay'), run: () => useUiStore.getState().togglePerfOverlay() },
     )
 
     for (const preset of usePresetStore.getState().presets) {

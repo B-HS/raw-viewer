@@ -51,7 +51,7 @@ const Toggle: FC<{ checked: boolean; onChange: (value: boolean) => void; label: 
         onClick={() => onChange(!checked)}
         className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${checked ? 'bg-emerald-600' : 'bg-neutral-700'}`}>
         <span
-            className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
+            className={`absolute left-0 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
         />
     </button>
 )

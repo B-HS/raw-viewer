@@ -39,6 +39,7 @@ type UiState = {
     eyedropper: boolean
     tatActive: boolean
     tatBand: HslBand | null
+    perfVisible: boolean
     attachEngine: (engine: EngineApi | null) => void
     setRenderCaps: (caps: RenderCaps | null) => void
     setGpuError: (on: boolean) => void
@@ -60,6 +61,7 @@ type UiState = {
     setEyedropper: (on: boolean) => void
     toggleTat: () => void
     setTatBand: (band: HslBand | null) => void
+    togglePerfOverlay: () => void
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -80,6 +82,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     eyedropper: false,
     tatActive: false,
     tatBand: null,
+    perfVisible: false,
     attachEngine: (engine) => {
         set({ engine })
         if (!engine) return
@@ -156,4 +159,5 @@ export const useUiStore = create<UiState>((set, get) => ({
     setEyedropper: (on) => set({ eyedropper: on }),
     toggleTat: () => set((state) => (state.tatActive ? { tatActive: false, tatBand: null } : { tatActive: true, eyedropper: false })),
     setTatBand: (band) => set({ tatBand: band }),
+    togglePerfOverlay: () => set((state) => ({ perfVisible: !state.perfVisible })),
 }))

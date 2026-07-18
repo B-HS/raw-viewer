@@ -100,6 +100,7 @@ export const ja = {
         detail: {
             title: 'ディテール',
             zoomHint: 'ⓘ シャープ/ノイズは100%ズームで正確に表示されます',
+            zoomSlider: 'ズーム',
             sharpen: 'シャープ',
             amount: '適用量',
             radius: '半径',
@@ -601,6 +602,7 @@ export const ja = {
             recent: '最近: {{name}}',
             openSettings: '設定を開く',
             openAbout: '情報 / ライセンス',
+            togglePerfOverlay: 'パフォーマンスオーバーレイ切替',
         },
     },
     trash: {
