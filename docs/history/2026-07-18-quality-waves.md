@@ -7,8 +7,8 @@
 
 - [x] W1. C2-후속: react-hooks 경고 31건 → 0건. React Compiler(babel-plugin-react-compiler, target 18) 도입(컨벤션 전제 누락 발견), 파생 상태·렌더 중 조정·모듈 함수 승격으로 근본 수정, useRenderEngine은 mount effect 단일화 + playlist 구독 전환, engine/caps/gpuError는 uiStore로 단일화. incompatible-library 룰만 config off(react-virtual 정보성 진단 — 사유는 acknowledge). 실화면 검증은 W5에서
 - [x] W2. store 플러그인 권한을 default(14커맨드)에서 실사용 4커맨드(load/get/set/save)로 축소. persisted-scope는 **불요 종결** — fs 플러그인 자체가 없고 Export는 Rust 커맨드가 직접 파일을 쓴다(스코프 검사 대상 아님)
-- [x] W3. 필름스트립 아틀라스: 측정 하니스 문서화([quality-assurance/filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 스크롤 fps 실측은 사용자 재석 항목, "병목 확인 전 미착수" 결정 유지
-- [x] W4. WebGPU: [phase6-contract.md](./phase6-contract.md) 작성(스파이크 결론: WebGL↔WebGPU 텍스처 공유 불가 → 하이브리드 배제, 전체 이식 로드맵 6a~6i) + 6a 감지 계층 구현(`src/gl/webgpu/detect.ts`, 설정>성능 진단 표시, i18n 3개국어). 6b부터는 실기동 시각 검증 필수라 사용자 재석 대기
+- [x] W3. 필름스트립 아틀라스: 측정 하니스 문서화([quality-assurance/filmstrip-performance.md](../quality-assurance/filmstrip-performance.md)) — 스크롤 fps 실측은 사용자 재석 항목, "병목 확인 전 미착수" 결정 유지
+- [x] W4. WebGPU: [phase6-contract.md](../phase6-contract.md) 작성(스파이크 결론: WebGL↔WebGPU 텍스처 공유 불가 → 하이브리드 배제, 전체 이식 로드맵 6a~6i) + 6a 감지 계층 구현(`src/gl/webgpu/detect.ts`, 설정>성능 진단 표시, i18n 3개국어). 6b부터는 실기동 시각 검증 필수라 사용자 재석 대기
 - [x] W5. 검증 사다리 전체 통과 — tsc 0에러, eslint 0에러·0경고, bun test 17, cargo test 324, 프로덕션 빌드(compiler 적용 확인), tauri dev 실기동 스모크(frontend ready 도달·15초 생존·패닉 0) 후 단일 커밋
 - 사용자 필요로 제외: Phase 3 수동 35항목(재석), v0.4.0 publish·업데이트 왕복(사용자 publish), README(스크린샷), Windows/Linux(하드웨어), Intel 빌드(dnglab x86_64 결정), 로컬 보정(PRD §12.2 — 별도 PRD 합의 필요)
 
@@ -27,7 +27,7 @@
 - [x] N3. docs 최신화 — phase6-contract(6h·검증 상태), architecture-frontend, release.md, decisions.md
 - [x] N4. v0.5.0 상향(3파일+lock) → 검증 사다리(tsc·lint 0/0, bun test 17, 빌드, i18n 0, tauri dev 스모크) → 커밋·push → prod 병합 → v0.5.0 태그
 
-## 진행 중: v0.5.1 검증 후 마무리 웨이브 (2026-07-18 사용자 지시 9건)
+## 완료: v0.5.1 검증 후 마무리 웨이브 (2026-07-18 사용자 지시 9건 → v0.5.2)
 
 - [x] F1. 선택·hover 표시 재설계 — ring/outline이 자식·inline boxShadow에 밀리던 구조를 셀 최상위 오버레이 border(span absolute inset-0)로 교체 (필름스트립·그리드)
 - [x] F2. 앱 표시명 "Raw Viewer" — 파일명(productName)까지 바꾸면 GitHub 자산명 공백 치환으로 업데이터 URL이 깨질 위험 → src-tauri/Info.plist 병합(CFBundleDisplayName/CFBundleName)으로 표시명만 변경. 창 title·타이틀바·새 창 title도 정리
@@ -41,8 +41,8 @@
   - 재방문 플래시: stale best 가드에 renderer.hasImage 결합 — 텍스처 없으면 L0 먼저 표시 후 L1 스왑
   - 진행 UI: 뷰포트 배지에 L0·L1·L2 3단 점 표시
 - [x] F7. 우측 편집 패널 검색 — 섹션별 라벨 키 인덱스 기반 필터(검색 시 매칭 섹션만 표시·재마운트로 펼침), 3개국어
-- [x] F8. 앱 아이콘 — 시안 3종(라인 조리개/채움 조리개/렌즈 링) 제작·사용자 선택(시안 A 라인 조리개) → 투명 배경 1024 렌더 → `tauri icon`으로 전체 세트 재생성
-- [x] F9. 검증 — tsc·eslint 0/0, bun test 17, vite build, cargo test 324, i18n diff 0, 실폴더(CR2 153장) 실기동 실측: 전방 L0 프리로드 65장 자동 실행·패닉 0·**유휴 CPU 0.0%**(이전 지속 99% 해소 실증). 커밋은 지시 대기
+- [x] F8. 앱 아이콘 — 시안 3종(라인 조리개/채움 조리개/렌즈 링) 제작·사용자 선택(시안 A 라인 조리개) → 1024 렌더(당시 qlmanage — 실제로는 흰 배경이 구워졌음, [bug/2026-07-18-icon-opaque-background.md](../bug/2026-07-18-icon-opaque-background.md) 참조. 이후 Chrome 투명 렌더로 재생성) → `tauri icon`으로 전체 세트 재생성
+- [x] F9. 검증 — tsc·eslint 0/0, bun test 17, vite build, cargo test 324, i18n diff 0, 실폴더(CR2 153장) 실기동 실측: 전방 L0 프리로드 65장 자동 실행·패닉 0·**유휴 CPU 0.0%**(이전 지속 99% 해소 실증). 커밋 완료(아래 커밋 목록)
 - 조사 상세: 워크플로 3관점(큐 우선순위/CPU 폭주/캐시 재방문) 보고서 — 근본 원인·권고 전문은 이 세션 기록, 핵심은 architecture-backend.md 파이프라인 절에 반영
 
 ## 관련 커밋 (dev)

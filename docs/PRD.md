@@ -2416,7 +2416,7 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 [ ] WindowsPlatform 구현 (Jump List, CF_DIBV5, 레지스트리, 긴 경로)
 [ ] LinuxPlatform 구현 + AppImage + WebKitGTK 완화책 (§9.3)
 [x] CPU 렌더 폴백 (셰이더와 픽셀 일치 검증)
-[ ] WebGPU 백엔드 (compute shader 히스토그램/NR)
+[x] WebGPU 백엔드 (compute shader 히스토그램/NR) — 웹뷰 WebGPU로 구현·v0.5.3 출시(옵트인 유지 결정 2026-07-18, phase6-contract.md)
 [x] 모니터 ICC 프로파일 전체 적용
 [x] 그리드 뷰 (§FR-17.4)
 [ ] 로컬 보정 (마스크/브러시/그라디언트)
@@ -2433,7 +2433,7 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 
 ### 12.1 CI/CD 및 배포 (사용자 요청에 따라 명시적 보류)
 
-> **정정 (2026-07-16~17):** 아래 중 GitHub Actions(macOS arm64 단일), macOS 서명+공증, Tauri Updater, 앱 아이콘(자리표시자)은 이후 사용자 지시로 보류 해제되어 구현 완료됐다. 현행 상태의 단일 출처는 [docs/release.md](./release.md). 나머지 항목(Windows 서명·릴리스 채널·크래시 리포팅·텔레메트리·성능 게이트·패키지 매니저 배포·MAS)은 여전히 보류.
+> **정정 (2026-07-16~17):** 아래 중 GitHub Actions(macOS arm64 단일), macOS 서명+공증, Tauri Updater, 앱 아이콘(현재 정식 라인 조리개 아이콘 — 소스 docs/assets/app-icon.svg, 재생성은 Chrome 투명 렌더 경로)은 이후 사용자 지시로 보류 해제되어 구현 완료됐다. 현행 상태의 단일 출처는 [docs/release.md](./release.md). 나머지 항목(Windows 서명·릴리스 채널·크래시 리포팅·텔레메트리·성능 게이트·패키지 매니저 배포·MAS)은 여전히 보류.
 ```
 ⏸ GitHub Actions 워크플로우 (matrix build: macOS arm64/x64, Windows x64, Linux x64)
 ⏸ macOS 코드 서명 (Developer ID Application) + notarization (notarytool)
@@ -2452,7 +2452,7 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 
 **Phase 0~3 동안의 임시 방편 (이것만 구현):**
 - 로컬 빌드: `npm run tauri build`
-- 개발 중 테스트: `xattr -cr AetherLens.app` (Gatekeeper 우회, 개발자 본인 기기에서만)
+- 개발 중 테스트: `xattr -cr AetherLens.app` (Gatekeeper 우회, 개발자 본인 기기에서만) (→ 현행: 서명·공증 파이프라인으로 대체 — release.md. 번들명은 'Raw Viewer.app')
 - `cargo deny check licenses`는 **Phase 0부터 로컬 pre-commit 훅으로** 강제 (§10.3)
 
 ### 12.2 기타 보류
@@ -2489,7 +2489,7 @@ nm -gU target/release/aetherlens | grep -i amaze   # 결과 있으면 실패
 
 ### 13.2 사용자 확인 필요 (Phase 3 완료 후)
 1. **CI/CD 및 코드 서명** — §12.1. **Apple Developer Program 가입 여부**가 배포 가능성을 좌우한다.
-2. **앱 이름 최종 확정** — `AetherLens`는 가칭. 번들 ID `app.aetherlens`도 함께 결정 필요.
+2. **앱 이름 최종 확정** — `AetherLens`는 가칭. 번들 ID `app.aetherlens`도 함께 결정 필요. (→ 확정: productName "Raw Viewer" · identifier `app.raw-viewer` — tauri.conf.json, v0.5.3부터. 본문 곳곳의 `app.aetherlens` 경로는 `app.raw-viewer`로 읽는다)
 3. **오픈소스 공개 여부** — MIT 공개 시 §10의 NOTICE 정리 + 서브모듈 정리 필요.
 4. **로컬 보정 우선순위** — Phase 4의 어느 위치에?
 

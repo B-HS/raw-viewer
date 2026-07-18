@@ -19,7 +19,7 @@
 - Phase 5(뷰어 완성도·건전성·고도화) 전체 착수 지시 — "빠짐없이 문서화 후 멈추지 말고 진행".
 - **라이선스 = MIT** (표준 전문, 서드파티는 NOTICE.md). **README는 실사용 스크린샷 생긴 뒤 작성.** **커밋 author 이메일 노출 수용**(히스토리 재작성 안 함).
 - **저장소 공개 전환** (사용자 실행). 언어 통계·MIT 인식 확인됨.
-- **업데이터**: 개인키는 `~/raw-viewer-updater.key`(로컬, 비밀번호 없음 — 백업 필요), 시크릿 `TAURI_SIGNING_PRIVATE_KEY` 등록됨(비밀번호 시크릿은 불필요). 기존 draft 릴리스 4개(v0.1.1~v0.3.0)는 **draft 유지**, v0.3.1부터 updater 자산 포함.
+- **업데이터**: 개인키는 `~/raw-viewer-updater.key`(로컬, 비밀번호 없음 — 백업 필요. → 2026-07-18 `~/environment/raw-viewer-updater.key`로 이동), 시크릿 `TAURI_SIGNING_PRIVATE_KEY` 등록됨(비밀번호 시크릿은 불필요). 기존 draft 릴리스 4개(v0.1.1~v0.3.0)는 **draft 유지**, v0.3.1부터 updater 자산 포함.
 
 ## 2026-07-18 (사용자 피드백 웨이브)
 - 6건 지시: 닫기 버그, Open With 크래시, 아이콘 확대, 전 아이콘 툴팁, **다국어 한/영/일 3개**(언어 파일은 `src/i18n/` 집중, PR로 기여 — docs/i18n.md), **커스텀 타이틀바**(신호등 제거, 전 OS 일관 창 컨트롤+메뉴).
@@ -46,7 +46,7 @@
 ## 2026-07-18 (v0.5.1~v0.5.2 검증·마무리)
 - **v0.5.0 수동 검증 방식**: A(웨이브 회귀)·B(WebGPU)·C(Phase3 픽스처) 체크리스트로 사용자와 왕복 — 기록은 quality-assurance/v0.5.0-manual-checklist.md.
 - **CI 캐시 워밍 도입**: 태그 실행은 기본 브랜치(prod) 캐시만 fallback → prod push 시 릴리스 프로필을 미리 컴파일(warm-release-cache.yml). 릴리스 절차에 "워밍 완료 후 태그" 추가.
-- **표시명 "Raw Viewer"**: productName(파일명) 변경은 GitHub 자산명 공백 치환으로 업데이터 URL 파손 위험 → Info.plist 병합(CFBundleDisplayName/CFBundleName)으로 표시명만 변경. 식별자·파일명은 raw-viewer 유지.
+- **표시명 "Raw Viewer"**: productName(파일명) 변경은 GitHub 자산명 공백 치환으로 업데이터 URL 파손 위험 → Info.plist 병합(CFBundleDisplayName/CFBundleName)으로 표시명만 변경. 식별자·파일명은 raw-viewer 유지. **(→ 같은 날 UX 고도화 웨이브에서 파일명까지 전환 — 아래 항목이 이 결정을 대체)**
 - **디코드 파이프라인 전략(사용자 지정)**: "L0은 전방 미로딩분 일괄 선로딩, L1/L2는 실제 선택 시" — v0.5.2에 구현(bug/2026-07-18-decode-cpu-oversubscription.md).
 - **편집 패널 검색**: 위치는 우측 편집 패널로 확정(설정 다이얼로그 아님).
 - **앱 아이콘**: 시안 3종 중 **A(라인 조리개)** 선택 — tauri icon 전체 세트 재생성.
@@ -67,9 +67,9 @@
 - **updater 개인키 이동**: `~/environment/raw-viewer-updater.key` (자격증명 폴더 통합). 머신 외부 백업은 여전히 권장.
 
 ## 보류·미결로 확정된 것
-- WebGPU 백엔드: 조사 문서만(docs/webgpu-assessment.md), 착수는 별도 지시 대기.
+- WebGPU 기본 백엔드화: 구현·시각 검증 완료(v0.5.3) 후에도 **옵트인 유지** — 사용 데이터 축적 후 재결정(위 2026-07-18 항목 참조).
 - 로컬 보정: PRD §12.2 보류 유지, 스키마 초안만(docs/local-adjustments-draft.md).
 - Windows/Linux: 하드웨어 부재로 차단.
-- export 경로 persisted-scope, store 플러그인 스코프 축소, `catch {}` 오류 삼킴 정책(분류 완료 — phase5-contract 부록 A): 현상 유지.
+- `catch {}` 오류 삼킴 정책(분류 완료 — phase5-contract 부록 A): 현상 유지. persisted-scope는 불요 종결·store 권한 축소는 적용 완료(위 항목 참조).
 - 필름스트립 아틀라스: 실측에서 병목 확인 전 미착수.
-- react-hooks compiler 경고 31건(set-state-in-effect·refs): warn 유지, 시각 검증과 병행해 정리(C2-후속).
+- react-hooks compiler 경고: 31건 → 0건 해소(2026-07-18 W1, React Compiler 도입·근본 수정). set-state-in-effect·refs 룰은 warn 유지(재발 감지용).

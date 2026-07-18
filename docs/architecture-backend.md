@@ -1,12 +1,12 @@
 # raw-viewer Rust 백엔드 아키텍처 (src-tauri/src)
 
-기준 커밋: dev 브랜치 e169fe6 (2026-07-18) 시점. 모든 주장에 `파일:라인` 근거를 붙였다. 추측은 "확인 필요"로 표시.
+기준 커밋: dev 브랜치 e169fe6 (2026-07-18) 시점 — 내용은 v0.5.3까지 갱신됐으나 `파일:라인` 번호는 이후 커밋(파이프라인 수술 등)으로 드리프트 가능. **심볼·함수명으로 찾는 것을 우선**하고 라인 번호는 참고로만. 추측은 "확인 필요"로 표시.
 
 진입점: `main.rs:3-9` — argv가 `__decode` 서브커맨드면 `isolate::dispatch_argv`로 격리 디코드 자식 프로세스로 동작하고 종료, 아니면 `raw_viewer_lib::run()`(lib.rs:46) 실행.
 
 ---
 
-> 부트스트랩 추가(2026-07-18): main.rs가 LibRaw 로드 전에 `OMP_NUM_THREADS=4`·`KMP_BLOCKTIME=0`을 설정(미설정 시에만)해 OpenMP 팀 크기를 캡한다. macOS 표시명은 `src-tauri/Info.plist` 병합(CFBundleDisplayName/CFBundleName = "Raw Viewer")로 지정 — productName은 raw-viewer 유지(업데이터 자산명 보호).
+> 부트스트랩 추가(2026-07-18): main.rs가 LibRaw 로드 전에 `OMP_NUM_THREADS=4`·`KMP_BLOCKTIME=0`을 설정(미설정 시에만)해 OpenMP 팀 크기를 캡한다. macOS 이름은 productName="Raw Viewer"(tauri.conf.json, v0.5.3부터 — 번들 `Raw Viewer.app`, 릴리스 자산은 점 표기 `Raw.Viewer_*`로 선제 리네임). `src-tauri/Info.plist`의 CFBundleDisplayName/CFBundleName 병합은 productName과 동일 값이라 현재는 잉여(무해).
 
 ## 1. 모듈 맵
 
@@ -265,6 +265,7 @@ CORS: 모든 응답에 `Access-Control-Allow-Origin`을 빌드별 고정 웹뷰 
 수명 이벤트: `CloseRequested`에서 edit/organize `flush_all`(try_state 사용 — `lib.rs:134-142`), `Destroyed`에서 `pipeline.forget_window(label)`로 창별 desired 셋 해제·범위 밖 취소(`lib.rs:143-147`). `RunEvent::Ready`에서 dock 메뉴 설치(`lib.rs:225-228`).
 
 플러그인: single-instance, dialog, opener, updater, process, window-state(DECORATIONS 제외), store(`lib.rs:50-64`).
+권한은 `capabilities/default.json`이 최소로 부여 — opener는 reveal+지도·GitHub URL 화이트리스트만, store는 load/get/set/save만, process는 restart만, window는 close/destroy/minimize/toggle-maximize/is-maximized/start-dragging (main·window-* 공통).
 
 ---
 

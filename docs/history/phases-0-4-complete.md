@@ -2,7 +2,7 @@
 
 > PROCESS.md에서 2026-07-18 이관. 완료된 Phase의 상세 체크리스트·SPEC-GAP·커밋 해시 원본 기록.
 
-## Phase 0 — 기반 (진행 중)
+## Phase 0 — 기반 (완료)
 - [x] 환경 확인 (toolchain·네트워크)
 - [x] 기준 문서 저장 (docs/PRD.md)
 - [x] Tauri 2 + Vite + React + TS(strict) + Tailwind 스캐폴딩 (bun) — cargo test 5건·bun run build 통과
@@ -17,10 +17,10 @@
 
 **Phase 0 완료.** 잔여(다음 세션): Tier 1 코퍼스 실제 다운로드(`scripts/fetch-fixtures.sh`, 약 500MB+), git init 여부 사용자 결정(→ pre-commit cargo-deny 훅, 커밋 시작).
 
-## Phase 1 — 뷰어 코어 (진행 중)
+## Phase 1 — 뷰어 코어 (완료)
 
 > **사용자 지시 (2026-07-15): 중단 지시가 있을 때까지 Phase 경계에서 멈추지 말고 연속 진행.**
-> 병렬 구현 계약: [docs/phase1-contract.md](./phase1-contract.md) (모듈 소유권·디코드 API·AETH 포맷·커맨드/이벤트 동결)
+> 병렬 구현 계약: [docs/phase1-contract.md](../phase1-contract.md) (모듈 소유권·디코드 API·AETH 포맷·커맨드/이벤트 동결)
 
 - [x] Tier 1 코퍼스 다운로드 (scripts/fetch-fixtures.sh, 백그라운드)
 - [x] Phase 1 IPC 타입 동결 (types.rs → ts-rs 재생성, 테스트 14건)
@@ -37,8 +37,8 @@
 - (이월) 모노크롬 DNG는 JPEG 썸네일 부재 → L0 없음 (L1로 첫 표시. UI 허용 확인 필요)
 - (이월) Bradford D50 전체 경로, 캐시 10GB LRU+index.sqlite, bicubic 축소 필터, LibRaw progress 콜백 취소, `⌘O` 파일 다이얼로그(dialog 플러그인)
 
-## Phase 2 — 편집 엔진 (진행 중)
-계약: [docs/phase2-contract.md](./phase2-contract.md) · EditState 타입 동결(types.rs → TS 26종)
+## Phase 2 — 편집 엔진 (완료)
+계약: [docs/phase2-contract.md](../phase2-contract.md) · EditState 타입 동결(types.rs → TS 26종)
 - [x] EditState §5.1 타입 + ts-rs 생성 · immer 추가 · rusqlite/base64 의존성
 - [x] P: catalog(sqlite WAL, 마이그레이션 구조)·XMP 사이드카(aether:state zstd19+b64, crs 근사, R5 가드)·edit 커맨드(메모리 즉시/catalog 2s/xmp 10s, navigate·종료 flush)·ISO 자동 초기값(probe_iso)·pipeline pending-set dedup 픽스 — 테스트 89건
 - [x] G: GL 패스 ①~⑧ 전체·더티트래킹(무연산 중립값 기준)·화면해상도 전략·타일링(2048+32)·EngineApi 동결 시그니처·히스토그램 워커·상대 WB 모델 — 단, GPU 부재 환경이라 셰이더 실렌더 미검증 명시
@@ -48,7 +48,7 @@
 
 Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highlightRecovery 근사, ToneCurve/crop/HSL crs: 매핑 Phase 3, 비RAW hotPixelRemoval true 유지(렌더 무효), 외부 사이드카 2~10s 창 레이스(희귀), reset=initial(ISO NR 포함) 복귀.
 
-## Phase 3 — 워크플로우 & 통합 (진행 중)
+## Phase 3 — 워크플로우 & 통합 (완료)
 ### 3a (계약: docs/phase3a-contract.md)
 - [x] 의존성: kamadak-exif·trash·notify·plugin-dialog/opener(+capabilities 배선)·react-virtual·leaflet
 - [x] M: ImageMetadata(§5.2)+get_metadata(exif+probe_metadata 병합, 5D3/iPhone GPS 실측 스냅샷)·organize(catalog 002+xmp 병합, reject=crs:Rating=-1)·휴지통(사이드카 동반, registry/스토어 정리)·notify 감시(200ms coalesce)·fs:changed — 테스트 122건
@@ -62,7 +62,7 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] Q: 프리셋(003 마이그레이션, 8섹션 마스크, 번들 10종 시드) + copy_settings — EditService 영속 경로 탑승
 - [x] W: ExportDialog·PresetPanel·exportRenderer(타일 interior 전송)·⌘⇧C/V/⌘⌥V·⌥1~9
 - [x] 검증: cargo test 184 + bun run build + prettier 통과
-- [ ] **차단 버그(통합 중 발견)**: Bayer RAW(5D3) L1/L2 뷰포트 렌더 깨짐 — iPhone linear DNG는 정상, 마진 포함 raw 치수(5796×3870) 표기로 보아 **processed 치수 vs payload 치수 불일치(row stride)** 유력. 3b 이전부터 존재(Bayer 파일 시각 검증 이번이 처음). 디버그 에이전트 진행 중. **해결·재검증 후 dev 커밋/푸시.**
+- [x] **차단 버그(통합 중 발견, 해결 완료 — LIBRAW_NOTHREADS 제거)**: Bayer RAW(5D3) L1/L2 뷰포트 렌더 깨짐 — iPhone linear DNG는 정상, 마진 포함 raw 치수(5796×3870) 표기로 보아 **processed 치수 vs payload 치수 불일치(row stride)** 유력. 3b 이전부터 존재(Bayer 파일 시각 검증 이번이 처음). 디버그 에이전트 진행 중. **해결·재검증 후 dev 커밋/푸시.**
 
 ### 3c (계약: docs/phase3c-contract.md) — **완료, dev 반영(13ecc05)**
 - [x] PL: objc2 실구현(NSPasteboard PNG+TIFF 스마트복사·파일/텍스트·Finder·open-with·recents)·Dock 메뉴(델리게이트 무교체 class_addMethod 주입, ● 점 표시)·파일연결(rank=Alternate)·Opened 콜드스타트 큐·싱글인스턴스·RAW+JPEG 페어링(get_pairs)·recents(004) — 테스트 206
@@ -97,7 +97,7 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 3. personal-llm 기록 = 생략(사용자).
 - 잔여 미달: X-T5는 병렬화 후에도 L1 250/L2 1200 목표 미달(40MP 풀해상도 Markesteijn 자체 한계) — 기준기(M1)에선 더 김. 추가 개선은 bilinear 프록시 전환뿐(품질 트레이드오프, 미채택).
 
-## Phase 4 (진행 중)
+## Phase 4 (완료)
 ### 4a — **완료, dev 반영(c6f93c9)**
 - [x] C4: Rust CPU 렌더러(①③④⑤⑦⑧, rayon) — TS 원본→bun 패리티 벡터(LUT 바이트 일치, WB/색공간 1e-3), aether `pixels/{id}/cpu`(AETH u8) + cpu:frame-ready, 5D3@2048px 25~51ms — 테스트 277
 - [x] D4: WebGL2 실패 폴백 뷰(강제 플래그 rawviewer.forceCpuRender)·TAT·샘플러 핀(5개)·히스토그램 호버
@@ -119,7 +119,7 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] 구조: historyStore↔editStore 순환을 `connectHistoryTarget` 주입으로 해소 · keymap↔settings 순환은 `shortcuts/resolve.ts` 분리로 해소 · `i18n/index.ts` barrel → `i18n/i18n.ts` · store 조작 액션(smartCopy·trash)을 `src/actions/`로 재배치(lib은 순수 유틸만) · gl 공용 타입 `gl/viewTypes.ts` 분리(type-only 순환 해소)
 - [x] 컨벤션: 추론 가능한 명시 반환 타입 26곳 제거(재귀 `gcd`·튜플 반환·`replaceRootPatches`/`buildLensPass` 등 컨텍스트 타이핑 필수 7곳은 유지) · 매직넘버 상수화 · Filmstrip/GridView 선택 로직 `components/listSelection.ts` 공통화 · localStorage `JSON.parse as` 3곳 unknown+가드 전환
 - [x] Rust: clippy 경고 전체 해소(0건) · 이벤트 채널명 리터럴을 `events.rs` 상수로 집중
-- [x] 배포 파이프라인 (사용자 지시, 2026-07-16): GitHub Actions — CI(PR·수동: prettier→tsc→clippy→test→빌드) + Release(`v*` 태그: 버전 일치 검증→검증→`tauri build`→DMG draft 릴리스). 서명·공증은 시크릿 존재 시 자동 활성화(무시크릿이면 무서명 DMG). `scripts/fetch-dnglab.sh` 신설(로컬·CI 공용). 상세·시크릿 목록은 [docs/release.md](./release.md)
+- [x] 배포 파이프라인 (사용자 지시, 2026-07-16): GitHub Actions — CI(PR·수동: prettier→tsc→clippy→test→빌드) + Release(`v*` 태그: 버전 일치 검증→검증→`tauri build`→DMG draft 릴리스). 서명·공증은 시크릿 존재 시 자동 활성화(무시크릿이면 무서명 DMG). `scripts/fetch-dnglab.sh` 신설(로컬·CI 공용). 상세·시크릿 목록은 [docs/release.md](../release.md)
 - 잔여 결정 사항: `read_watermark_png`·export 출력 경로는 dialog 경유 전제(커맨드 자체는 경로 무제한 — persisted-scope 도입 여부는 추후 결정) · `store:default` 스코프 축소 미적용 · 오류 삼킴(`catch {}`) 패턴은 기존 정책 유지
 
 ### 비-RAW 공통 포맷 디코드 — **완료 (2026-07-18, 사용자 버그 리포트로 착수)**
@@ -138,14 +138,14 @@ Phase 2 SPEC-GAP: WB=AsShot(6500,0) 상대 모델(Planckian Q3→Phase 3), highl
 - [x] F6. 커스텀 타이틀바 — decorations:false(주창+보조창), TitleBar 컴포넌트(드래그 영역·메뉴: 열기/내보내기/프리셋 가져오기/전체화면/설정/정보·창 컨트롤 3종), window-state DECORATIONS 플래그 제외(기존 사용자 복원 함정), 전체화면 시 숨김, 크래시 배너 오프셋
 - [x] F-검증. 실기동 스모크 — Open With 콜드 스타트 재현: 디버그 번들을 `open -a <app> 사진.jpg`로 기동, 앱 생존·신규 크래시 리포트 0 확인. 닫기 버튼·타이틀바 드래그는 코드 근거(권한+destroy, tauri 소스 분석) 확정, 시각 확인은 사용자 실사용 시
 
-### 4 잔여
-WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수는 사용자 지시 대기) · Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의) · CI/CD·코드서명(§12.1 보류)
+### 4 잔여 (아카이브 시점 기준 — 이후 WebGPU는 Phase 6으로 구현 완료, CI/CD·서명도 구축 완료)
+Windows/Linux platform(하드웨어 필요) · 로컬 보정(§12.2 별도 논의)
 
 
 
-## Phase 5 — 뷰어 완성도·건전성·고도화 (진행 중, 2026-07-18 착수)
+## Phase 5 — 뷰어 완성도·건전성·고도화 (완료, 2026-07-18 착수·완료)
 
-> 사양의 단일 출처: [docs/phase5-contract.md](./phase5-contract.md). 사용자 지시: 멈추라 할 때까지 연속 진행. 각 항목 완료 시 검증(부록 B) 통과 후 체크.
+> 사양의 단일 출처: [docs/phase5-contract.md](../phase5-contract.md). 사용자 지시: 멈추라 할 때까지 연속 진행. 각 항목 완료 시 검증(부록 B) 통과 후 체크.
 
 ### A. 정확성 결함
 - [x] A1. 비-RAW 임베디드 ICC 처리 — image `into_decoder().icc_profile()` → sRGB 태그는 고속 경로, 그 외 lcms2 Transform(RGB_8/16→RGB_FLT, 소스 ICC→rec2020 linear 프로파일)로 버퍼 직접 변환 + identity 행렬. 실패 시 sRGB 폴백(warn). 테스트: rec2020-linear ICC 임베드 PNG(비순환 검증)·P3 적색(R>0.70) — 9건 통과
@@ -160,7 +160,7 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 - [x] B6. 배치 Export — raster는 기존 구현 확인(shift+cmd+E 선택 전체, 진행/취소/재시도 완비. 평가 오판 정정), DNG 일괄(runDngBatch) 추가
 - [x] B7. 슬라이드쇼 (KeyS, 설정 간격 1-30s, 마지막 장 자동 정지, 전체화면 연동, 키 입력 시 해제)
 - [x] B8. 파일 조작 — rename_image·move_images·copy_images 커맨드(확장자 고정·충돌 거부·XMP 사이드카 동반), 카탈로그가 경로 키라 Catalog::reassign_path 1방으로 편집·별점 이관(테스트), 컨텍스트 메뉴+RenameDialog·폴더 선택 이동/복사·toast
-- [x] B9. 자동 업데이트 — updater+process 플러그인, 공개키 커밋·개인키 ~/raw-viewer-updater.key(사용자 백업 필요), 시작 시 확인(설정 가능)+설정에서 설치, 릴리스가 .app.tar.gz+.sig+latest.json 생성(시크릿 조건부). 주의: 비공개 저장소 동안 업데이트 확인은 실패(무해) — release.md 기록
+- [x] B9. 자동 업데이트 — updater+process 플러그인, 공개키 커밋·개인키 ~/raw-viewer-updater.key(사용자 백업 필요 — 이후 ~/environment/로 이동, decisions.md 2026-07-18), 시작 시 확인(설정 가능)+설정에서 설치, 릴리스가 .app.tar.gz+.sig+latest.json 생성(시크릿 조건부). 주의: 비공개 저장소 동안 업데이트 확인은 실패(무해) — release.md 기록 (→ 이후 저장소 공개·v0.5.3 publish로 소멸)
 - [x] B10. 애니메이션 GIF/WebP 재생 — aether original/{id} 라우트(gif·webp 화이트리스트+CORS, 테스트), isAnimated(gif 상시·webp VP8X 플래그, 테스트), Viewport img 분기+배지
 
 ### C. 엔지니어링 건전성
@@ -169,7 +169,7 @@ WebGPU(macOS 26+ 필요 — 현 머신 26.5.2로 **진행 가능해짐**, 착수
 - [x] C3. E2E 스모크 — scripts/e2e-decode.sh: 실바이너리 __decode로 png·jpg·heic·avif x L0/L1/L2 12건 검증(로컬 통과), CI 편입. 계약의 __e2e 서브커맨드 방식은 AppState가 tauri 핸들 필수라 __decode 방식으로 대체
 - [x] C4. PRD §11 체크리스트 정정 — 완료 53건 [x] 반영, 잔여 [ ]는 실제 미구현 4건(Windows·Linux·WebGPU·로컬보정)만
 
-- [ ] C2-후속. react-hooks compiler 경고 31건(set-state-in-effect·refs) 컴포넌트별 정리 — 동작 리팩토링이라 시각 검증과 병행 필요
+- [x] C2-후속. react-hooks compiler 경고 31건(set-state-in-effect·refs) 컴포넌트별 정리 — 2026-07-18 W1에서 해소(31건 → 0건, React Compiler 도입 — 2026-07-18-quality-waves.md)
 
 ### D. 고도화
 - [x] D1. 비-RAW L0 고속화 — JPEG 임베디드 EXIF 썸네일(IFD1, ≥256px 게이트) 우선 사용. 통상 EXIF 썸네일은 160px라 실효는 대형 프리뷰 내장 파일에 한정(스펙 게이트 준수) — 부정 경로 테스트 포함

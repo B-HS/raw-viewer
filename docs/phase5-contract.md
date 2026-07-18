@@ -1,7 +1,7 @@
 # Phase 5 계약 — 뷰어 완성도 · 엔지니어링 건전성 · 고도화
 
 > 2026-07-18 객관 평가(사용자 지시)에서 도출된 전 작업의 구현 계약. **어떤 세션에서 이어받아도 이 문서만으로 구현 가능**하도록 요구사항·설계·대상 파일·수용 기준을 명시한다.
-> 진행 상태는 [PROCESS.md](./PROCESS.md) Phase 5 체크리스트가 단일 출처. 여기는 사양만 둔다.
+> 진행 상태 체크리스트는 완료 후 [history/phases-0-4-complete.md](./history/phases-0-4-complete.md)로 아카이브됨(Phase 5 완료). 여기는 사양만 둔다.
 > 공통 규칙: 기존 계약(DecodedRaw = linear Rec.2020 f16 + cam_to_rec2020 행렬, AETH 직렬화, LevelReadyPayload)은 절대 불변. 프론트 컨벤션은 `~/.claude/convention/*.md`.
 
 ## A. 정확성 결함 (최우선)

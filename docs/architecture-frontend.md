@@ -1,6 +1,6 @@
 # raw-viewer 프론트엔드 아키텍처 (src/)
 
-기준 커밋 시점: 2026-07-18 v0.5.2(마무리 웨이브 — §8.1 추가분 포함) 반영 (dev 브랜치). 모든 경로는 저장소 루트 기준. 근거의 `파일:라인`은 이 시점 기준이며 이후 시프트될 수 있다 — 구조 서술을 우선 신뢰.
+기준 커밋 시점: 2026-07-18 v0.5.3(첫 공개 릴리스 — §8.1 마무리·§8.2 UX 고도화 웨이브 포함) 반영 (dev 브랜치). 모든 경로는 저장소 루트 기준. 근거의 `파일:라인`은 이 시점 기준이며 이후 시프트될 수 있다 — 구조 서술을 우선 신뢰.
 
 스택: Vite 6 + React 18 + **React Compiler**(babel-plugin-react-compiler target 18 + react-compiler-runtime — vite.config.ts, 2026-07-18 도입) + TypeScript strict + zustand 5 + immer 11 + i18next/react-i18next + Tailwind 3 + @tanstack/react-virtual + Tauri v2 API (package.json). 스크립트: `dev`(vite) / `typecheck`(tsc --noEmit) / `test`(bun test src) / `lint`(eslint src) / `build`. eslint는 react-hooks v7 컴파일러 진단 포함(경고 0 유지 — `incompatible-library`만 config off, 사유는 acknowledge).
 
@@ -19,7 +19,7 @@
 | `src/gl/` | WebGL2 렌더 파이프라인 (뷰포트 `Renderer` 클래스 + export/clipboard 오프스크린 렌더러 + 셰이더 + LUT/행렬 유틸) | React 비의존. `engineApi.ts`가 스토어와의 유일한 계약 |
 | `src/shortcuts/` | 키맵 정의(`keymap.ts`), 설정 결합 매칭(`resolve.ts`), 커맨드 팔레트 액션(`actions.ts`) | keymap은 순수 정의, resolve만 스토어 의존 (아래 5장) |
 | `src/i18n/` | i18next 초기화(`i18n.ts`) + 언어 리소스 `en/ko/ja.ts` | 3파일 동일 키 구조 필수 (아래 7장) |
-| `src/lib/` | 유틸: `sortEntries`(순수), `useModalDismiss`(포커스트랩 훅), `watermark`(캔버스 렌더 — 예외적으로 `ipc/export`의 `readWatermarkPng` import: lib/watermark.ts:1) | 대체로 순수. watermark만 IPC 의존이 있음 |
+| `src/lib/` | 유틸: `sortEntries`(순수), `useModalDismiss`(포커스트랩 훅), `useDismissOnOutside`(document 레벨 외부 클릭·ESC 드롭다운 닫힘 — TitleBar 두 메뉴 사용), `watermark`(캔버스 렌더 — 예외적으로 `ipc/export`의 `readWatermarkPng` import: lib/watermark.ts:1) | 대체로 순수. watermark만 IPC 의존이 있음 |
 | `src/components/` | 화면 전부. `viewport/`(GL 캔버스+오버레이), `filmstrip/`, `gridview/`, `panels/`(Edit/Meta/Preset 우측 패널), `settings/`, 루트에 다이얼로그·TitleBar·StatusBar 등 | `listSelection.ts`는 filmstrip/gridview 공용 클릭 선택 로직 (components/listSelection.ts:7-28) |
 | `src/App.tsx` | 최상위 조립 + 전역 키 핸들러 2개 + 앱 수명주기 effect 전부 (889줄) | 아래 각 장 참조 |
 
@@ -147,7 +147,7 @@ zustand 스토어 (create 사용):
 - 전제: 네이티브 창 장식 제거 — `"decorations": false` (src-tauri/tauri.conf.json:20). 풀스크린에서는 TitleBar 자체를 렌더하지 않음 (App.tsx:767, 802).
 - 드래그 영역: `<header data-tauri-drag-region …>` (components/TitleBar.tsx:55-57). 내부 앱명 span은 `pointer-events-none` (58).
 - 구성: 앱명 + "메뉴" 드롭다운(파일 열기·내보내기·프리셋 가져오기·풀스크린·설정·About) + **"UI" 드롭다운**(우측 패널·필름스트립·상태 바·퀵 바·줌/디코드 배지·Perf 체크박스 — 토글해도 메뉴 유지, 상태는 useLayout/useUiStore 반응 구독) + 우측 창 컨트롤 3버튼 — `getCurrentWindow().minimize()/toggleMaximize()/close()`. maximize 상태는 `onResized`+`isMaximized()`로 동기화.
-- 드롭다운 닫힘: `useModalDismiss`(ESC/포커스트랩, 메뉴만) + **`lib/useDismissOnOutside`**(document pointerdown 외부 클릭 + ESC, 두 메뉴 공통). 한 메뉴가 열린 채 다른 메뉴 버튼에 호버하면 전환(메뉴바 관례).
+- 드롭다운 닫힘: `useModalDismiss`(ESC/포커스트랩, 메뉴만) + **`lib/useDismissOnOutside`**(document pointerdown 외부 클릭 + ESC — ESC는 document **capture + stopPropagation**이라 메뉴가 열린 동안 다른 ESC 핸들러(그리드 뷰 닫기 등)에 도달하지 않음, 두 메뉴 공통). 한 메뉴가 열린 채 다른 메뉴 버튼에 호버하면 전환(메뉴바 관례).
 - **더블클릭 최대화는 Tauri 네이티브**: drag.js(2.11.5)가 macOS에서 mouseup 기반으로 `internal_toggle_maximize`를 invoke(권한은 core:default 기본 포함) — **JS 핸들러를 추가하면 이중 토글**되므로 추가 금지.
 - 권한: capabilities에 `core:window:allow-close/destroy/minimize/toggle-maximize/is-maximized/start-dragging` 명시 (src-tauri/capabilities/default.json:18-23). 창 컨트롤·드래그가 안 되면 이 목록부터 확인.
 - close 버튼은 `close()` → `onCloseRequested` 훅(아래 9장 closingRef)을 거쳐 flush 후 `destroy()`.
