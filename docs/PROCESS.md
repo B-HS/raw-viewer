@@ -61,7 +61,18 @@
 
 ## 남은 작업
 
-### 사용자 확인 대기 (v0.5.2 빌드로)
+### 진행 중 — UX 고도화 웨이브 (2026-07-18, v0.5.2 실사용 피드백 8건)
+- [x] 1. 메뉴 드롭다운 밖 클릭·Escape 닫힘 — 공용 훅 lib/useDismissOnOutside.ts, 두 메뉴 호버 전환 포함
+- [x] 2. 우측 패널 재오픈 토글 — 우측 엣지 중앙 셰브론, lastRightPanel(persist) 복원
+- [x] 3. 타이틀바 더블클릭 최대화 — 조사 결과 Tauri 2.11.5 네이티브 제공(권한 기본 포함)이라 **코드 무추가**가 정답(핸들러 추가 시 이중 토글). 실기기 재확인만 잔여
+- [x] 4. 좌하단 퀵 바 — ↺↻⇄⇅·크롭, store/geometry.ts 공통화(중복 람다 3곳 → 1)
+- [x] 5. 타이틀바 "UI" 메뉴 — 우측 패널·필름스트립·상태 바·퀵 바·줌/디코드 배지·Perf 체크박스(layout.ts persist, 토글 시 메뉴 유지)
+- [x] 6. 배포 파일명 "Raw Viewer" — productName 변경 + release.yml 자산 선제 점 리네임(latest.json·SHA256SUMS 정합)·가드 글롭화·본문 xattr 갱신. published 0개라 업데이터 무영향
+- [x] 7. Dock 아이콘 — 적용은 됐었고 (a) 가독성 부족 → 선 50·대비 상향, (b) **qlmanage 알파 미보존으로 흰 배경**(사용자 발견) → Chrome 투명 렌더로 재생성·픽셀 검증(bug/2026-07-18-icon-opaque-background.md). 소스 docs/assets/app-icon.svg
+- [x] 8. 컨텍스트 메뉴 위치 번쩍임 — 렌더 시점 좌표 동기화 + useLayoutEffect 클램프(ContextMenu.tsx)
+- [x] 검증: tsc 0 · eslint 0 · bun test 17 · cargo test 통과(exit 0) · i18n 3파일 676키 diff 0 · dev 실기동 스모크(CR2 153장 로드, 퀵 바·UI 메뉴·배지 렌더 확인, 패닉 0)
+- [x] 리뷰 워크플로(4관점+적대 검증) 확정 2건·저심각 4건 전부 반영 — Escape capture+stopPropagation(그리드 동시 닫힘 회귀), 메뉴 role='menu'/'menuitem'+✓ aria-hidden, 컨텍스트 메뉴 재오픈 시 서브메뉴 리셋, 반전 아이콘 SVG(⇄ 의미 충돌 해소), 재오픈 버튼 히트 24px, disabled 호버 제거. 재검증 tsc·eslint·test 통과
+- [ ] 사용자 커밋 지시 대기
 - [ ] v0.5.2 실사용 확인: CR2 폴더 성능(썸네일 자동 채움·먼 사진 클릭·CPU/팬), 새 아이콘·표시명 "Raw Viewer", 선택 표시(필름스트립/그리드), About(작성자·링크), 업데이트 실패 문구, 편집 패널 검색, 줌 슬라이더, 디코드 진행 점, Perf 오버레이(팔레트), 슬라이드쇼 S 자동 넘김(B11), B6(고ISO NR 비교 — CR2 폴더로 가능), B10(fps 비교)
 - [ ] C 그룹: Phase 3 §8.2 수동 35항목([phase3-acceptance.md](./quality-assurance/phase3-acceptance.md)) — 픽스처 항목별 안내 가능
 - [ ] 필름스트립 성능 실측([filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 병목이면 아틀라스 착수

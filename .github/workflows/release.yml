@@ -146,7 +146,11 @@ jobs:
 
       - name: Verify bundle is self-contained
         run: |
-          APP="src-tauri/target/release/bundle/macos/raw-viewer.app"
+          APP=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)
+          if [ -z "$APP" ]; then
+            echo "no .app bundle found under src-tauri/target/release/bundle/macos" >&2
+            exit 1
+          fi
           STATUS=0
           while IFS= read -r BIN; do
             if otool -L "$BIN" | grep -E '/opt/homebrew|/usr/local'; then
@@ -166,8 +170,16 @@ jobs:
           UPDATER_TGZ=$(find src-tauri/target/release/bundle/macos -name '*.app.tar.gz' -maxdepth 1 2>/dev/null | head -1 || true)
           if [ -n "$UPDATER_TGZ" ] && [ -f "$UPDATER_TGZ.sig" ]; then
             cp "$UPDATER_TGZ" "$UPDATER_TGZ.sig" dist-release/
+          fi
+          # GitHub rewrites spaces in release asset names to dots; rename up front so latest.json/SHA256SUMS match the served names
+          for f in dist-release/*' '*; do
+            [ -e "$f" ] || continue
+            mv "$f" "${f// /.}"
+          done
+          RENAMED_TGZ=$(find dist-release -name '*.app.tar.gz' | head -1 || true)
+          if [ -n "$RENAMED_TGZ" ] && [ -f "$RENAMED_TGZ.sig" ]; then
             VERSION=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
-            ASSET=$(basename "$UPDATER_TGZ") SIG_FILE="$UPDATER_TGZ.sig" VERSION="$VERSION" python3 - << 'PYEOF'
+            ASSET=$(basename "$RENAMED_TGZ") SIG_FILE="$RENAMED_TGZ.sig" VERSION="$VERSION" python3 - << 'PYEOF'
           import datetime
           import json
           import os
@@ -201,7 +213,7 @@ jobs:
           draft: true
           files: dist-release/*
           body: |
-            raw-viewer ${{ github.ref_name }} (macOS Apple Silicon)
+            Raw Viewer ${{ github.ref_name }} (macOS Apple Silicon)
 
             서명되지 않은 빌드의 경우 최초 실행 시 다음 명령으로 격리 속성을 해제해야 합니다:
-            `xattr -cr /Applications/raw-viewer.app`
+            `xattr -cr "/Applications/Raw Viewer.app"`

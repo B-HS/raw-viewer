@@ -43,7 +43,8 @@ zustand 스토어 (create 사용):
 | `filter.ts` | 필터 조건(minRating/flag/label/editedOnly/rawOnly/search) + 순수 함수 `isFilterActive`/`matchesFilter` (38-50) |
 | `lens.ts` | 이미지별 렌즈 프로파일 매칭 캐시(`cache: Map`). loadForImage 토큰 레이스 차단, 결과를 `engine.setLensProfile`로 push (6, 33-46) |
 | `meta.ts` | 현재 이미지 메타데이터(`getMetadata` IPC). 섹션 접힘 상태는 localStorage `raw-viewer:meta-collapsed` (6) |
-| `layout.ts` | `rightPanel`('edit'\|'meta'\|'preset'\|'history'\|'none') + `filmstripVisible`. localStorage `raw-viewer:layout` 영속 (5) |
+| `layout.ts` | `rightPanel`('edit'\|'meta'\|'preset'\|'history'\|'none') + `lastRightPanel`(접기 직전 패널 — reopen/toggleRightPanel용) + 표시 플래그 `filmstripVisible`·`quickBarVisible`·`statusBarVisible`·`viewerPillVisible`. localStorage `raw-viewer:layout` 영속 (5) |
+| `geometry.ts` | 스토어 아님 — `rotateBy(±1)`·`toggleFlipH/V` 모듈 액션(editStore.edit 경유). App 키핸들러·CropGeometrySection·QuickBar 3곳 공용 |
 | `presetStore.ts` | 프리셋 목록 + apply/save/remove/XMP import·export. apply는 flushPending → `applyPreset` IPC → `applyServerState`로 편집 상태 재로드 (44-55) |
 | `editClipboard.ts` | 편집 설정 복사/붙여넣기. `sourceImageId`만 보관하고 실제 복사는 백엔드 `copySettings` (pasteTo/pastePrevious/syncSelection 모두 flushPending 선행) |
 | `pairs.ts` | RAW→JPEG 페어 맵 `jpegByRaw` (`get_pairs` IPC, 디렉토리 오픈 시 로드: App.tsx:220) |
@@ -145,7 +146,9 @@ zustand 스토어 (create 사용):
 
 - 전제: 네이티브 창 장식 제거 — `"decorations": false` (src-tauri/tauri.conf.json:20). 풀스크린에서는 TitleBar 자체를 렌더하지 않음 (App.tsx:767, 802).
 - 드래그 영역: `<header data-tauri-drag-region …>` (components/TitleBar.tsx:55-57). 내부 앱명 span은 `pointer-events-none` (58).
-- 구성: 앱명 + 단일 "메뉴" 드롭다운(파일 열기·내보내기·프리셋 가져오기·풀스크린·설정·About, `useModalDismiss`로 ESC/포커스트랩: 34) + 우측 창 컨트롤 3버튼 — `getCurrentWindow().minimize()/toggleMaximize()/close()` (98-133). maximize 상태는 `onResized`+`isMaximized()`로 동기화 (35-52).
+- 구성: 앱명 + "메뉴" 드롭다운(파일 열기·내보내기·프리셋 가져오기·풀스크린·설정·About) + **"UI" 드롭다운**(우측 패널·필름스트립·상태 바·퀵 바·줌/디코드 배지·Perf 체크박스 — 토글해도 메뉴 유지, 상태는 useLayout/useUiStore 반응 구독) + 우측 창 컨트롤 3버튼 — `getCurrentWindow().minimize()/toggleMaximize()/close()`. maximize 상태는 `onResized`+`isMaximized()`로 동기화.
+- 드롭다운 닫힘: `useModalDismiss`(ESC/포커스트랩, 메뉴만) + **`lib/useDismissOnOutside`**(document pointerdown 외부 클릭 + ESC, 두 메뉴 공통). 한 메뉴가 열린 채 다른 메뉴 버튼에 호버하면 전환(메뉴바 관례).
+- **더블클릭 최대화는 Tauri 네이티브**: drag.js(2.11.5)가 macOS에서 mouseup 기반으로 `internal_toggle_maximize`를 invoke(권한은 core:default 기본 포함) — **JS 핸들러를 추가하면 이중 토글**되므로 추가 금지.
 - 권한: capabilities에 `core:window:allow-close/destroy/minimize/toggle-maximize/is-maximized/start-dragging` 명시 (src-tauri/capabilities/default.json:18-23). 창 컨트롤·드래그가 안 되면 이 목록부터 확인.
 - close 버튼은 `close()` → `onCloseRequested` 훅(아래 9장 closingRef)을 거쳐 flush 후 `destroy()`.
 
@@ -199,6 +202,13 @@ for (const [name, keys] of [['ko', new Set(flat(ko))], ['ja', new Set(flat(ja))]
 - **Perf 오버레이**: uiStore.perfVisible + 커맨드 팔레트 "성능 오버레이 토글" 액션.
 - **AboutSummary**(components/): 소개·작성자(@B-HS)·저장소 링크 — About 다이얼로그와 설정>정보 공용. opener 스코프에 `github.com/B-HS/**` 필요.
 - **업데이트 에러 분류**: ipc/updater의 `describeUpdateError`(noRelease/network/unknown) — 수동 확인 실패 토스트에 사유+원문 축약.
+
+## 8.2 2026-07-18 UX 고도화 웨이브 추가분
+
+- **QuickBar**(components/viewport/): 뷰포트 좌하단 ↺↻(rotateBy)·⇄⇅(flip)·크롭 토글. 마운트 조건 `quickBarVisible && !gridActive && !isFullscreen`(App.tsx `quickBarMounted`) — 스캔 배지는 퀵 바 마운트 시 `bottom-12`로 올라감. 편집 상태 없으면 disabled.
+- **우측 패널 재오픈 버튼**: `rightPanel === 'none' && !isFullscreen`일 때 뷰포트 우측 엣지 중앙 셰브론(z-40, GridView 위) — `reopenRightPanel()`로 `lastRightPanel` 복원.
+- **ContextMenu 위치 버그 수정**: 컴포넌트가 닫혀도 언마운트되지 않아 이전 `pos`가 살아 있던 것이 원인 — 스토어 x/y 변경을 **렌더 중 상태 동기화**(origin 비교)로 즉시 반영(+서브메뉴 리셋)하고, 화면 경계 클램프는 `useLayoutEffect`로 페인트 전에 적용. "이전 위치에서 번쩍" 재발 시 이 두 지점을 본다.
+- **UI 표시 플래그 소비처**: 상태 바(App.tsx), 줌/디코드 배지(Viewport.tsx `viewerPillVisible`), 퀵 바(App.tsx). CpuFallbackView·애니메이션 분기의 배지는 플래그 미적용(별도 트리).
 
 ## 9. 함정 목록 (신규 세션 주의사항)
 

@@ -22,6 +22,7 @@ import { EditPanel } from './components/panels/EditPanel'
 import { MetaPanel } from './components/panels/MetaPanel/MetaPanel'
 import { PresetPanel } from './components/panels/PresetPanel'
 import { StatusBar } from './components/StatusBar'
+import { QuickBar } from './components/viewport/QuickBar'
 import { Viewport } from './components/viewport/Viewport'
 import { useSettingsTab } from './components/settings/settingsTab'
 import {
@@ -53,6 +54,7 @@ import { useEditClipboard } from './store/editClipboard'
 import { useEditStore } from './store/editStore'
 import { useExportStore } from './store/exportStore'
 import { isFilterActive, matchesFilter, useFilter } from './store/filter'
+import { rotateBy } from './store/geometry'
 import { useGridView } from './store/gridView'
 import { useHistoryStore } from './store/historyStore'
 import { useLayout } from './store/layout'
@@ -223,6 +225,8 @@ export const App: FC = () => {
     const selectionCount = usePlaylist((state) => state.selection.length)
     const rightPanel = useLayout((state) => state.rightPanel)
     const filmstripVisible = useLayout((state) => state.filmstripVisible)
+    const quickBarVisible = useLayout((state) => state.quickBarVisible)
+    const statusBarVisible = useLayout((state) => state.statusBarVisible)
     const filmstripHeight = useSettings((state) => state.filmstripHeight)
     const toastMessage = useToast((state) => state.message)
     const currentName = usePlaylist((state) => state.entries[state.currentIndex]?.fileName ?? '')
@@ -234,6 +238,8 @@ export const App: FC = () => {
     const sortKey = useSettings((state) => state.sortKey)
     const sortOrder = useSettings((state) => state.sortOrder)
     const { t } = useTranslation()
+
+    const quickBarMounted = quickBarVisible && !gridActive && !isFullscreen
 
     const handleOpen = (path: string) => openImagePath(path, setOpenError)
 
@@ -411,10 +417,6 @@ export const App: FC = () => {
     }, [])
 
     useEffect(() => {
-        const rotate = (delta: number) =>
-            useEditStore.getState().edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), {
-                label: i18n.t('history.rotate'),
-            })
         const cycleAspect = () => {
             const aspect = useEditStore.getState().state?.crop?.aspect ?? 'original'
             applyCropAspect(CROP_ASPECTS[(CROP_ASPECTS.indexOf(aspect) + 1) % CROP_ASPECTS.length])
@@ -448,10 +450,10 @@ export const App: FC = () => {
                 else useEditStore.getState().resetAll()
             } else if (matchAction(event, 'edit.rotateLeft')) {
                 event.preventDefault()
-                rotate(-1)
+                rotateBy(-1)
             } else if (matchAction(event, 'edit.rotateRight')) {
                 event.preventDefault()
-                rotate(1)
+                rotateBy(1)
             } else if (event.metaKey && digitValue(event.code) >= 0) {
                 event.preventDefault()
                 event.stopImmediatePropagation()
@@ -787,7 +789,7 @@ export const App: FC = () => {
                 {!isFullscreen && <TitleBar onOpenFile={pickAndOpen} />}
                 <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-6'>
                     <div className='text-center'>
-                        <h1 className='text-xl font-semibold'>raw-viewer</h1>
+                        <h1 className='text-xl font-semibold'>Raw Viewer</h1>
                         <p className='mt-2 text-sm text-neutral-400'>{t('app.dropHint')}</p>
                     </div>
                     <form
@@ -823,8 +825,10 @@ export const App: FC = () => {
             <div className='flex min-h-0 flex-1'>
                 <div className='relative min-w-0 flex-1' onContextMenu={openContextMenu}>
                     <Viewport />
+                    {quickBarMounted && <QuickBar />}
                     {scanning && (
-                        <div className='absolute bottom-3 left-3 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-300'>
+                        <div
+                            className={`absolute left-3 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-300 ${quickBarMounted ? 'bottom-12' : 'bottom-3'}`}>
                             {total > 0 ? t('app.scanningTotal', { count: entryCount, total }) : t('app.scanning', { count: entryCount })}
                         </div>
                     )}
@@ -838,6 +842,18 @@ export const App: FC = () => {
                     )}
                     <PerfOverlay visible={perfVisible} />
                     {gridActive && <GridView />}
+                    {rightPanel === 'none' && !isFullscreen && (
+                        <button
+                            type='button'
+                            onClick={() => useLayout.getState().reopenRightPanel()}
+                            title={t('app.reopenPanel')}
+                            aria-label={t('app.reopenPanel')}
+                            className='absolute right-0 top-1/2 z-40 flex w-6 -translate-y-1/2 items-center justify-center rounded-l border border-r-0 border-neutral-700 bg-neutral-900/90 py-4 text-neutral-400 hover:text-neutral-100'>
+                            <svg viewBox='0 0 8 12' width='8' height='12' fill='none' stroke='currentColor' strokeWidth='1.5' aria-hidden='true'>
+                                <path d='M6 1 2 6l4 5' />
+                            </svg>
+                        </button>
+                    )}
                 </div>
                 {rightPanel !== 'none' && !isFullscreen && (
                     <div className='flex h-full w-80 shrink-0 flex-col'>
@@ -870,7 +886,7 @@ export const App: FC = () => {
                     </div>
                 </div>
             )}
-            {!isFullscreen && <StatusBar />}
+            {!isFullscreen && statusBarVisible && <StatusBar />}
             {crashLoopVisible && (
                 <div
                     role='alert'

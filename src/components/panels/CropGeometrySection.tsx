@@ -1,6 +1,7 @@
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from '../../store/crop'
+import { rotateBy, toggleFlipH, toggleFlipV } from '../../store/geometry'
 import { DEFAULT_EDIT_STATE } from '../../store/editDefaults'
 import { useEditStore } from '../../store/editStore'
 import { useUiStore } from '../../store/uiStore'
@@ -36,9 +37,6 @@ export const CropGeometrySection: FC = () => {
             onChange={(value) => edit((draft) => void (draft.geometry[key] = value), { coalesceKey: `geometry.${key}`, label })}
         />
     )
-
-    const rotate = (delta: number) =>
-        edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), { label: t('history.rotate') })
 
     return (
         <Section id='crop' title={t('panel.crop.title')}>
@@ -81,7 +79,7 @@ export const CropGeometrySection: FC = () => {
                 <span className='text-xs text-neutral-400'>{t('panel.crop.rotate')}</span>
                 <button
                     type='button'
-                    onClick={() => rotate(-1)}
+                    onClick={() => rotateBy(-1)}
                     title={t('panel.crop.rotateLeftAria')}
                     aria-label={t('panel.crop.rotateLeftAria')}
                     className='rounded bg-neutral-800 px-2 py-1 text-sm leading-none hover:bg-neutral-700'>
@@ -89,26 +87,18 @@ export const CropGeometrySection: FC = () => {
                 </button>
                 <button
                     type='button'
-                    onClick={() => rotate(1)}
+                    onClick={() => rotateBy(1)}
                     title={t('panel.crop.rotateRightAria')}
                     aria-label={t('panel.crop.rotateRightAria')}
                     className='rounded bg-neutral-800 px-2 py-1 text-sm leading-none hover:bg-neutral-700'>
                     ↻
                 </button>
                 <label className='ml-2 flex items-center gap-1 text-xs text-neutral-300'>
-                    <input
-                        type='checkbox'
-                        checked={geometry.flipH}
-                        onChange={(event) => edit((draft) => void (draft.geometry.flipH = event.target.checked), { label: t('history.flipH') })}
-                    />
+                    <input type='checkbox' checked={geometry.flipH} onChange={toggleFlipH} />
                     {t('panel.crop.flipH')}
                 </label>
                 <label className='flex items-center gap-1 text-xs text-neutral-300'>
-                    <input
-                        type='checkbox'
-                        checked={geometry.flipV}
-                        onChange={(event) => edit((draft) => void (draft.geometry.flipV = event.target.checked), { label: t('history.flipV') })}
-                    />
+                    <input type='checkbox' checked={geometry.flipV} onChange={toggleFlipV} />
                     {t('panel.crop.flipV')}
                 </label>
             </div>
