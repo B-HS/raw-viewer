@@ -1,6 +1,8 @@
 import { createExportEngine } from '../exportRenderer'
 import { floatToHalf, halfToFloat } from '../half'
+import { nrUniforms } from '../passUniforms'
 import { NEUTRAL_EDIT_STATE } from '../stateDefaults'
+import { NR_COMPUTE_RADIUS, NR_COMPUTE_SIGMA_SPATIAL } from './wgsl'
 import { WebGpuRenderer } from './webgpuRenderer'
 import type { EditState } from '../../types/EditState'
 import type { LensProfileMatch } from '../../types/LensProfileMatch'
@@ -14,7 +16,15 @@ const MAX_DIFF_LIMIT = 0.012
 const MEAN_DIFF_LIMIT = 0.002
 const GRAIN_MAX_DIFF_LIMIT = 0.5
 
-type Vector = { name: string; flip: number; colorMatrix: number[] | null; lensProfile: LensProfileMatch | null; state: EditState; maxLimit?: number }
+type Vector = {
+    name: string
+    flip: number
+    colorMatrix: number[] | null
+    lensProfile: LensProfileMatch | null
+    state: EditState
+    maxLimit?: number
+    reference?: 'nr'
+}
 
 const cloneState = () => structuredClone(NEUTRAL_EDIT_STATE)
 
@@ -34,6 +44,60 @@ const makeSource = () => {
 
 const CAMERA_MATRIX = [0.9, 0.08, 0.02, 0.05, 0.85, 0.1, 0.01, 0.12, 0.87]
 
+const LUMA = [0.2627, 0.678, 0.0593]
+
+const nrReference = (source: Uint16Array, width: number, height: number, state: EditState) => {
+    const n = nrUniforms(state.detail)
+    const rgb = new Float32Array(width * height * 3)
+    for (let i = 0; i < rgb.length; i++) rgb[i] = halfToFloat(source[i])
+    const out = new Uint16Array(width * height * 4)
+    const thr = 0.05 + (0.004 - 0.05) * n.nrLumaDetail
+    const cthr = 0.2 + (0.02 - 0.2) * n.nrColorDetail
+    const lumaOf = (index: number) => rgb[index] * LUMA[0] + rgb[index + 1] * LUMA[1] + rgb[index + 2] * LUMA[2]
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const center = (y * width + x) * 3
+            const y0 = lumaOf(center)
+            const chroma0 = [rgb[center] - y0, rgb[center + 1] - y0, rgb[center + 2] - y0]
+            let sumY = 0
+            let sumW = 0
+            const sumC = [0, 0, 0]
+            let sumCW = 0
+            for (let dy = -NR_COMPUTE_RADIUS; dy <= NR_COMPUTE_RADIUS; dy++) {
+                for (let dx = -NR_COMPUTE_RADIUS; dx <= NR_COMPUTE_RADIUS; dx++) {
+                    const sx = Math.min(width - 1, Math.max(0, x + dx))
+                    const sy = Math.min(height - 1, Math.max(0, y + dy))
+                    const s = (sy * width + sx) * 3
+                    const ys = lumaOf(s)
+                    const sw = Math.exp(-(dx * dx + dy * dy) / (2 * NR_COMPUTE_SIGMA_SPATIAL * NR_COMPUTE_SIGMA_SPATIAL))
+                    const rw = Math.exp(-((ys - y0) * (ys - y0)) / (2 * thr * thr)) * sw
+                    sumY += ys * rw
+                    sumW += rw
+                    const cs = [rgb[s] - ys, rgb[s + 1] - ys, rgb[s + 2] - ys]
+                    const dc0 = cs[0] - chroma0[0]
+                    const dc1 = cs[1] - chroma0[1]
+                    const dc2 = cs[2] - chroma0[2]
+                    const cw = Math.exp(-(dc0 * dc0 + dc1 * dc1 + dc2 * dc2) / (2 * cthr * cthr)) * sw
+                    sumC[0] += cs[0] * cw
+                    sumC[1] += cs[1] * cw
+                    sumC[2] += cs[2] * cw
+                    sumCW += cw
+                }
+            }
+            const yd = sumY / sumW
+            let ynew = y0 + (yd - y0) * n.nrLuma
+            ynew = ynew + (y0 - ynew) * (n.nrLumaContrast * (1 - n.nrLuma) * 0.5)
+            const outIndex = (y * width + x) * 4
+            for (let ch = 0; ch < 3; ch++) {
+                const chroma = chroma0[ch] + (sumC[ch] / sumCW - chroma0[ch]) * n.nrColor
+                out[outIndex + ch] = floatToHalf(Math.max(ynew + chroma, 0))
+            }
+            out[outIndex + 3] = floatToHalf(1)
+        }
+    }
+    return { width, height, data: out }
+}
+
 const LENS_PROFILE: LensProfileMatch = {
     profileId: 'parity-lens',
     lensName: 'Parity 50mm',
@@ -47,7 +111,7 @@ const buildVectors = (): Vector[] => {
     const push = (
         name: string,
         mutate: (state: EditState) => void,
-        extra?: Partial<Pick<Vector, 'flip' | 'colorMatrix' | 'lensProfile' | 'maxLimit'>>,
+        extra?: Partial<Pick<Vector, 'flip' | 'colorMatrix' | 'lensProfile' | 'maxLimit' | 'reference'>>,
     ) => {
         const state = cloneState()
         mutate(state)
@@ -96,13 +160,23 @@ const buildVectors = (): Vector[] => {
         state.lens.manualVignette = -40
     })
     push('lens-profile', () => undefined, { lensProfile: LENS_PROFILE })
-    push('detail', (state) => {
-        state.detail.nrLuminance = 50
-        state.detail.nrColor = 40
+    push('sharpen', (state) => {
         state.detail.sharpenAmount = 60
         state.detail.sharpenRadius = 1.5
         state.detail.sharpenMasking = 30
     })
+    push(
+        'nr-compute',
+        (state) => {
+            state.baseCurve = 'linear'
+            state.detail.nrLuminance = 60
+            state.detail.nrColor = 50
+            state.detail.nrLumaDetail = 50
+            state.detail.nrColorDetail = 50
+            state.detail.nrLumaContrast = 20
+        },
+        { reference: 'nr' },
+    )
     push('effects', (state) => {
         state.effects.clarity = 40
         state.effects.dehaze = 25
@@ -155,19 +229,26 @@ const collectWebGl = async (source: Uint16Array, vector: Vector) => {
     return { width: job.width, height: job.height, data: out }
 }
 
-const compare = (a: Uint16Array, b: Uint16Array) => {
+const compare = (a: Uint16Array, b: Uint16Array, width: number) => {
     let maxDiff = 0
     let sum = 0
     let count = 0
+    let worst = ''
     for (let i = 0; i < a.length; i += 4) {
         for (let ch = 0; ch < 3; ch++) {
-            const diff = Math.abs(halfToFloat(a[i + ch]) - halfToFloat(b[i + ch]))
-            if (diff > maxDiff) maxDiff = diff
+            const va = halfToFloat(a[i + ch])
+            const vb = halfToFloat(b[i + ch])
+            const diff = Math.abs(va - vb)
+            if (diff > maxDiff) {
+                maxDiff = diff
+                const pixel = i / 4
+                worst = `@(${pixel % width},${Math.floor(pixel / width)})ch${ch} ref=${va.toFixed(4)} got=${vb.toFixed(4)}`
+            }
             sum += diff
             count++
         }
     }
-    return { maxDiff, meanDiff: sum / count }
+    return { maxDiff, meanDiff: sum / count, worst }
 }
 
 const run = async () => {
@@ -177,6 +258,11 @@ const run = async () => {
     const emit = (line: string) => {
         lines.push(line)
         out.textContent = lines.join('\n')
+    }
+    const originalConsoleError = console.error
+    console.error = (...args: unknown[]) => {
+        originalConsoleError(...args)
+        emit(`CONSOLE: ${args.map((item) => String(item)).join(' ')}`)
     }
     const canvas = document.createElement('canvas')
     canvas.width = 4
@@ -194,7 +280,7 @@ const run = async () => {
     let failures = 0
     for (const vector of buildVectors()) {
         try {
-            const reference = await collectWebGl(source, vector)
+            const reference = vector.reference === 'nr' ? nrReference(source, SOURCE_W, SOURCE_H, vector.state) : await collectWebGl(source, vector)
             const candidate = await gpu.renderExport(
                 { width: SOURCE_W, height: SOURCE_H, data: source, colorMatrix: vector.colorMatrix, flip: vector.flip },
                 vector.state,
@@ -205,12 +291,32 @@ const run = async () => {
                 emit(`FAIL ${vector.name} size ${reference.width}x${reference.height} vs ${candidate.width}x${candidate.height}`)
                 continue
             }
-            const { maxDiff, meanDiff } = compare(reference.data, candidate.data)
+            const { maxDiff, meanDiff, worst } = compare(reference.data, candidate.data, reference.width)
             const maxLimit = vector.maxLimit ?? MAX_DIFF_LIMIT
             const meanLimit = vector.maxLimit != null ? vector.maxLimit : MEAN_DIFF_LIMIT
             const pass = maxDiff <= maxLimit && meanDiff <= meanLimit
             if (!pass) failures++
-            emit(`${pass ? 'PASS' : 'FAIL'} ${vector.name} max=${maxDiff.toFixed(5)} mean=${meanDiff.toFixed(6)}`)
+            emit(`${pass ? 'PASS' : 'FAIL'} ${vector.name} max=${maxDiff.toFixed(5)} mean=${meanDiff.toFixed(6)}${pass ? '' : ` ${worst}`}`)
+            if (!pass) {
+                for (const [px, py] of [
+                    [0, 0],
+                    [16, 0],
+                    [64, 0],
+                    [120, 0],
+                    [126, 0],
+                    [127, 0],
+                    [0, 16],
+                    [0, 48],
+                    [0, 92],
+                    [0, 95],
+                    [64, 48],
+                    [127, 93],
+                ]) {
+                    const base = (py * reference.width + px) * 4
+                    const fmt = (arr: Uint16Array) => [0, 1, 2].map((ch) => halfToFloat(arr[base + ch]).toFixed(4)).join(',')
+                    emit(`  px(${px},${py}) ref=[${fmt(reference.data)}] got=[${fmt(candidate.data)}]`)
+                }
+            }
         } catch (error) {
             failures++
             emit(`FAIL ${vector.name} error=${error instanceof Error ? error.message : 'unknown'}`)

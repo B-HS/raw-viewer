@@ -267,11 +267,13 @@ fn bandValue(v0: vec4f, v1: vec4f, i: i32) -> f32 {
 }
 `
 
-export const WGSL_NR = /* wgsl */ `
-${FULLSCREEN_VERT}
-${COMMON}
+export const NR_COMPUTE_RADIUS = 4
+export const NR_COMPUTE_SIGMA_SPATIAL = 2.0
+export const NR_COMPUTE_WORKGROUP = 16
+
+export const WGSL_NR_COMPUTE = /* wgsl */ `
 struct U {
-    texel: vec2f,
+    size: vec2f,
     nrLuma: f32,
     nrLumaDetail: f32,
     nrLumaContrast: f32,
@@ -280,31 +282,48 @@ struct U {
     pad: f32,
 }
 @group(0) @binding(0) var<uniform> u: U;
-@group(0) @binding(1) var tex: texture_2d<f32>;
-@group(0) @binding(2) var samp: sampler;
-@fragment fn fs(in: VsOut) -> @location(0) vec4f {
-    let c = textureSampleLevel(tex, samp, in.uv, 0.0).rgb;
-    let y0 = luma(c);
-    let chroma0 = c - y0;
+@group(0) @binding(1) var src: texture_2d<f32>;
+@group(0) @binding(2) var dst: texture_storage_2d<rgba16float, write>;
+const RADIUS: i32 = ${NR_COMPUTE_RADIUS};
+const GROUP: i32 = ${NR_COMPUTE_WORKGROUP};
+const TILE: i32 = GROUP + 2 * RADIUS;
+const SIGMA_S: f32 = ${NR_COMPUTE_SIGMA_SPATIAL};
+var<workgroup> tileRgb: array<vec3f, ${(NR_COMPUTE_WORKGROUP + 2 * NR_COMPUTE_RADIUS) * (NR_COMPUTE_WORKGROUP + 2 * NR_COMPUTE_RADIUS)}>;
+fn luma(c: vec3f) -> f32 { return dot(c, vec3f(0.2627, 0.678, 0.0593)); }
+@compute @workgroup_size(${NR_COMPUTE_WORKGROUP}, ${NR_COMPUTE_WORKGROUP})
+fn cs(@builtin(workgroup_id) wid: vec3u, @builtin(local_invocation_id) lid: vec3u, @builtin(local_invocation_index) lindex: u32) {
+    let origin = vec2i(wid.xy) * GROUP - RADIUS;
+    let maxCoord = vec2i(u.size) - 1;
+    var index = i32(lindex);
+    while (index < TILE * TILE) {
+        let t = origin + vec2i(index % TILE, index / TILE);
+        tileRgb[index] = textureLoad(src, clamp(t, vec2i(0), maxCoord), 0).rgb;
+        index += GROUP * GROUP;
+    }
+    workgroupBarrier();
+    let gid = vec2i(wid.xy) * GROUP + vec2i(lid.xy);
+    if (gid.x > maxCoord.x || gid.y > maxCoord.y) { return; }
+    let local = vec2i(lid.xy) + RADIUS;
+    let center = tileRgb[local.y * TILE + local.x];
+    let y0 = luma(center);
+    let chroma0 = center - y0;
     let thr = mix(0.05, 0.004, u.nrLumaDetail);
-    var dilations = array<f32, 3>(1.0, 2.0, 4.0);
-    var weights = array<f32, 3>(0.5, 0.3, 0.2);
-    var dirs = array<vec2f, 4>(vec2f(1.0, 0.0), vec2f(-1.0, 0.0), vec2f(0.0, 1.0), vec2f(0.0, -1.0));
-    var sumY = y0;
-    var sumW = 1.0;
-    var sumC = chroma0;
-    var sumCW = 1.0;
-    for (var l = 0; l < 3; l++) {
-        for (var k = 0; k < 4; k++) {
-            let off = dirs[k] * dilations[l] * u.texel;
-            let s = textureSampleLevel(tex, samp, in.uv + off, 0.0).rgb;
+    let cthr = mix(0.2, 0.02, u.nrColorDetail);
+    var sumY = 0.0;
+    var sumW = 0.0;
+    var sumC = vec3f(0.0);
+    var sumCW = 0.0;
+    for (var dy = -RADIUS; dy <= RADIUS; dy++) {
+        for (var dx = -RADIUS; dx <= RADIUS; dx++) {
+            let s = tileRgb[(local.y + dy) * TILE + (local.x + dx)];
             let ys = luma(s);
-            let rw = exp(-(ys - y0) * (ys - y0) / (2.0 * thr * thr)) * weights[l];
+            let sw = exp(-f32(dx * dx + dy * dy) / (2.0 * SIGMA_S * SIGMA_S));
+            let rw = exp(-(ys - y0) * (ys - y0) / (2.0 * thr * thr)) * sw;
             sumY += ys * rw;
             sumW += rw;
-            let cthr = mix(0.2, 0.02, u.nrColorDetail);
             let cs = s - ys;
-            let cw = exp(-dot(cs - chroma0, cs - chroma0) / (2.0 * cthr * cthr)) * weights[l];
+            let dc = cs - chroma0;
+            let cw = exp(-dot(dc, dc) / (2.0 * cthr * cthr)) * sw;
             sumC += cs * cw;
             sumCW += cw;
         }
@@ -313,7 +332,7 @@ struct U {
     var ynew = mix(y0, yd, u.nrLuma);
     ynew = mix(ynew, y0, u.nrLumaContrast * (1.0 - u.nrLuma) * 0.5);
     let chroma = mix(chroma0, sumC / sumCW, u.nrColor);
-    return vec4f(max(vec3f(ynew) + chroma, vec3f(0.0)), 1.0);
+    textureStore(dst, gid, vec4f(max(vec3f(ynew) + chroma, vec3f(0.0)), 1.0));
 }
 `
 

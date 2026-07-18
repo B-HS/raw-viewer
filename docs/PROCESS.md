@@ -48,7 +48,7 @@
 ## 현재 상태 스냅샷 (2026-07-18 저녁 기준)
 
 - **저장소**: 공개(public), MIT 라이선스 인식됨, 언어 통계 정상(TS 51%/Rust 47%). 브랜치 dev=prod 동기화 상태.
-- **최신 릴리스 태그**: **v0.4.0** (draft — publish는 사용자 담당). v0.3.1부터 자동 업데이트 자산 포함. v0.1.1~v0.3.0 draft 4개는 의도적 유지.
+- **최신 릴리스 태그**: **v0.5.0** (draft — publish는 사용자 담당. WebGPU 백엔드+compute NR 포함, 실화면 검증은 이 빌드로 수행 예정). v0.3.1부터 자동 업데이트 자산 포함. v0.1.1~v0.4.0 draft는 의도적 유지.
 - **시크릿**: Apple 서명·공증 5종 + `TAURI_SIGNING_PRIVATE_KEY` 등록 완료. updater 개인키 = `~/raw-viewer-updater.key`(재생성 금지·백업 필요).
 - **테스트**: Rust 324건 + 프론트 bun test 17건 + E2E 디코드 스모크 12건. eslint 에러 0(경고 31 — C2-후속). CI(PR·수동)와 릴리스 워크플로 모두 그린.
 - **기능 상태**: RAW 16기종 + 일반 포맷(jpg/png/webp/tiff/bmp/gif/heic/heif/avif, 임베디드 ICC 반영) 뷰잉·비파괴 편집·프리셋·Export(래스터 배치+DNG)·정렬 5종·슬라이드쇼·전체화면·커스텀 타이틀바·파일 조작(rename/move/copy)·애니메이션 재생·다국어(한/영/일)·자동 업데이트.
@@ -70,6 +70,13 @@
 - [x] V3. 백엔드 선택 배관 — settings `renderBackend`(기본 webgl2, 설정>성능에서 WebGPU 실험적 옵트인), useRenderEngine async 초기화 + WebGPU 실패 시 WebGL2→CPU 강등, engineApi는 `EngineBackend`(Pick 유도)로 중립화
 - [x] V4. 패리티 하니스(parity.html + parityMain.ts) — headless Chrome(Metal)에서 17벡터 **ALL PASS**: 12벡터 완전 일치, geometry 0.00366·lens 0.00098(보간 미세차)·grain 0.086(hash 미세차, 관용 내). orient flip5/6 매핑 오류를 수식 유도로 발견·수정 후 재실행 확정
 - [x] V5. 검증 — tsc·eslint 0/0, bun test 17, 프로덕션 빌드, i18n diff 0, tauri dev 실기동(기본 WebGL2 경로 생존·frontend ready·패닉 0). Rust 무변경(cargo 생략). phase6-contract 상태 갱신 후 단일 커밋
+
+## 완료: 6h + v0.5.0 (2026-07-18 사용자 지시 — "6h·docs 마치고 0.5.0으로 커밋, 나머지 테스트는 빌드판에서")
+
+- [x] N1. 6h NR compute — workgroup 공유 메모리 9×9 양방향 필터(WebGPU 전용, WebGL2는 기존 유지). 하니스에 TS 참조 구현 대조 벡터 추가 → 18벡터 ALL PASS(nr-compute 0.00098)
+- [x] N2. 하니스 디버깅 부산물 — 최악 픽셀 진단 출력, uncaptured error 리포팅(`device.onuncapturederror` — 제품에도 반입), "baseCurve='standard'는 중립에서도 CURVE 활성" 함정을 phase6-contract에 기록
+- [x] N3. docs 최신화 — phase6-contract(6h·검증 상태), architecture-frontend, release.md, decisions.md
+- [x] N4. v0.5.0 상향(3파일+lock) → 검증 사다리(tsc·lint 0/0, bun test 17, 빌드, i18n 0, tauri dev 스모크) → 커밋·push → prod 병합 → v0.5.0 태그
 
 ## 남은 작업 (전부 사용자 재석·결정 대기 — 자율 진행 가능 항목은 2026-07-18 웨이브에서 소진)
 
