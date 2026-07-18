@@ -1,6 +1,6 @@
 # raw-viewer 프론트엔드 아키텍처 (src/)
 
-기준 커밋 시점: 2026-07-18 잔여 작업 웨이브(React Compiler 도입·useRenderEngine 재구조화·uiStore 엔진 단일화) 반영 (dev 브랜치). 모든 경로는 저장소 루트 기준. 근거의 `파일:라인`은 이 시점 기준이며 이후 시프트될 수 있다 — 구조 서술을 우선 신뢰.
+기준 커밋 시점: 2026-07-18 v0.5.2(마무리 웨이브 — §8.1 추가분 포함) 반영 (dev 브랜치). 모든 경로는 저장소 루트 기준. 근거의 `파일:라인`은 이 시점 기준이며 이후 시프트될 수 있다 — 구조 서술을 우선 신뢰.
 
 스택: Vite 6 + React 18 + **React Compiler**(babel-plugin-react-compiler target 18 + react-compiler-runtime — vite.config.ts, 2026-07-18 도입) + TypeScript strict + zustand 5 + immer 11 + i18next/react-i18next + Tailwind 3 + @tanstack/react-virtual + Tauri v2 API (package.json). 스크립트: `dev`(vite) / `typecheck`(tsc --noEmit) / `test`(bun test src) / `lint`(eslint src) / `build`. eslint는 react-hooks v7 컴파일러 진단 포함(경고 0 유지 — `incompatible-library`만 config off, 사유는 acknowledge).
 
@@ -187,6 +187,18 @@ for (const [name, keys] of [['ko', new Set(flat(ko))], ['ja', new Set(flat(ja))]
 - 순수 로직을 추가할 때 keymap/filter/sortEntries처럼 **스토어 비의존 모듈로 빼면** 바로 테스트 대상이 된다 (keymap.ts가 import 0개인 이유).
 
 ---
+
+## 8.1 2026-07-18 마무리 웨이브 추가분
+
+- **편집 패널 검색**: EditPanel이 `SECTION_LABEL_KEYS`(섹션별 라벨 i18n 키 인덱스)로 필터 — **함정: 섹션에 컨트롤을 추가하면 이 인덱스에도 키를 추가**해야 검색에 잡힌다. 검색어 유무 전환 시 key 변경으로 섹션 재마운트(접힘 리셋).
+- **ZoomControl**(components/viewport/): 뷰포트 우하단 배지에 5~200% 슬라이더. `requestZoom({ ratio })` — viewportCommand의 ZoomCommand에 객체 배율이 추가됨.
+- **선택 표시**: FilmstripCell/GridCell은 ring/outline이 아니라 **셀 최상위 `absolute inset-0` 보더 오버레이 span**으로 active/selected/hover 표시(라벨 inline boxShadow와 충돌하지 않는 유일한 방식으로 확정).
+- **전방 L0 프리로드**: App.tsx가 스캔 완료·currentIndex 변경 디바운스(800ms)에 `preloadL0`(ipc/performance)로 전방 미로딩 id 최대 500장 전송. useRenderEngine의 onLevelReady는 **창(±3) 밖 L0 이벤트도 `setLevel`로 기록**(fetch 없이 — 필름스트립 셀이 `?rev=` 변경으로 자동 리로드).
+- **재방문 L0 즉시 표시**: fetchAndUpload의 상위 레벨 가드에 `renderer.hasImage` 결합 — best가 l1이어도 텍스처가 없으면 L0을 수용해 먼저 그린다.
+- **디코드 진행 점**: Viewport 배지에 L0·L1·L2 3단 점(LEVEL_RANK 기반).
+- **Perf 오버레이**: uiStore.perfVisible + 커맨드 팔레트 "성능 오버레이 토글" 액션.
+- **AboutSummary**(components/): 소개·작성자(@B-HS)·저장소 링크 — About 다이얼로그와 설정>정보 공용. opener 스코프에 `github.com/B-HS/**` 필요.
+- **업데이트 에러 분류**: ipc/updater의 `describeUpdateError`(noRelease/network/unknown) — 수동 확인 실패 토스트에 사유+원문 축약.
 
 ## 9. 함정 목록 (신규 세션 주의사항)
 

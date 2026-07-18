@@ -4,9 +4,8 @@
 
 ## 현재 상태 스냅샷 (2026-07-18)
 
-- 최신 태그: **v0.5.0** (React Compiler, WebGPU 백엔드 실험적 옵트인+compute NR, react-hooks 경고 0, store 권한 축소. 실화면 검증은 이 빌드로 수행 예정). 릴리스는 draft로 생성됨 — **publish는 사용자가 직접**.
+- 최신 태그: **v0.5.2** (파이프라인 재설계·마무리 UI 9건·새 아이콘·표시명 Raw Viewer). 릴리스는 draft — **publish는 사용자가 직접**. v0.1.1~v0.5.1 draft는 의도적 유지.
 - v0.3.1부터 updater 자산(`latest.json`·`.app.tar.gz`·`.sig`) 포함 — 서명 시크릿 등록 완료 상태.
-- v0.1.1~v0.4.0 draft는 **의도적으로 draft 유지**(사용자 결정 — 미검증·결함 버전 비공개).
 - 자동 업데이트는 **published 릴리스 중 최신**(`releases/latest`)을 본다 — draft만 있으면 업데이트 확인이 실패(무해)하므로, 배포하려면 최신 릴리스를 publish해야 한다.
 - 등록된 시크릿 (총 6): `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `TAURI_SIGNING_PRIVATE_KEY`.
 
