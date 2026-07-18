@@ -75,18 +75,17 @@
 - [x] 리뷰 워크플로(4관점+적대 검증) 확정 2건·저심각 4건 전부 반영 — Escape capture+stopPropagation(그리드 동시 닫힘 회귀), 메뉴 role='menu'/'menuitem'+✓ aria-hidden, 컨텍스트 메뉴 재오픈 시 서브메뉴 리셋, 반전 아이콘 SVG(⇄ 의미 충돌 해소), 재오픈 버튼 히트 24px, disabled 호버 제거. 재검증 tsc·eslint·test 통과
 - [x] 커밋 `23b0717` → dev·prod push → v0.5.3 상향(`5d3f7e3`) → 워밍 적중 릴리스(Verify 228s+빌드 240s) → draft 자산 5종·latest.json URL 정합 확인
 
-### 사용자 확인 대기 (v0.5.3 빌드로)
-- [ ] UX 웨이브 확인: 파일명 `Raw Viewer.app`(구 raw-viewer.app 수동 삭제), Dock 아이콘 투명 배경, 메뉴 밖 클릭 닫힘, UI 메뉴 토글, 퀵 바, 패널 재오픈 셰브론, 컨텍스트 메뉴 위치, **타이틀바 더블클릭 최대화(코드 무추가 — Tauri 네이티브 동작 확인, 안 되면 재조사)**
-- [ ] v0.5.2 이월 확인: CR2 폴더 성능(썸네일 자동 채움·먼 사진 클릭·CPU/팬), 선택 표시(필름스트립/그리드), About(작성자·링크), 업데이트 실패 문구, 편집 패널 검색, 줌 슬라이더, 디코드 진행 점, Perf 오버레이(팔레트), 슬라이드쇼 S 자동 넘김(B11), B6(고ISO NR 비교 — CR2 폴더로 가능), B10(fps 비교)
-- [ ] C 그룹: Phase 3 §8.2 수동 35항목([phase3-acceptance.md](./quality-assurance/phase3-acceptance.md)) — 픽스처 항목별 안내 가능
-- [ ] 필름스트립 성능 실측([filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 병목이면 아틀라스 착수
-- [ ] WebGPU 시각 검증(phase6 §2.1) — 옵트인 후 육안·fps. 통과 시 기본 백엔드화 여부 결정
-- [ ] 자동 업데이트 왕복 실검증 — v0.5.2 설치본에서 0.5.3 감지·설치 (publish는 2026-07-18 완료)
+### 사용자 확인 완료 (2026-07-18, v0.5.3 빌드로 전부 pass)
+- [x] UX 웨이브 확인(파일명·아이콘 투명·메뉴 닫힘·UI 메뉴·퀵 바·재오픈·컨텍스트 메뉴·더블클릭 최대화) — pass
+- [x] 자동 업데이트 왕복(v0.5.2 → 0.5.3 감지·설치) — pass
+- [x] v0.5.2 이월 확인(CR2 성능·선택 표시·About·검색·줌·진행 점·Perf·슬라이드쇼·B6·B10 등) — pass
+- [x] WebGPU 시각 검증(phase6 §2.1) — pass. **잔여 결정: 기본 백엔드화 여부**
 
 ### 사용자 결정·외부 조건 대기
+- [ ] WebGPU 기본 백엔드화 여부 — 시각 검증 pass, 사용자 결정 대기
 - [ ] 로컬 보정 — PRD §12.2 보류, [초안](./local-adjustments-draft.md)만. 별도 PRD 합의 필요
 - [ ] Windows/Linux — 하드웨어 확보 전 차단 / Intel·유니버설 빌드 — dnglab x86_64 확보 결정 필요
-- [ ] updater 개인키(`~/raw-viewer-updater.key`) 백업 — 사용자 할 일 (분실 시 기존 사용자 업데이트 영구 불능)
+- [x] updater 개인키 위치 정리 — `~/environment/raw-viewer-updater.key`로 이동(2026-07-18, 바이트 비교 검증). 머신 외부 백업은 여전히 권장
 
 ## SPEC-GAP 로그 (활성)
 - (build.rs) libjpeg 미링크: LibRaw의 lossy-JPEG 압축 DNG·일부 내장 썸네일 디코딩 불가 가능.
