@@ -51,7 +51,8 @@
 ## 현재 상태 스냅샷 (2026-07-18 심야 기준)
 
 - **저장소**: 공개(public), MIT. dev=prod 동기화.
-- **최신 릴리스 태그**: **v0.5.3** (UX 고도화 8건+파일명 "Raw Viewer" 전환, draft — publish는 사용자 담당). 자산명은 점 표기(`Raw.Viewer_0.5.3_aarch64.dmg`·`Raw.Viewer.app.tar.gz`)이며 latest.json URL 일치 검증 완료. v0.1.1~v0.5.2 draft는 의도적 유지. 자동 업데이트는 published 최신만 바라봄(아직 publish 0개).
+- **최신 릴리스**: **v0.5.3 = 첫 공개(published) 릴리스** (2026-07-18, "Raw Viewer 0.5.3" — 영문 릴리스 노트+스크린샷). 자산명은 점 표기(`Raw.Viewer_0.5.3_aarch64.dmg`·`Raw.Viewer.app.tar.gz`)이며 latest.json·자산 URL 200 확인 — **자동 업데이트 엔드포인트 라이브**(기설치 v0.5.2가 0.5.3을 감지해야 함 → 왕복 실검증 가능). v0.1.1~v0.5.2 draft는 의도적 유지.
+- **README.md 작성 완료**(영문·히어로 스크린샷 docs/assets/screenshot.jpg·기능 요약·설치·단축키) — prod 반영.
 - **시크릿**: Apple 서명·공증 5종 + `TAURI_SIGNING_PRIVATE_KEY` 등록 완료. updater 개인키 = `~/raw-viewer-updater.key`(재생성 금지·**백업은 아직 사용자 미완**).
 - **테스트**: Rust 324건 + 프론트 bun test 17건 + E2E 디코드 스모크 12건 + WebGPU 패리티 하니스 18벡터(parity.html, headless Chrome). eslint 에러 0·경고 0.
 - **CI**: PR CI + 릴리스(태그) + **prod push 캐시 워밍**(warm-release-cache.yml — 릴리스 콜드 빌드 해소, 14.5분→~11분).
@@ -80,10 +81,9 @@
 - [ ] C 그룹: Phase 3 §8.2 수동 35항목([phase3-acceptance.md](./quality-assurance/phase3-acceptance.md)) — 픽스처 항목별 안내 가능
 - [ ] 필름스트립 성능 실측([filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 병목이면 아틀라스 착수
 - [ ] WebGPU 시각 검증(phase6 §2.1) — 옵트인 후 육안·fps. 통과 시 기본 백엔드화 여부 결정
-- [ ] 릴리스 publish(사용자) → 자동 업데이트 왕복 실검증
+- [ ] 자동 업데이트 왕복 실검증 — v0.5.2 설치본에서 0.5.3 감지·설치 (publish는 2026-07-18 완료)
 
 ### 사용자 결정·외부 조건 대기
-- [ ] README.md — 실사용 스크린샷 확보 후 작성
 - [ ] 로컬 보정 — PRD §12.2 보류, [초안](./local-adjustments-draft.md)만. 별도 PRD 합의 필요
 - [ ] Windows/Linux — 하드웨어 확보 전 차단 / Intel·유니버설 빌드 — dnglab x86_64 확보 결정 필요
 - [ ] updater 개인키(`~/raw-viewer-updater.key`) 백업 — 사용자 할 일 (분실 시 기존 사용자 업데이트 영구 불능)
