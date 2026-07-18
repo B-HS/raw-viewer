@@ -34,6 +34,11 @@
 - **아틀라스**: 측정 하니스만 문서화(quality-assurance/filmstrip-performance.md), 실측 전 미착수 유지.
 - **WebGPU**: phase6-contract.md 체결 — 하이브리드(부분 채용) 배제, 전체 이식 로드맵. 6a(감지·진단)만 반입, 6b+는 실기동 검증 필수라 사용자 재석 대기.
 
+## 2026-07-18 (WebGPU 일괄 구현)
+- **단계별 재석 게이트 해제 지시**: "3번(WebGPU) 빼고는 다 테스트니까 구현을 전부 먼저 하고 테스트를 한꺼번에" — phase6 6b~6g·6i를 일괄 구현. 검증 공백은 headless Chrome 패리티 하니스(parity.html, 17벡터 ALL PASS)로 메움.
+- **기본 백엔드는 WebGL2 유지**: WebGPU는 설정 > 성능의 "WebGPU (실험적)" 옵트인. 시각 재석 검증 통과 후 기본화 여부 재결정.
+- 6h(NR compute 업그레이드)는 출력이 의도적으로 달라지는 개선이라 별도 화질 튜닝·재석 필요로 미착수 유지.
+
 ## 보류·미결로 확정된 것
 - WebGPU 백엔드: 조사 문서만(docs/webgpu-assessment.md), 착수는 별도 지시 대기.
 - 로컬 보정: PRD §12.2 보류 유지, 스키마 초안만(docs/local-adjustments-draft.md).

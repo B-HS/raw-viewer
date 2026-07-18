@@ -18,17 +18,19 @@ assessment의 "다음 단계 2"(히스토그램 compute를 WebGL2 렌더 결과�
 
 ## 2. 단계 (체크리스트)
 
-- [x] 6a. 감지 계층 — `src/gl/webgpu/detect.ts`: `navigator.gpu` 유무 → adapter/device 요청 → `shader-f16` feature 감지. 결과는 `WebGpuSupport`로 정규화. 설정 > 정보에서 진단 표시(사용자가 자기 환경 확인 가능).
-- [ ] 6b. 컨텍스트 스파이크 — canvas `webgpu` 컨텍스트 구성(`getPreferredCanvasFormat`), rgba16float 렌더 타깃 생성, 단색 클리어 프레임 표시. **실기동 검증 필수(사용자 재석)** — WKWebView에서 실제 프레임이 보이는지.
-- [ ] 6c. 업로드 경로 — AETH f16 → `GPUTexture(rgba16float)` 업로드(RGB→RGBA 패딩), L0 JPEG → `copyExternalImageToTexture`.
-- [ ] 6d. 패스 이식 1차 — pass1(WB+행렬)과 pass8(출력 변환)만 WGSL로: "업로드→WB→출력"의 최소 사진 표시. 패리티 벡터 §4로 WebGL2와 비교.
-- [ ] 6e. 패스 이식 2차 — TONE/CURVE/COLOR (LUT 텍스처 공유 구조 유지).
-- [ ] 6f. 패스 이식 3차 — GEOMETRY/DETAIL/EFFECTS + 타일링(MAX_TEXTURE_SIZE 상당 — `maxTextureDimension2D`).
-- [ ] 6g. 히스토그램 compute — processed 텍스처에서 workgroup atomics로 256빈 집계, `mapAsync` 비동기 readback(메인스레드 stall 제거, 1/8 축소 불필요 → 풀해상도 정확도).
-- [ ] 6h. NR compute — WGSL workgroup 공유 메모리 타일 처리(assessment 2단계).
-- [ ] 6i. 백엔드 선택 배관 — useRenderEngine에서 감지 결과로 구현체 선택, 설정 > 성능에 강제 백엔드 옵션(디버그), 3단 폴백 자동화.
+> **방침 변경 (2026-07-18 사용자 지시)**: "테스트만 남기고 구현을 전부 먼저" — 단계별 재석 게이트 대신 6b~6g·6i를 일괄 구현하고, headless Chrome 패리티 하니스(§4)로 수치 검증을 선행했다. 시각 확인만 사용자 재석 항목으로 남는다.
 
-> 6b부터는 **각 단계가 실기동 시각 검증을 통과해야 다음으로** 넘어간다(§8.1 검증 사다리 + 사용자 재석). 헤드리스 세션에서는 6a까지만 반입한다 — 무검증 GPU 코드 대량 반입 금지.
+- [x] 6a. 감지 계층 — `src/gl/webgpu/detect.ts` + 설정 > 성능 진단 표시.
+- [x] 6b~6c. 컨텍스트·업로드 — `WebGpuRenderer.create`(adapter/device → configure, display-p3 시도), AETH f16 → rgba16float(RGB→RGBA 패딩, 512행 청크 업로드, 한도 초과 시 CPU box 다운스케일), L0 → `copyExternalImageToTexture`.
+- [x] 6d~6f. 패스 전체 이식 — `src/gl/webgpu/wgsl.ts`에 pass1~8·NR·샤프닝·orient WGSL(GLSL 수식 일대일, uniformity 제약은 `textureSampleLevel`로 회피), `webgpuRenderer.ts`가 dirty 스테이지 캐시·buildBase·compare/side-by-side/crop/clipping/모니터 LUT까지 Renderer와 동일 구조로 구현.
+- [x] 6g. 히스토그램 compute — workgroup atomics 256빈 4채널, `mapAsync` 비동기 readback, 150ms 스로틀. GL의 1/8 축소와 달리 **풀해상도** 집계.
+- [ ] 6h. NR compute 업그레이드 — 패리티 목표(기존 출력 동일)와 달리 **출력이 의도적으로 달라지는** 개선이라 별도 화질 튜닝·재석 필요. 미착수.
+- [x] 6i. 백엔드 선택 — settings `renderBackend`(기본 **webgl2**, 설정 > 성능에서 "WebGPU (실험적)" 옵트인), useRenderEngine이 async 초기화·실패 시 WebGL2→CPU 자동 강등. samplePixel은 비동기 미러(≤1024, 120ms 스로틀)로 동기 계약 유지.
+
+## 2.1 검증 상태 (2026-07-18)
+
+- **수치 패리티 통과**: headless Chrome(150, Metal)에서 `parity.html` 하니스 17벡터 — WebGL2(exportRenderer) 기준 f16 비교. 결과: 12벡터 완전 일치(max=0), geometry max=0.00366·lens max=0.00098(보간 미세차), grain max=0.086(hash f32 미세차, 관용 내), flip3/5/6 완전 일치. `PARITY: ALL PASS (17)`.
+- **남은 검증(사용자 재석)**: WKWebView 실기동에서 WebGPU 옵트인 후 시각 확인(뷰포트 표시·줌팬·compare·크롭·클리핑·샘플러 핀·히스토그램), Perf 오버레이로 WebGL2 대비 fps 비교. 기본값이 WebGL2라 미검증 상태로도 사용자 영향 없음.
 
 ## 3. 파일 배치
 

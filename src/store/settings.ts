@@ -12,6 +12,8 @@ export type AppTheme = 'system' | 'dark' | 'light'
 
 export type L2Policy = 'always' | 'idle' | 'zoom'
 
+export type RenderBackend = 'webgl2' | 'webgpu'
+
 export type SettingsValues = {
     language: AppLanguage
     theme: AppTheme
@@ -29,6 +31,7 @@ export type SettingsValues = {
     sortKey: SortKey
     sortOrder: SortOrder
     autoUpdateCheck: boolean
+    renderBackend: RenderBackend
     shortcutOverrides: Record<string, Binding>
 }
 
@@ -66,6 +69,7 @@ const DEFAULTS: SettingsValues = {
     sortKey: 'name',
     sortOrder: 'asc',
     autoUpdateCheck: true,
+    renderBackend: 'webgl2',
     shortcutOverrides: {},
 }
 
@@ -106,6 +110,7 @@ const isSortOrder = (value: unknown): value is SortOrder => value === 'asc' || v
 const isLanguage = (value: unknown): value is AppLanguage => value === 'system' || value === 'ko' || value === 'en' || value === 'ja'
 const isTheme = (value: unknown): value is AppTheme => value === 'system' || value === 'dark' || value === 'light'
 const isL2Policy = (value: unknown): value is L2Policy => value === 'always' || value === 'idle' || value === 'zoom'
+const isRenderBackend = (value: unknown): value is RenderBackend => value === 'webgl2' || value === 'webgpu'
 
 type SettingsStore = SettingsValues & {
     hydrated: boolean
@@ -127,6 +132,7 @@ type SettingsStore = SettingsValues & {
     setSlideshowInterval: (ms: number) => void
     setSort: (key: SortKey, order: SortOrder) => void
     setAutoUpdateCheck: (enabled: boolean) => void
+    setRenderBackend: (backend: RenderBackend) => void
     setShortcutBinding: (id: string, binding: Binding) => void
     resetShortcutBinding: (id: string) => void
     resetShortcutBindings: () => void
@@ -155,6 +161,7 @@ export const useSettings = create<SettingsStore>((set, get) => ({
             const sortKey = await store.get('sortKey')
             const sortOrder = await store.get('sortOrder')
             const autoUpdateCheck = await store.get('autoUpdateCheck')
+            const renderBackend = await store.get('renderBackend')
             const shortcutOverrides = await store.get('shortcutOverrides')
             values = {
                 language: isLanguage(language) ? language : DEFAULTS.language,
@@ -174,6 +181,7 @@ export const useSettings = create<SettingsStore>((set, get) => ({
                 sortKey: isSortKey(sortKey) ? sortKey : DEFAULTS.sortKey,
                 sortOrder: isSortOrder(sortOrder) ? sortOrder : DEFAULTS.sortOrder,
                 autoUpdateCheck: typeof autoUpdateCheck === 'boolean' ? autoUpdateCheck : DEFAULTS.autoUpdateCheck,
+                renderBackend: isRenderBackend(renderBackend) ? renderBackend : DEFAULTS.renderBackend,
                 shortcutOverrides: sanitizeOverrides(shortcutOverrides),
             }
         } catch {}
@@ -246,6 +254,10 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     setAutoUpdateCheck: (enabled) => {
         set({ autoUpdateCheck: enabled })
         persist('autoUpdateCheck', enabled)
+    },
+    setRenderBackend: (backend) => {
+        set({ renderBackend: backend })
+        persist('renderBackend', backend)
     },
     setSort: (key, order) => {
         set({ sortKey: key, sortOrder: order })

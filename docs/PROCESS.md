@@ -63,6 +63,14 @@
 - [x] W5. 검증 사다리 전체 통과 — tsc 0에러, eslint 0에러·0경고, bun test 17, cargo test 324, 프로덕션 빌드(compiler 적용 확인), tauri dev 실기동 스모크(frontend ready 도달·15초 생존·패닉 0) 후 단일 커밋
 - 사용자 필요로 제외: Phase 3 수동 35항목(재석), v0.4.0 publish·업데이트 왕복(사용자 publish), README(스크린샷), Windows/Linux(하드웨어), Intel 빌드(dnglab x86_64 결정), 로컬 보정(PRD §12.2 — 별도 PRD 합의 필요)
 
+## 완료: WebGPU 6b~6i 일괄 구현 (2026-07-18 사용자 지시 — "테스트만 남기고 구현 전부 먼저", 커밋은 마지막 1회)
+
+- [x] V1. WGSL 전체 이식(`src/gl/webgpu/wgsl.ts`) — pass1~8·NR·샤프닝·orient·히스토그램 compute, GLSL과 수식 일대일 대응(uniformity 제약은 textureSampleLevel로 회피)
+- [x] V2. `WebGpuRenderer`(`src/gl/webgpu/webgpuRenderer.ts`) — Renderer 동일 공개 표면: 업로드(f16 RGBA 패딩·청크), dirty 스테이지 캐시, pass8 뷰포트(compare/side-by-side/crop/clipping/LUT), buildBase, 히스토그램 compute+mapAsync, samplePixel 비동기 미러, renderExport(패리티·export 경로)
+- [x] V3. 백엔드 선택 배관 — settings `renderBackend`(기본 webgl2, 설정>성능에서 WebGPU 실험적 옵트인), useRenderEngine async 초기화 + WebGPU 실패 시 WebGL2→CPU 강등, engineApi는 `EngineBackend`(Pick 유도)로 중립화
+- [x] V4. 패리티 하니스(parity.html + parityMain.ts) — headless Chrome(Metal)에서 17벡터 **ALL PASS**: 12벡터 완전 일치, geometry 0.00366·lens 0.00098(보간 미세차)·grain 0.086(hash 미세차, 관용 내). orient flip5/6 매핑 오류를 수식 유도로 발견·수정 후 재실행 확정
+- [x] V5. 검증 — tsc·eslint 0/0, bun test 17, 프로덕션 빌드, i18n diff 0, tauri dev 실기동(기본 WebGL2 경로 생존·frontend ready·패닉 0). Rust 무변경(cargo 생략). phase6-contract 상태 갱신 후 단일 커밋
+
 ## 남은 작업 (전부 사용자 재석·결정 대기 — 자율 진행 가능 항목은 2026-07-18 웨이브에서 소진)
 
 - [ ] Phase 3 수동 검증: §8.2 수동 35항목(quality-assurance 문서), Z8 고효율 NEF 육안, 신규 UI(타이틀바·CPU 폴백·그리드·TAT) 시각 확인 + 2026-07-18 웨이브 회귀 확인(패널·필름스트립·CPU 폴백·샘플러 핀·팔레트) — 사용자 재석 필요

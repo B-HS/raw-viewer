@@ -5,6 +5,19 @@ import type { EditState } from '../types/EditState'
 import type { LensProfileMatch } from '../types/LensProfileMatch'
 import type { WbState } from '../types/WbState'
 
+export type EngineBackend = Pick<
+    Renderer,
+    | 'setEditState'
+    | 'setLensProfile'
+    | 'setClipping'
+    | 'setCompare'
+    | 'setSideBySide'
+    | 'setCropEditMode'
+    | 'setUseMonitorProfile'
+    | 'onHistogram'
+    | 'samplePixel'
+>
+
 export type EngineApi = {
     setEditState: (state: EditState | null) => void
     setLensProfile: (imageId: string | null, profile: LensProfileMatch | null) => void
@@ -19,7 +32,7 @@ export type EngineApi = {
     tempTintFromGains: (gains: [number, number, number]) => { temp: number; tint: number }
 }
 
-export const createEngineApi = (renderer: Renderer, requestRender: () => void): EngineApi => ({
+export const createEngineApi = (renderer: EngineBackend, requestRender: () => void): EngineApi => ({
     setEditState: (state) => {
         renderer.setEditState(state)
         requestRender()
