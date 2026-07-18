@@ -58,7 +58,7 @@ pub async fn open_in_new_window(path: PathBuf, app: AppHandle, queue: State<'_, 
     let label = queue.next_window_label();
     queue.enqueue_for_window(&label, path);
     tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::default())
-        .title("raw-viewer")
+        .title("Raw Viewer")
         .inner_size(1280.0, 800.0)
         .min_inner_size(900.0, 600.0)
         .decorations(false)
@@ -111,6 +111,12 @@ pub async fn navigate(
 ) -> AppResult<()> {
     edits.on_navigate(&image_id);
     state.pipeline.navigate(window.label(), image_id, prev_ids, next_ids);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn preload_l0(image_ids: Vec<String>, state: State<'_, AppState>) -> AppResult<()> {
+    state.pipeline.preload_l0(image_ids);
     Ok(())
 }
 

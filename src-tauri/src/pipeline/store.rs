@@ -82,6 +82,11 @@ impl PixelStore {
         inner.current = image_id;
     }
 
+    pub fn current(&self) -> Option<String> {
+        let inner = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
+        inner.current.clone()
+    }
+
     pub fn contains(&self, image_id: &str, level: ProxyLevel) -> bool {
         let inner = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
         inner.map.contains_key(&(image_id.to_owned(), level))

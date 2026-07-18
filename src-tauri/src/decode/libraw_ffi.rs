@@ -440,16 +440,23 @@ pub fn decode(path: &Path, level: DecodeLevel, cancel: &CancelFlag) -> Result<De
 
         let samples = unsafe { std::slice::from_raw_parts(image.data.as_ptr() as *const u16, sample_count) };
         let mut rgb_f16 = Vec::with_capacity(width * height * 3);
+        const CANCEL_CHECK_STRIDE: usize = 1 << 20;
         if out_colors == 3 {
-            for &sample in samples {
-                rgb_f16.push(f16::from_f32(sample as f32 / 65535.0));
+            for chunk in samples.chunks(CANCEL_CHECK_STRIDE) {
+                check_cancel(cancel)?;
+                for &sample in chunk {
+                    rgb_f16.push(f16::from_f32(sample as f32 / 65535.0));
+                }
             }
         } else {
-            for &sample in samples {
-                let value = f16::from_f32(sample as f32 / 65535.0);
-                rgb_f16.push(value);
-                rgb_f16.push(value);
-                rgb_f16.push(value);
+            for chunk in samples.chunks(CANCEL_CHECK_STRIDE) {
+                check_cancel(cancel)?;
+                for &sample in chunk {
+                    let value = f16::from_f32(sample as f32 / 65535.0);
+                    rgb_f16.push(value);
+                    rgb_f16.push(value);
+                    rgb_f16.push(value);
+                }
             }
         }
 

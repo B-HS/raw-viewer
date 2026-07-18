@@ -6,7 +6,7 @@ import { aetherUrl } from '../../ipc/pixels'
 import { useEditStore } from '../../store/editStore'
 import { useHistogram } from '../../store/histogramStore'
 import { useLens } from '../../store/lens'
-import { usePlaylist } from '../../store/playlist'
+import { LEVEL_RANK, usePlaylist } from '../../store/playlist'
 import { useUiStore } from '../../store/uiStore'
 import { CpuFallbackView } from './CpuFallbackView'
 import { CropOverlay } from './CropOverlay'
@@ -15,6 +15,8 @@ import { SamplerPinsOverlay } from './SamplerPinsOverlay'
 import { TatOverlay } from './TatOverlay'
 import { useRenderEngine } from './useRenderEngine'
 import { ZoomControl } from './ZoomControl'
+
+const LEVEL_STEPS = ['l0', 'l1', 'l2'] as const
 
 export const Viewport: FC = () => {
     const { t } = useTranslation()
@@ -174,6 +176,14 @@ export const Viewport: FC = () => {
                 <div className='pointer-events-none absolute bottom-3 right-3 flex items-center gap-2 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-200'>
                     <ZoomControl />
                     <span>{level ? t(`viewport.level.${level.level}`) : t('viewport.decoding')}</span>
+                    <span className='flex items-center gap-1' title={t('viewport.decodeProgress')} aria-label={t('viewport.decodeProgress')}>
+                        {LEVEL_STEPS.map((step) => (
+                            <span
+                                key={step}
+                                className={`h-1.5 w-1.5 rounded-full ${level && LEVEL_RANK[level.level] >= LEVEL_RANK[step] ? 'bg-sky-400' : 'bg-neutral-600'}`}
+                            />
+                        ))}
+                    </span>
                     {(!level || level.level !== 'l2') && (
                         <span className='h-3 w-3 animate-spin rounded-full border-2 border-neutral-500 border-t-neutral-200' />
                     )}

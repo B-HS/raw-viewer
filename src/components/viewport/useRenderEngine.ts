@@ -90,7 +90,7 @@ export const useRenderEngine = () => {
             const fetchAndUpload = async (payload: LevelReadyPayload) => {
                 if (disposed) return
                 const known = usePlaylist.getState().best[payload.imageId]
-                if (known && LEVEL_RANK[known.level] > LEVEL_RANK[payload.level]) return
+                if (known && LEVEL_RANK[known.level] > LEVEL_RANK[payload.level] && renderer.hasImage(payload.imageId)) return
                 const key = `${payload.imageId}:${payload.level}`
                 fetches.get(key)?.abort()
                 const controller = new AbortController()
@@ -339,7 +339,11 @@ export const useRenderEngine = () => {
                 const level = await onLevelReady((payload) => {
                     const state = usePlaylist.getState()
                     const index = state.entries.findIndex((entry) => entry.imageId === payload.imageId)
-                    if (index < 0 || Math.abs(index - state.currentIndex) > WINDOW_RADIUS) return
+                    if (index < 0) return
+                    if (Math.abs(index - state.currentIndex) > WINDOW_RADIUS) {
+                        if (payload.level === 'l0') state.setLevel(payload)
+                        return
+                    }
                     fetchAndUpload(payload)
                 })
                 const failed = await onDecodeFailed((payload) => {

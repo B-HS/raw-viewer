@@ -22,10 +22,12 @@ pub const PRIO_CURRENT_L0: u32 = 0;
 pub const PRIO_CURRENT_L1: u32 = 10;
 pub const PRIO_CURRENT_L2: u32 = 20;
 pub const PRIO_NEIGHBOR_BASE: u32 = 100;
+pub const PRIO_PRELOAD_BASE: u32 = 200;
 
 const RAPID_WINDOW: Duration = Duration::from_millis(100);
-const IDLE_DELAY: Duration = Duration::from_millis(150);
+const IDLE_DELAY: Duration = Duration::from_millis(400);
 const TIMER_POLL: Duration = Duration::from_millis(250);
+const LIGHT_WORKERS: usize = 2;
 
 pub struct Services {
     pub registry: Registry,
@@ -137,7 +139,9 @@ impl PendingSet {
 struct Shared {
     app: AppHandle,
     services: Arc<Services>,
-    queue: JobQueue,
+    queue_light: JobQueue,
+    queue_heavy: JobQueue,
+    l0_gen: Mutex<CancelFlag>,
     meta: Mutex<HashMap<(String, ProxyLevel), LevelMeta>>,
     active: Mutex<HashMap<String, CancelFlag>>,
     pending: PendingSet,
@@ -157,7 +161,9 @@ impl Pipeline {
         let shared = Arc::new(Shared {
             app,
             services,
-            queue: JobQueue::new(),
+            queue_light: JobQueue::new(),
+            queue_heavy: JobQueue::new(),
+            l0_gen: Mutex::new(Arc::new(AtomicBool::new(false))),
             meta: Mutex::new(HashMap::new()),
             active: Mutex::new(HashMap::new()),
             pending: PendingSet::default(),
@@ -167,11 +173,17 @@ impl Pipeline {
             settings: RwLock::new(PerfSettings::default()),
             crash_count: AtomicU32::new(0),
         });
-        for _ in 0..worker_count() {
+        for _ in 0..LIGHT_WORKERS {
             let worker_shared = Arc::clone(&shared);
             let _ = std::thread::Builder::new()
-                .name("decode-worker".to_owned())
-                .spawn(move || run_worker(worker_shared));
+                .name("decode-worker-light".to_owned())
+                .spawn(move || run_worker(worker_shared, WorkerLane::Light));
+        }
+        for _ in 0..heavy_worker_count() {
+            let worker_shared = Arc::clone(&shared);
+            let _ = std::thread::Builder::new()
+                .name("decode-worker-heavy".to_owned())
+                .spawn(move || run_worker(worker_shared, WorkerLane::Heavy));
         }
         let timer_shared = Arc::clone(&shared);
         let _ = std::thread::Builder::new()
@@ -199,20 +211,31 @@ impl Pipeline {
     pub fn request_l2(&self, image_id: String) {
         self.shared.enqueue_current(&image_id, ProxyLevel::L2, PRIO_CURRENT_L2);
     }
+
+    pub fn preload_l0(&self, image_ids: Vec<String>) {
+        self.shared.preload_l0(image_ids);
+    }
 }
 
 impl Drop for Pipeline {
     fn drop(&mut self) {
         self.shared.shutdown.store(true, Ordering::Relaxed);
-        self.shared.queue.shutdown();
+        self.shared.queue_light.shutdown();
+        self.shared.queue_heavy.shutdown();
         self.shared.idle.1.notify_all();
     }
 }
 
-fn worker_count() -> usize {
-    // SPEC-GAP: contract asks for physical_cores-1; std has no physical-core count without an extra crate, so available_parallelism (logical) is used as a proxy. Exact on Apple Silicon (no SMT).
+#[derive(Clone, Copy)]
+enum WorkerLane {
+    Light,
+    Heavy,
+}
+
+fn heavy_worker_count() -> usize {
+    // SPEC-GAP: the original physical_cores-1 sizing assumed single-threaded decodes; LibRaw runs OpenMP teams (OMP_NUM_THREADS capped in main.rs), so heavy decode concurrency is bounded to keep workers x team size near the core count.
     let logical = std::thread::available_parallelism().map(|value| value.get()).unwrap_or(4);
-    logical.saturating_sub(1).max(2)
+    (logical / 4).clamp(2, 4)
 }
 
 fn union_desired(nav: &HashMap<String, WindowNav>) -> HashSet<String> {
@@ -230,9 +253,6 @@ fn neighbor_jobs(prev: &[String], next: &[String], out: &mut Vec<(u32, String, P
         for (index, id) in list.iter().enumerate() {
             let base = PRIO_NEIGHBOR_BASE + (index as u32) * 2;
             out.push((base, id.clone(), ProxyLevel::L0));
-            if index <= 1 {
-                out.push((base + 1, id.clone(), ProxyLevel::L1));
-            }
         }
     }
 }
@@ -334,6 +354,44 @@ impl Shared {
         Arc::clone(active.entry(id.to_owned()).or_insert_with(|| Arc::new(AtomicBool::new(false))))
     }
 
+    fn l0_flag(&self) -> CancelFlag {
+        Arc::clone(&self.l0_gen.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    fn flag_for(&self, id: &str, level: ProxyLevel) -> CancelFlag {
+        if level == ProxyLevel::L0 {
+            self.l0_flag()
+        } else {
+            self.cancel_for(id)
+        }
+    }
+
+    fn queue_for(&self, level: ProxyLevel) -> &JobQueue {
+        if level == ProxyLevel::L0 {
+            &self.queue_light
+        } else {
+            &self.queue_heavy
+        }
+    }
+
+    fn preload_l0(&self, image_ids: Vec<String>) {
+        let flag = {
+            let mut gen = self.l0_gen.lock().unwrap_or_else(PoisonError::into_inner);
+            gen.store(true, Ordering::Relaxed);
+            *gen = Arc::new(AtomicBool::new(false));
+            Arc::clone(&gen)
+        };
+        for (index, id) in image_ids.into_iter().enumerate() {
+            if self.services.store.contains(&id, ProxyLevel::L0) {
+                continue;
+            }
+            if self.pending.reserve(&id, ProxyLevel::L0, &flag) {
+                self.queue_light
+                    .push(PRIO_PRELOAD_BASE.saturating_add(index as u32), id, ProxyLevel::L0, Arc::clone(&flag));
+            }
+        }
+    }
+
     fn cancel_outside(&self, window: &HashSet<String>) {
         let mut active = self.active.lock().unwrap_or_else(PoisonError::into_inner);
         active.retain(|id, flag| {
@@ -380,9 +438,9 @@ impl Shared {
             self.reemit(id, level);
             return;
         }
-        let flag = self.cancel_for(id);
+        let flag = self.flag_for(id, level);
         if self.pending.reserve(id, level, &flag) {
-            self.queue.push(priority, id.to_owned(), level, flag);
+            self.queue_for(level).push(priority, id.to_owned(), level, flag);
         }
     }
 
@@ -390,9 +448,9 @@ impl Shared {
         if self.services.store.contains(id, level) {
             return;
         }
-        let flag = self.cancel_for(id);
+        let flag = self.flag_for(id, level);
         if self.pending.reserve(id, level, &flag) {
-            self.queue.push(priority, id.to_owned(), level, flag);
+            self.queue_for(level).push(priority, id.to_owned(), level, flag);
         }
     }
 
@@ -409,6 +467,9 @@ impl Shared {
             return;
         }
         if self.services.store.contains(&job.image_id, job.level) {
+            return;
+        }
+        if job.level == ProxyLevel::L2 && self.services.store.current().as_deref() != Some(job.image_id.as_str()) {
             return;
         }
         let path = match self.services.registry.resolve(&job.image_id) {
@@ -542,8 +603,12 @@ impl Shared {
     }
 }
 
-fn run_worker(shared: Arc<Shared>) {
-    while let Some(job) = shared.queue.pop_blocking() {
+fn run_worker(shared: Arc<Shared>, lane: WorkerLane) {
+    let queue = match lane {
+        WorkerLane::Light => &shared.queue_light,
+        WorkerLane::Heavy => &shared.queue_heavy,
+    };
+    while let Some(job) = queue.pop_blocking() {
         shared.process_job(job);
     }
 }
@@ -702,17 +767,15 @@ mod tests {
     }
 
     #[test]
-    fn plan_jobs_normal_enqueues_current_l0_l1_and_neighbors() {
+    fn plan_jobs_normal_enqueues_current_l0_l1_and_neighbor_l0_only() {
         let jobs = plan_jobs("cur", &ids(&["p1", "p2", "p3"]), &ids(&["n1"]), false);
         assert_eq!(jobs[0], (PRIO_CURRENT_L0, "cur".to_owned(), ProxyLevel::L0));
         assert_eq!(jobs[1], (PRIO_CURRENT_L1, "cur".to_owned(), ProxyLevel::L1));
         assert!(jobs.contains(&(PRIO_NEIGHBOR_BASE, "p1".to_owned(), ProxyLevel::L0)));
-        assert!(jobs.contains(&(PRIO_NEIGHBOR_BASE + 1, "p1".to_owned(), ProxyLevel::L1)));
         assert!(jobs.contains(&(PRIO_NEIGHBOR_BASE + 2, "p2".to_owned(), ProxyLevel::L0)));
-        assert!(jobs.contains(&(PRIO_NEIGHBOR_BASE + 3, "p2".to_owned(), ProxyLevel::L1)));
         assert!(jobs.contains(&(PRIO_NEIGHBOR_BASE + 4, "p3".to_owned(), ProxyLevel::L0)));
-        assert!(!jobs.contains(&(PRIO_NEIGHBOR_BASE + 5, "p3".to_owned(), ProxyLevel::L1)));
         assert!(jobs.contains(&(PRIO_NEIGHBOR_BASE, "n1".to_owned(), ProxyLevel::L0)));
+        assert!(jobs.iter().all(|(_, id, level)| id == "cur" || *level == ProxyLevel::L0));
     }
 
     #[test]
@@ -731,8 +794,8 @@ mod tests {
     }
 
     #[test]
-    fn worker_count_is_at_least_two() {
-        assert!(worker_count() >= 2);
+    fn heavy_worker_count_is_bounded() {
+        assert!((2..=4).contains(&heavy_worker_count()));
     }
 
     #[test]
