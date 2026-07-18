@@ -25,8 +25,9 @@ import type { ViewState } from '../viewTransform'
 import { wbGainsFromState } from '../wbModel'
 import type { ClippingMode, CompareSplit } from '../viewTypes'
 import {
+    NR_COMPUTE_WORKGROUP,
     WGSL_HISTOGRAM,
-    WGSL_NR,
+    WGSL_NR_COMPUTE,
     WGSL_ORIENT,
     WGSL_PASS1,
     WGSL_PASS2,
@@ -143,6 +144,7 @@ export class WebGpuRenderer {
     private fullscreenPipelines = new Map<string, GPURenderPipeline>()
     private pass8Pipeline!: GPURenderPipeline
     private histogramPipeline!: GPUComputePipeline
+    private nrComputePipeline!: GPUComputePipeline
     private quadBuffer!: GPUBuffer
     private linearSampler!: GPUSampler
     private nearestSampler!: GPUSampler
@@ -207,6 +209,7 @@ export class WebGpuRenderer {
         const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
         if (!adapter) throw new Error('webgpu adapter unavailable')
         const device = await adapter.requestDevice()
+        device.onuncapturederror = (event) => console.error('webgpu uncaptured error:', event.error.message)
         const context = canvas.getContext('webgpu')
         if (!context) {
             device.destroy()
@@ -253,6 +256,10 @@ export class WebGpuRenderer {
             layout: 'auto',
             compute: { module: device.createShaderModule({ code: WGSL_HISTOGRAM }), entryPoint: 'cs' },
         })
+        this.nrComputePipeline = device.createComputePipeline({
+            layout: 'auto',
+            compute: { module: device.createShaderModule({ code: WGSL_NR_COMPUTE }), entryPoint: 'cs' },
+        })
 
         this.baseLut = this.createCurveTexture(buildBaseCurveLut(256, 'standard'))
         this.baseLutStandard = this.createCurveTexture(buildBaseCurveLut(256, 'standard'))
@@ -285,7 +292,7 @@ export class WebGpuRenderer {
             width,
             height,
             PROC_FORMAT,
-            GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+            GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.STORAGE_BINDING,
         )
     }
 
@@ -624,9 +631,22 @@ export class WebGpuRenderer {
         return data
     }
 
-    private nrUniform(texel: [number, number]) {
+    private runNrCompute(encoder: GPUCommandEncoder, input: GPUTexture, output: GPUTexture, width: number, height: number) {
         const n = nrUniforms(this.editState.detail)
-        return new Float32Array([texel[0], texel[1], n.nrLuma, n.nrLumaDetail, n.nrLumaContrast, n.nrColor, n.nrColorDetail, 0])
+        const uniform = new Float32Array([width, height, n.nrLuma, n.nrLumaDetail, n.nrLumaContrast, n.nrColor, n.nrColorDetail, 0])
+        const bindGroup = this.device.createBindGroup({
+            layout: this.nrComputePipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: this.uniformBuffer(uniform) } },
+                { binding: 1, resource: input.createView() },
+                { binding: 2, resource: output.createView() },
+            ],
+        })
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.nrComputePipeline)
+        pass.setBindGroup(0, bindGroup)
+        pass.dispatchWorkgroups(Math.ceil(width / NR_COMPUTE_WORKGROUP), Math.ceil(height / NR_COMPUTE_WORKGROUP))
+        pass.end()
     }
 
     private sharpenUniform(texel: [number, number]) {
@@ -700,15 +720,7 @@ export class WebGpuRenderer {
             let stageInput = input
             if (nrActive) {
                 const dst = sharpenActive ? this.scratchTarget(0) : target
-                this.drawFullscreen(
-                    encoder,
-                    this.fullscreenPipeline('nr', WGSL_NR),
-                    dst,
-                    this.nrUniform(texel),
-                    [stageInput],
-                    this.linearSampler,
-                    true,
-                )
+                this.runNrCompute(encoder, stageInput, dst, this.procW, this.procH)
                 stageInput = dst
             }
             if (sharpenActive) {
@@ -1208,15 +1220,7 @@ export class WebGpuRenderer {
                 if (nrActive) {
                     if (sharpenActive && !scratch) scratch = makeTarget()
                     const dst = sharpenActive && scratch ? scratch : output
-                    this.drawFullscreen(
-                        encoder,
-                        this.fullscreenPipeline('nr', WGSL_NR),
-                        dst,
-                        this.nrUniform(texel),
-                        [stageInput],
-                        this.linearSampler,
-                        true,
-                    )
+                    this.runNrCompute(encoder, stageInput, dst, width, height)
                     stageInput = dst
                 }
                 if (sharpenActive) {

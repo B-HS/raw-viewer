@@ -24,12 +24,13 @@ assessment의 "다음 단계 2"(히스토그램 compute를 WebGL2 렌더 결과�
 - [x] 6b~6c. 컨텍스트·업로드 — `WebGpuRenderer.create`(adapter/device → configure, display-p3 시도), AETH f16 → rgba16float(RGB→RGBA 패딩, 512행 청크 업로드, 한도 초과 시 CPU box 다운스케일), L0 → `copyExternalImageToTexture`.
 - [x] 6d~6f. 패스 전체 이식 — `src/gl/webgpu/wgsl.ts`에 pass1~8·NR·샤프닝·orient WGSL(GLSL 수식 일대일, uniformity 제약은 `textureSampleLevel`로 회피), `webgpuRenderer.ts`가 dirty 스테이지 캐시·buildBase·compare/side-by-side/crop/clipping/모니터 LUT까지 Renderer와 동일 구조로 구현.
 - [x] 6g. 히스토그램 compute — workgroup atomics 256빈 4채널, `mapAsync` 비동기 readback, 150ms 스로틀. GL의 1/8 축소와 달리 **풀해상도** 집계.
-- [ ] 6h. NR compute 업그레이드 — 패리티 목표(기존 출력 동일)와 달리 **출력이 의도적으로 달라지는** 개선이라 별도 화질 튜닝·재석 필요. 미착수.
+- [x] 6h. NR compute 업그레이드 (2026-07-18) — 프래그먼트 12샘플 à-trous 근사를 **workgroup 공유 메모리 타일(24×24 halo) 기반 9×9 양방향 필터**로 대체(`WGSL_NR_COMPUTE`): 공간 가우시안(σ=2) × 휘도/채도 범위 가중, 슬라이더 임계 체계(thr/cthr)는 기존과 동일 유지. WebGPU 백엔드 전용 — WebGL2는 기존 프래그먼트 NR 유지(백엔드 간 NR 출력이 의도적으로 다름). 검증은 하니스의 `nr-compute` 벡터 — **동일 알고리즘의 TS 참조 구현과 비교** max=0.00098(f16 정밀도 수준).
 - [x] 6i. 백엔드 선택 — settings `renderBackend`(기본 **webgl2**, 설정 > 성능에서 "WebGPU (실험적)" 옵트인), useRenderEngine이 async 초기화·실패 시 WebGL2→CPU 자동 강등. samplePixel은 비동기 미러(≤1024, 120ms 스로틀)로 동기 계약 유지.
 
 ## 2.1 검증 상태 (2026-07-18)
 
-- **수치 패리티 통과**: headless Chrome(150, Metal)에서 `parity.html` 하니스 17벡터 — WebGL2(exportRenderer) 기준 f16 비교. 결과: 12벡터 완전 일치(max=0), geometry max=0.00366·lens max=0.00098(보간 미세차), grain max=0.086(hash f32 미세차, 관용 내), flip3/5/6 완전 일치. `PARITY: ALL PASS (17)`.
+- **수치 패리티 통과**: headless Chrome(150, Metal)에서 `parity.html` 하니스 **18벡터 ALL PASS** — 17벡터는 WebGL2(exportRenderer) 기준 f16 비교(13벡터 완전 일치, geometry 0.00366·lens 0.00098 보간 미세차, grain 0.086 hash 미세차 관용 내, flip3/5/6 일치), `nr-compute`는 동일 알고리즘의 TS 참조 구현 기준(0.00098).
+- 하니스 함정 기록: `NEUTRAL_EDIT_STATE.baseCurve='standard'`라 **CURVE 스테이지는 "중립" 상태에서도 항상 활성**이다. 특정 스테이지만 검증하는 벡터는 `baseCurve='linear'`로 꺼야 한다(nr-compute 디버깅에서 발견 — TS 참조가 CURVE를 몰라 전면 불일치로 보였음).
 - **남은 검증(사용자 재석)**: WKWebView 실기동에서 WebGPU 옵트인 후 시각 확인(뷰포트 표시·줌팬·compare·크롭·클리핑·샘플러 핀·히스토그램), Perf 오버레이로 WebGL2 대비 fps 비교. 기본값이 WebGL2라 미검증 상태로도 사용자 영향 없음.
 
 ## 3. 파일 배치
