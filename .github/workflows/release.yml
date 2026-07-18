@@ -37,6 +37,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # shared with warm-release-cache.yml (prod) so tag runs restore a hot cache;
+          # saving from a tag ref is useless to later runs, so skip it there
+          shared-key: release
+          save-if: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
       - uses: actions/cache@v4
         with:

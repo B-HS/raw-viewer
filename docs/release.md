@@ -17,13 +17,19 @@
 | `.github/workflows/ci.yml` | dev/prod 대상 PR, 수동 실행 | prettier → tsc → eslint → bun test → clippy(-D warnings) → cargo test(픽스처 포함) → E2E 디코드 스모크(`scripts/e2e-decode.sh`) → 프론트 빌드 |
 | `.github/workflows/release.yml` | `v*` 태그 푸시, 수동 실행 | 태그=버전 일치 검증 → bun test → `cargo test --release`(빌드와 컴파일 공유) → Apple 서명 구성(시크릿 조건부, IDENTITY는 .p12에서 자동 추출) → updater 서명 구성(조건부) → `tauri build` → **자기완결성 가드**(번들이 `/opt/homebrew`·`/usr/local` dylib 링크 시 실패) → DMG·SHA256SUMS·updater 자산·latest.json을 **draft 릴리스**로 업로드 |
 
-설계 근거: CI를 push마다 돌리지 않는 것은 비공개 시절 과금 때문이었으나, 릴리스가 자체 검증을 수행해 태그 릴리스가 단독으로 안전하므로 공개 후에도 유지. clippy는 lint라 PR CI 전용. 릴리스 테스트를 release 프로필로 돌리는 이유는 `tauri build`와 의존성·LibRaw 컴파일을 공유하고 배포와 동일 프로필을 검증하기 위함. 잡은 하나 — 분리하면 러너 셋업·캐시 복원 이중 지불에 테스트(debug)·빌드(release) 간 공유 산출물도 없다. 캐시: rust-cache + vendor(libraw·lensfun·dnglab) + fixtures(tier1 600MB).
+설계 근거: CI를 push마다 돌리지 않는 것은 비공개 시절 과금 때문이었으나, 릴리스가 자체 검증을 수행해 태그 릴리스가 단독으로 안전하므로 공개 후에도 유지. clippy는 lint라 PR CI 전용. 릴리스 테스트를 release 프로필로 돌리는 이유는 `tauri build`와 의존성·LibRaw 컴파일을 공유하고 배포와 동일 프로필을 검증하기 위함. 잡은 하나 — 분리하면 러너 셋업·캐시 복원 이중 지불에 테스트(debug)·빌드(release) 간 공유 산출물도 없다.
+
+### 캐시 전략 (2026-07-18 도입 — 릴리스 시간 단축)
+
+- **문제**: 태그로 트리거된 실행은 GitHub Actions 캐시를 **기본 브랜치(prod)에서만** fallback 복원하는데, prod에는 어떤 워크플로도 돌지 않아 캐시가 생긴 적이 없었다 → 매 릴리스가 콜드 빌드(v0.5.0 실측: cargo test --release 440s + tauri build 282s + vendor·fixtures 재다운로드 57s ≈ 총 14.5분).
+- **해결**: `warm-release-cache.yml` — **prod push 시** rust 릴리스 프로필 컴파일(`cargo test --release --no-run`)과 vendor·fixtures 캐시를 prod 스코프에 저장. release.yml의 rust-cache와 `shared-key: release`로 공유하고, 태그 실행에서는 저장 생략(`save-if` — 태그 스코프 저장은 이후 실행이 못 쓴다).
+- **운영 주의**: prod push 직후 바로 태그를 푸시하면 워밍이 안 끝나 그 릴리스는 콜드다. **워밍 완료(Actions "Warm release cache" 그린) 후 태그를 푸시**하면 첫 릴리스부터 적중. 연속 릴리스는 이전 워밍 캐시로 자동 적중.
 
 ## 릴리스 절차 (확립된 흐름)
 
 1. 버전 상향: `package.json` + `src-tauri/tauri.conf.json` + `src-tauri/Cargo.toml` 세 곳 (+ `cargo check`로 Cargo.lock 갱신).
 2. dev 검증·커밋·push → prod 병합·push (`git merge dev -m "chore: merge dev into prod"` — diff 0 확인).
-3. 태그: `git tag vX.Y.Z && git push origin vX.Y.Z` (태그≠버전이면 워크플로 즉시 실패).
+3. **prod push가 트리거한 "Warm release cache" 완료를 기다린 뒤** 태그: `git tag vX.Y.Z && git push origin vX.Y.Z` (태그≠버전이면 워크플로 즉시 실패).
 4. Actions 완료(~15-20분, 캐시 히트 시) 후 draft 확인 → **사용자가 Publish** → 배포된 앱들이 자동 업데이트 감지.
 
 ## 시크릿 상세
