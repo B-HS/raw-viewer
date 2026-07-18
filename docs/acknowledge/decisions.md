@@ -53,6 +53,14 @@
 - **실사진 테스트 폴더**: `/Volumes/SSD/202309 osaka/DCIM/100CANON` (CR2 153장) 테스트 사용 허가.
 - **B10(fps 비교)·A16(CPU 폴백)은 스킵 허용**, B6(NR 화질)은 고ISO 확보 후.
 
+## 2026-07-18 (UX 고도화 웨이브 — v0.5.2 실사용 피드백 8건)
+- **파일명도 "Raw Viewer"로 전환(사용자 지시)**: productName="Raw Viewer". 이전 결정(표시명만 변경)의 근거였던 업데이터 파손 위험은 **published 릴리스 0개**라 실존 위험이 없어 해제. GitHub가 자산명 공백을 점으로 치환하므로 release.yml이 업로드 전에 선제 리네임(`Raw.Viewer_*`)해 latest.json URL·SHA256SUMS 정합을 보장. 자기완결성 가드는 하드코딩 경로 → 글롭+부재 시 실패로 교정. 식별자(app.raw-viewer)·crate명은 유지(캐시 디렉토리·빌드 캐시 연속성). 기설치본의 .app 파일명은 자동으로 안 바뀌므로 새 DMG 설치 시 구 raw-viewer.app 수동 삭제 필요.
+- **타이틀바 더블클릭 최대화**: Tauri 2.11.5 drag.js가 macOS 네이티브 구현(mouseup 방식, #8306 수정 완료)이고 `internal_toggle_maximize` 권한도 core:default 기본 포함 — JS 핸들러를 추가하면 이중 토글이라 **코드 무추가**가 정답. 실기기 재확인만 남음(안 되면 웹뷰에 이벤트 미도달 → Rust측 조사).
+- **UI 메뉴(타이틀바)**: Menu 오른쪽 "UI" 드롭다운 — 우측 패널·필름스트립·상태 바·퀵 바·줌/디코드 배지·Perf 오버레이 체크박스. 체크 토글 시 메뉴는 닫히지 않음(연속 조작). 표시 플래그는 layout.ts localStorage 블롭에 통합 persist(Perf만 uiStore 비영속 유지).
+- **퀵 바 구성**: 좌하단 ↺↻(90도 회전)·⇄⇅(반전)·크롭 토글. 회전/반전 액션은 store/geometry.ts로 공통화(기존 App.tsx·CropGeometrySection 중복 람다 대체 — 2회 이상 룰).
+- **우측 패널 재오픈**: 접힘 시 우측 엣지 중앙 셰브론 탭. 마지막 패널(lastRightPanel persist) 복원.
+- **아이콘 흰 배경 버그(사용자 발견)**: qlmanage 렌더가 SVG 알파를 버리고 흰 배경을 구움 — v0.5.2 아이콘부터 존재. **재생성은 반드시 headless Chrome `--default-background-color=00000000`** 경로 사용(bug/2026-07-18-icon-opaque-background.md). 시안 A 유지, 소형 가독성 위해 선 두께 30→50·배경 대비 상향. 소스 SVG는 docs/assets/app-icon.svg로 저장소에 보존.
+
 ## 보류·미결로 확정된 것
 - WebGPU 백엔드: 조사 문서만(docs/webgpu-assessment.md), 착수는 별도 지시 대기.
 - 로컬 보정: PRD §12.2 보류 유지, 스키마 초안만(docs/local-adjustments-draft.md).

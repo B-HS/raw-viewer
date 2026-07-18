@@ -1,6 +1,6 @@
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { copyImages, moveImages, openInNewWindow } from '../ipc/commands'
@@ -49,7 +49,19 @@ export const ContextMenu: FC = () => {
     const recentApps = useSettings((state) => state.recentApps)
 
     const [pos, setPos] = useState({ x, y })
+    const [origin, setOrigin] = useState({ x, y })
+    const [wasOpen, setWasOpen] = useState(open)
     const [sub, setSub] = useState<'rating' | 'label' | 'openWith' | null>(null)
+
+    if (origin.x !== x || origin.y !== y) {
+        setOrigin({ x, y })
+        setPos({ x, y })
+        setSub(null)
+    }
+    if (wasOpen !== open) {
+        setWasOpen(open)
+        if (open) setSub(null)
+    }
 
     const close = () => useContextMenu.getState().close()
     const primary = imageIds[0]
@@ -124,7 +136,7 @@ export const ContextMenu: FC = () => {
         openEditedWith(selected)
     }
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!open) return
         const element = menuRef.current
         if (!element) return

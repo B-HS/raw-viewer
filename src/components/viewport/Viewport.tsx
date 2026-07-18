@@ -5,6 +5,7 @@ import { REC2020_LUMA } from '../../gl/colorSpaces'
 import { aetherUrl } from '../../ipc/pixels'
 import { useEditStore } from '../../store/editStore'
 import { useHistogram } from '../../store/histogramStore'
+import { useLayout } from '../../store/layout'
 import { useLens } from '../../store/lens'
 import { LEVEL_RANK, usePlaylist } from '../../store/playlist'
 import { useUiStore } from '../../store/uiStore'
@@ -33,6 +34,7 @@ export const Viewport: FC = () => {
     const sideBySide = useUiStore((state) => state.sideBySide)
     const eyedropper = useUiStore((state) => state.eyedropper)
     const tatActive = useUiStore((state) => state.tatActive)
+    const viewerPillVisible = useLayout((state) => state.viewerPillVisible)
 
     const current = entries[currentIndex]
     const level = current ? best[current.imageId] : undefined
@@ -172,7 +174,7 @@ export const Viewport: FC = () => {
                 </div>
             )}
 
-            {!error && (
+            {!error && viewerPillVisible && (
                 <div className='pointer-events-none absolute bottom-3 right-3 flex items-center gap-2 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-200'>
                     <ZoomControl />
                     <span>{level ? t(`viewport.level.${level.level}`) : t('viewport.decoding')}</span>

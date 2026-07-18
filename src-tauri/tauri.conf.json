@@ -1,6 +1,6 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "raw-viewer",
+    "productName": "Raw Viewer",
     "version": "0.5.2",
     "identifier": "app.raw-viewer",
     "build": {

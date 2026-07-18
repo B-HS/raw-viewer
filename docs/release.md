@@ -5,6 +5,7 @@
 ## 현재 상태 스냅샷 (2026-07-18)
 
 - 최신 태그: **v0.5.2** (파이프라인 재설계·마무리 UI 9건·새 아이콘·표시명 Raw Viewer). 릴리스는 draft — **publish는 사용자가 직접**. v0.1.1~v0.5.1 draft는 의도적 유지.
+- **파일명 전환(미태그)**: productName="Raw Viewer" — 다음 릴리스부터 번들은 `Raw Viewer.app`, DMG 로컬명은 `Raw Viewer_<ver>_aarch64.dmg`. GitHub 자산명은 공백을 점으로 치환하므로 워크플로가 **업로드 전에 선제 리네임**(`Raw.Viewer_*`)해 latest.json URL·SHA256SUMS와 서빙 자산명을 일치시킨다. 자기완결성 가드는 `.app` 글롭(+부재 시 실패)으로 교정. 기설치본의 구 `raw-viewer.app`은 새 DMG 설치 시 수동 삭제 필요.
 - v0.3.1부터 updater 자산(`latest.json`·`.app.tar.gz`·`.sig`) 포함 — 서명 시크릿 등록 완료 상태.
 - 자동 업데이트는 **published 릴리스 중 최신**(`releases/latest`)을 본다 — draft만 있으면 업데이트 확인이 실패(무해)하므로, 배포하려면 최신 릴리스를 publish해야 한다.
 - 등록된 시크릿 (총 6): `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `TAURI_SIGNING_PRIVATE_KEY`.
@@ -23,6 +24,10 @@
 - **문제**: 태그로 트리거된 실행은 GitHub Actions 캐시를 **기본 브랜치(prod)에서만** fallback 복원하는데, prod에는 어떤 워크플로도 돌지 않아 캐시가 생긴 적이 없었다 → 매 릴리스가 콜드 빌드(v0.5.0 실측: cargo test --release 440s + tauri build 282s + vendor·fixtures 재다운로드 57s ≈ 총 14.5분).
 - **해결**: `warm-release-cache.yml` — **prod push 시** rust 릴리스 프로필 컴파일(`cargo test --release --no-run`)과 vendor·fixtures 캐시를 prod 스코프에 저장. release.yml의 rust-cache와 `shared-key: release`로 공유하고, 태그 실행에서는 저장 생략(`save-if` — 태그 스코프 저장은 이후 실행이 못 쓴다).
 - **운영 주의**: prod push 직후 바로 태그를 푸시하면 워밍이 안 끝나 그 릴리스는 콜드다. **워밍 완료(Actions "Warm release cache" 그린) 후 태그를 푸시**하면 첫 릴리스부터 적중. 연속 릴리스는 이전 워밍 캐시로 자동 적중.
+
+## 앱 아이콘 재생성
+
+소스는 `docs/assets/app-icon.svg`. 래스터화는 **반드시 headless Chrome `--default-background-color=00000000`**(투명 배경)으로 1024px PNG를 만들고 `bun run tauri icon <png>` 실행 — qlmanage는 알파를 흰색으로 합성하므로 금지([bug/2026-07-18-icon-opaque-background.md](./bug/2026-07-18-icon-opaque-background.md)). 산출물 커밋 전 모서리 픽셀 알파 0 검증.
 
 ## 릴리스 절차 (확립된 흐름)
 
