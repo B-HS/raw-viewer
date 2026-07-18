@@ -1,0 +1,54 @@
+name: Warm release cache
+
+# tag-triggered release runs can only restore caches from the default branch (prod),
+# so this workflow compiles the release profile on prod pushes to keep those caches hot.
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+concurrency:
+  group: warm-release-cache
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          shared-key: release
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/vendor
+            src-tauri/resources/lensfun
+            src-tauri/binaries
+          key: vendor-${{ runner.os }}-${{ hashFiles('src-tauri/libraw.pin', 'src-tauri/lensfun.pin', 'scripts/fetch-dnglab.sh') }}
+
+      - uses: actions/cache@v4
+        with:
+          path: tests/fixtures/tier1
+          key: fixtures-${{ hashFiles('scripts/fetch-fixtures.sh') }}
+
+      - name: Install libomp
+        run: brew install libomp
+
+      - name: Restore vendored sources
+        run: |
+          bash scripts/sync-vendor.sh
+          bash scripts/sync-lensfun.sh
+          bash scripts/fetch-dnglab.sh
+          bash scripts/fetch-fixtures.sh
+
+      - name: Compile release profile (no test run)
+        working-directory: src-tauri
+        run: cargo test --release --no-run

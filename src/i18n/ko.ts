@@ -100,6 +100,7 @@ export const ko = {
         detail: {
             title: '디테일',
             zoomHint: 'ⓘ 샤프닝/노이즈는 100% 줌에서 정확합니다',
+            zoomSlider: '줌',
             sharpen: '샤프닝',
             amount: '양',
             radius: '반경',
@@ -599,6 +600,7 @@ export const ko = {
             recent: '최근 파일: {{name}}',
             openSettings: '설정 열기',
             openAbout: '정보 / 라이선스',
+            togglePerfOverlay: '성능 오버레이 토글',
         },
     },
     trash: {

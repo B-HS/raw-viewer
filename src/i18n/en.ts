@@ -100,6 +100,7 @@ export const en = {
         detail: {
             title: 'Detail',
             zoomHint: 'ⓘ Sharpening/noise are accurate at 100% zoom',
+            zoomSlider: 'Zoom',
             sharpen: 'Sharpening',
             amount: 'Amount',
             radius: 'Radius',
@@ -600,6 +601,7 @@ export const en = {
             recent: 'Recent: {{name}}',
             openSettings: 'Open settings',
             openAbout: 'About / Licenses',
+            togglePerfOverlay: 'Toggle performance overlay',
         },
     },
     trash: {

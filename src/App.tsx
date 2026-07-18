@@ -228,6 +228,7 @@ export const App: FC = () => {
     const gridActive = useGridView((state) => state.active)
     const isFullscreen = useUiStore((state) => state.isFullscreen)
     const slideshowActive = useUiStore((state) => state.slideshowActive)
+    const perfVisible = useUiStore((state) => state.perfVisible)
     const sortKey = useSettings((state) => state.sortKey)
     const sortOrder = useSettings((state) => state.sortOrder)
     const { t } = useTranslation()
@@ -697,9 +698,10 @@ export const App: FC = () => {
         }
         const timer = setInterval(advance, useSettings.getState().slideshowIntervalMs)
         const stopOnKey = () => useUiStore.getState().setSlideshow(false)
-        window.addEventListener('keydown', stopOnKey)
+        const armTimer = setTimeout(() => window.addEventListener('keydown', stopOnKey), 0)
         return () => {
             clearInterval(timer)
+            clearTimeout(armTimer)
             window.removeEventListener('keydown', stopOnKey)
             if (enteredFullscreen && useUiStore.getState().isFullscreen)
                 toggleFullscreen()
@@ -818,7 +820,7 @@ export const App: FC = () => {
                             {t('app.syncSelection', { count: selectionCount })}
                         </button>
                     )}
-                    <PerfOverlay visible={false} />
+                    <PerfOverlay visible={perfVisible} />
                     {gridActive && <GridView />}
                 </div>
                 {rightPanel !== 'none' && !isFullscreen && (

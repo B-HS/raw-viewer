@@ -14,6 +14,7 @@ import { HistogramHoverOverlay } from './HistogramHoverOverlay'
 import { SamplerPinsOverlay } from './SamplerPinsOverlay'
 import { TatOverlay } from './TatOverlay'
 import { useRenderEngine } from './useRenderEngine'
+import { ZoomControl } from './ZoomControl'
 
 export const Viewport: FC = () => {
     const { t } = useTranslation()
@@ -171,6 +172,7 @@ export const Viewport: FC = () => {
 
             {!error && (
                 <div className='pointer-events-none absolute bottom-3 right-3 flex items-center gap-2 rounded bg-black/60 px-2.5 py-1 text-xs text-neutral-200'>
+                    <ZoomControl />
                     <span>{level ? t(`viewport.level.${level.level}`) : t('viewport.decoding')}</span>
                     {(!level || level.level !== 'l2') && (
                         <span className='h-3 w-3 animate-spin rounded-full border-2 border-neutral-500 border-t-neutral-200' />

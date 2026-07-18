@@ -1,4 +1,4 @@
-export type ZoomCommand = 'fit' | 'actual' | 'double' | 'toggleFit'
+export type ZoomCommand = 'fit' | 'actual' | 'double' | 'toggleFit' | { ratio: number }
 
 const listeners = new Set<(command: ZoomCommand) => void>()
 

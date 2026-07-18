@@ -42,6 +42,18 @@ export const Filmstrip: FC = () => {
     const handleContext = (entryIndex: number, event: MouseEvent) => openEntryContext(entries, entryIndex, event)
 
     useEffect(() => {
+        const element = scrollRef.current
+        if (!element) return
+        const onWheel = (event: WheelEvent) => {
+            if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+            event.preventDefault()
+            element.scrollLeft += event.deltaY
+        }
+        element.addEventListener('wheel', onWheel, { passive: false })
+        return () => element.removeEventListener('wheel', onWheel)
+    }, [])
+
+    useEffect(() => {
         if (currentPos >= 0) virtualizer.scrollToIndex(currentPos, { align: 'center' })
     }, [currentPos, virtualizer])
 

@@ -314,7 +314,8 @@ export const useRenderEngine = () => {
                 if (command === 'fit') view = { fit: true, zoom: view.zoom, pan: { x: 0, y: 0 } }
                 else if (command === 'actual') view = zoomTo(1)
                 else if (command === 'double') view = zoomTo(2)
-                else view = toggleFit(view, metrics, { x: 0, y: 0 })
+                else if (command === 'toggleFit') view = toggleFit(view, metrics, { x: 0, y: 0 })
+                else view = zoomTo(command.ratio)
                 scheduleRender()
             })
 
