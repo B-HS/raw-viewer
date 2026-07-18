@@ -31,25 +31,25 @@ assessment의 "다음 단계 2"(히스토그램 compute를 WebGL2 렌더 결과�
 
 - **수치 패리티 통과**: headless Chrome(150, Metal)에서 `parity.html` 하니스 **18벡터 ALL PASS** — 17벡터는 WebGL2(exportRenderer) 기준 f16 비교(13벡터 완전 일치, geometry 0.00366·lens 0.00098 보간 미세차, grain 0.086 hash 미세차 관용 내, flip3/5/6 일치), `nr-compute`는 동일 알고리즘의 TS 참조 구현 기준(0.00098).
 - 하니스 함정 기록: `NEUTRAL_EDIT_STATE.baseCurve='standard'`라 **CURVE 스테이지는 "중립" 상태에서도 항상 활성**이다. 특정 스테이지만 검증하는 벡터는 `baseCurve='linear'`로 꺼야 한다(nr-compute 디버깅에서 발견 — TS 참조가 CURVE를 몰라 전면 불일치로 보였음).
-- **남은 검증(사용자 재석)**: WKWebView 실기동에서 WebGPU 옵트인 후 시각 확인(뷰포트 표시·줌팬·compare·크롭·클리핑·샘플러 핀·히스토그램), Perf 오버레이로 WebGL2 대비 fps 비교. 기본값이 WebGL2라 미검증 상태로도 사용자 영향 없음.
+- **시각 검증 pass**(2026-07-18, v0.5.3 사용자 검증 — 옵트인 후 육안·fps 확인). 기본 백엔드화는 보류: **옵트인 유지**, 사용 데이터 축적 후 재결정([acknowledge/decisions.md](./acknowledge/decisions.md)).
 
 ## 3. 파일 배치
 
 ```
 src/gl/webgpu/
-  detect.ts        6a — 감지·정규화 (구현됨)
-  context.ts       6b — 디바이스/캔버스 구성
-  shaders.wgsl.ts  6d~ — WGSL 소스 (패스별 상수)
-  webgpuRenderer.ts 6d~ — EngineApi 구현체
+  detect.ts        6a — 감지·정규화
+  wgsl.ts          6d~ — WGSL 소스 (패스별 상수, NR compute 포함)
+  webgpuRenderer.ts 6b~6i — EngineApi 구현체 (디바이스/캔버스 구성 포함)
+  parityMain.ts    §4 패리티 하니스 엔트리 (루트 parity.html에서 로드)
 ```
 
 - `Renderer`(WebGL2)·`cpurender`는 수정하지 않는다(폴백 보존). engineApi.ts 계약 변경 금지.
 
 ## 4. 패리티 검증 벡터
 
-- 기존 cpurender 패리티 테스트와 동일 전략: 고정 입력(작은 f16 타일 + 대표 EditState 세트) → WebGL2/WebGPU/CPU 3자 출력 비교.
-- 허용 오차: u8 기준 ±2/255 (셰이더 부동소수 차이), 클리핑 경계 픽셀 제외.
-- 실행: WebGPU는 헤드리스 불가 → 설정 > 성능의 "패리티 자가진단" 버튼(개발 빌드 한정)으로 실기동 실행, 결과를 콘솔+토스트로.
+- (계약 당시 초안은 3자 비교·u8 ±2/255·설정 내 자가진단 버튼이었으나 실제 구현이 대체 — 아래가 현행)
+- 실행: `parity.html` + `src/gl/webgpu/parityMain.ts`를 headless Chrome(`--enable-unsafe-webgpu --use-angle=metal`)으로 구동, localhost 리포트 서버로 결과 수집.
+- 비교 기준: WebGL2(exportRenderer) 출력 f16 비교, `nr-compute`만 TS 참조 구현 기준. 결과·관용치는 §2.1. 설정 내 자가진단 버튼은 도입하지 않음.
 
 ## 5. 리스크·미결
 
