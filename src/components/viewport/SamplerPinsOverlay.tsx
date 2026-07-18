@@ -9,7 +9,9 @@ import type { SamplerPin, SamplerUnit } from '../../store/samplerPins'
 import { rec2020LinearToSrgb } from './sampling'
 import { uvToCanvas } from './projection'
 
-type Resolved = { pin: SamplerPin; x: number; y: number; text: string; swatch: string }
+type PinSample = { text: string; swatch: string }
+
+const EMPTY_SAMPLE: PinSample = { text: '—', swatch: 'rgb(0, 0, 0)' }
 
 const clampByte = (value: number) => Math.max(0, Math.min(255, Math.round(value * 255)))
 
@@ -23,53 +25,74 @@ const formatValue = (unit: SamplerUnit, srgb: [number, number, number]) => {
 
 const PinsLive: FC<{ imageId: string; pins: SamplerPin[] }> = ({ imageId, pins }) => {
     const nonce = useViewportProjection((state) => state.nonce)
-    const [resolved, setResolved] = useState<Resolved[]>([])
+    const model = useViewportProjection((state) => state.model)
+    const clientW = useViewportProjection((state) => state.clientW)
+    const clientH = useViewportProjection((state) => state.clientH)
+    const projectionImageId = useViewportProjection((state) => state.imageId)
+    const [samples, setSamples] = useState<Map<number, PinSample>>(new Map())
     const { t } = useTranslation()
 
+    const positioned =
+        model && projectionImageId === imageId
+            ? pins.map((pin) => {
+                  const point = uvToCanvas(model, clientW, clientH, pin.u, pin.v)
+                  return { pin, x: point.x, y: point.y }
+              })
+            : []
+
     useEffect(() => {
-        const projection = useViewportProjection.getState()
-        const engine = useUiStore.getState().engine
-        if (!projection.model || projection.imageId !== imageId || !engine) {
-            setResolved([])
-            return
-        }
-        const next: Resolved[] = []
-        for (const pin of pins) {
-            const point = uvToCanvas(projection.model, projection.clientW, projection.clientH, pin.u, pin.v)
-            const sample = engine.samplePixel(point.x, point.y)
-            const srgb = sample ? rec2020LinearToSrgb(sample.r, sample.g, sample.b) : ([0, 0, 0] as [number, number, number])
-            const swatch = `rgb(${clampByte(srgb[0])}, ${clampByte(srgb[1])}, ${clampByte(srgb[2])})`
-            next.push({ pin, x: point.x, y: point.y, text: sample ? formatValue(pin.unit, srgb) : '—', swatch })
-        }
-        setResolved(next)
+        const raf = requestAnimationFrame(() => {
+            const projection = useViewportProjection.getState()
+            const engine = useUiStore.getState().engine
+            if (!projection.model || projection.imageId !== imageId || !engine) return
+            const next = new Map<number, PinSample>()
+            for (const pin of pins) {
+                const point = uvToCanvas(projection.model, projection.clientW, projection.clientH, pin.u, pin.v)
+                const sample = engine.samplePixel(point.x, point.y)
+                if (!sample) {
+                    next.set(pin.id, EMPTY_SAMPLE)
+                    continue
+                }
+                const srgb = rec2020LinearToSrgb(sample.r, sample.g, sample.b)
+                next.set(pin.id, {
+                    text: formatValue(pin.unit, srgb),
+                    swatch: `rgb(${clampByte(srgb[0])}, ${clampByte(srgb[1])}, ${clampByte(srgb[2])})`,
+                })
+            }
+            setSamples(next)
+        })
+        return () => cancelAnimationFrame(raf)
     }, [nonce, pins, imageId])
 
     return (
         <>
-            {resolved.map((item) => (
-                <div key={item.pin.id} className='pointer-events-none absolute' style={{ left: item.x, top: item.y }}>
-                    <div className='absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.6)]' />
-                    <div className='pointer-events-auto absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded bg-black/75 px-1.5 py-1 text-[10px] text-neutral-100 shadow'>
-                        <button
-                            type='button'
-                            onClick={() => useSamplerPins.getState().cycleUnit(imageId, item.pin.id)}
-                            title={t('sampler.cycleUnit')}
-                            aria-label={t('sampler.cycleUnit')}
-                            className='flex items-center gap-1.5'>
-                            <span className='h-3 w-3 rounded-sm border border-white/40' style={{ backgroundColor: item.swatch }} />
-                            <span className='tabular-nums'>{item.text}</span>
-                        </button>
-                        <button
-                            type='button'
-                            onClick={() => useSamplerPins.getState().remove(imageId, item.pin.id)}
-                            title={t('sampler.remove')}
-                            aria-label={t('sampler.remove')}
-                            className='px-1 py-0.5 text-xs leading-none text-neutral-400 hover:text-neutral-100'>
-                            ✕
-                        </button>
+            {positioned.map((item) => {
+                const sample = samples.get(item.pin.id) ?? EMPTY_SAMPLE
+                return (
+                    <div key={item.pin.id} className='pointer-events-none absolute' style={{ left: item.x, top: item.y }}>
+                        <div className='absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.6)]' />
+                        <div className='pointer-events-auto absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded bg-black/75 px-1.5 py-1 text-[10px] text-neutral-100 shadow'>
+                            <button
+                                type='button'
+                                onClick={() => useSamplerPins.getState().cycleUnit(imageId, item.pin.id)}
+                                title={t('sampler.cycleUnit')}
+                                aria-label={t('sampler.cycleUnit')}
+                                className='flex items-center gap-1.5'>
+                                <span className='h-3 w-3 rounded-sm border border-white/40' style={{ backgroundColor: sample.swatch }} />
+                                <span className='tabular-nums'>{sample.text}</span>
+                            </button>
+                            <button
+                                type='button'
+                                onClick={() => useSamplerPins.getState().remove(imageId, item.pin.id)}
+                                title={t('sampler.remove')}
+                                aria-label={t('sampler.remove')}
+                                className='px-1 py-0.5 text-xs leading-none text-neutral-400 hover:text-neutral-100'>
+                                ✕
+                            </button>
+                        </div>
                     </div>
-                </div>
-            ))}
+                )
+            })}
         </>
     )
 }

@@ -26,6 +26,14 @@
 - **eslint 도입** (초기 "미도입" 보류 해제 — Phase 5 건전성 작업의 일환): flat config + typescript-eslint + react-hooks v7(컴파일러 규칙 내장). set-state-in-effect·refs 계열은 warn 유지(C2-후속). `zod-validation-error`는 overrides로 ^4 고정(v3의 `./v4` 서브패스 결함 회피) — `bun.lock` 전체 재생성은 사용자가 거부, lockfile 보존 하에 해결.
 - 단축키 배정(스펙과 다른 결정): RAW/JPEG 페어 토글 = **⌘J** (PRD의 ⌥J는 클리핑 검사 J계열이 선점), 슬라이드쇼 = KeyS, 전체화면 = KeyF.
 
+## 2026-07-18 (잔여 작업 일괄 소진 — "멈추라 할 때까지 진행, 커밋은 마지막 1회")
+- **React Compiler 도입**: vite에 `babel-plugin-react-compiler`(target 18) + `react-compiler-runtime`. frontend.md 컨벤션("컴파일러 활성화가 useCallback/useMemo 금지의 전제")의 누락 전제를 충족. 번들에 memo cache 적용 확인.
+- **eslint `react-hooks/incompatible-library` off**: react-virtual(useVirtualizer)에 대한 "Compilation Skipped" 정보성 진단 2건 — 라이브러리 교체 없이는 해소 불가, 컴포넌트별 스킵은 의도된 동작이라 config 레벨에서 끔(주석 억제 아님).
+- **store 플러그인 권한 축소**: `store:default` → allow-load/get/set/save 4개(실사용 전수).
+- **persisted-scope 불요 종결**: fs 플러그인 미사용(Export는 Rust 직접 쓰기)이라 적용 대상 아님.
+- **아틀라스**: 측정 하니스만 문서화(quality-assurance/filmstrip-performance.md), 실측 전 미착수 유지.
+- **WebGPU**: phase6-contract.md 체결 — 하이브리드(부분 채용) 배제, 전체 이식 로드맵. 6a(감지·진단)만 반입, 6b+는 실기동 검증 필수라 사용자 재석 대기.
+
 ## 보류·미결로 확정된 것
 - WebGPU 백엔드: 조사 문서만(docs/webgpu-assessment.md), 착수는 별도 지시 대기.
 - 로컬 보정: PRD §12.2 보류 유지, 스키마 초안만(docs/local-adjustments-draft.md).

@@ -54,16 +54,24 @@
 - **기능 상태**: RAW 16기종 + 일반 포맷(jpg/png/webp/tiff/bmp/gif/heic/heif/avif, 임베디드 ICC 반영) 뷰잉·비파괴 편집·프리셋·Export(래스터 배치+DNG)·정렬 5종·슬라이드쇼·전체화면·커스텀 타이틀바·파일 조작(rename/move/copy)·애니메이션 재생·다국어(한/영/일)·자동 업데이트.
 - **Phase 진행**: Phase 0~5 완료(상세: [history/phases-0-4-complete.md](./history/phases-0-4-complete.md)). 2026-07-18 사용자 피드백 웨이브 6건(F1~F6) 완료 — 닫기 버그·Open With 크래시 원인/수정은 [bug/](./bug/) 참조.
 
-## 남은 작업 (착수 대기 — 우선순위 없음, 사용자 지시로 선택)
+## 완료: 남은 작업 일괄 소진 (2026-07-18 사용자 지시 — 멈추라 할 때까지, 커밋은 마지막 1회)
 
-- [ ] C2-후속: react-hooks compiler 경고 31건(set-state-in-effect·refs) 컴포넌트별 정리 — 동작 리팩토링이라 실화면 검증과 병행 필요
-- [ ] Phase 3 수동 검증: §8.2 수동 35항목(quality-assurance 문서), Z8 고효율 NEF 육안, 신규 UI(타이틀바·CPU 폴백·그리드·TAT) 시각 확인 — 사용자 재석 필요
+- [x] W1. C2-후속: react-hooks 경고 31건 → 0건. React Compiler(babel-plugin-react-compiler, target 18) 도입(컨벤션 전제 누락 발견), 파생 상태·렌더 중 조정·모듈 함수 승격으로 근본 수정, useRenderEngine은 mount effect 단일화 + playlist 구독 전환, engine/caps/gpuError는 uiStore로 단일화. incompatible-library 룰만 config off(react-virtual 정보성 진단 — 사유는 acknowledge). 실화면 검증은 W5에서
+- [x] W2. store 플러그인 권한을 default(14커맨드)에서 실사용 4커맨드(load/get/set/save)로 축소. persisted-scope는 **불요 종결** — fs 플러그인 자체가 없고 Export는 Rust 커맨드가 직접 파일을 쓴다(스코프 검사 대상 아님)
+- [x] W3. 필름스트립 아틀라스: 측정 하니스 문서화([quality-assurance/filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 스크롤 fps 실측은 사용자 재석 항목, "병목 확인 전 미착수" 결정 유지
+- [x] W4. WebGPU: [phase6-contract.md](./phase6-contract.md) 작성(스파이크 결론: WebGL↔WebGPU 텍스처 공유 불가 → 하이브리드 배제, 전체 이식 로드맵 6a~6i) + 6a 감지 계층 구현(`src/gl/webgpu/detect.ts`, 설정>성능 진단 표시, i18n 3개국어). 6b부터는 실기동 시각 검증 필수라 사용자 재석 대기
+- [x] W5. 검증 사다리 전체 통과 — tsc 0에러, eslint 0에러·0경고, bun test 17, cargo test 324, 프로덕션 빌드(compiler 적용 확인), tauri dev 실기동 스모크(frontend ready 도달·15초 생존·패닉 0) 후 단일 커밋
+- 사용자 필요로 제외: Phase 3 수동 35항목(재석), v0.4.0 publish·업데이트 왕복(사용자 publish), README(스크린샷), Windows/Linux(하드웨어), Intel 빌드(dnglab x86_64 결정), 로컬 보정(PRD §12.2 — 별도 PRD 합의 필요)
+
+## 남은 작업 (전부 사용자 재석·결정 대기 — 자율 진행 가능 항목은 2026-07-18 웨이브에서 소진)
+
+- [ ] Phase 3 수동 검증: §8.2 수동 35항목(quality-assurance 문서), Z8 고효율 NEF 육안, 신규 UI(타이틀바·CPU 폴백·그리드·TAT) 시각 확인 + 2026-07-18 웨이브 회귀 확인(패널·필름스트립·CPU 폴백·샘플러 핀·팔레트) — 사용자 재석 필요
+- [ ] 필름스트립 성능 실측([quality-assurance/filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 병목이면 아틀라스 착수
+- [ ] WebGPU 6b~6i([phase6-contract.md](./phase6-contract.md)) — 단계마다 실기동 시각 검증 필수, 사용자 재석 시 진행
 - [ ] v0.4.0 릴리스 publish 후 자동 업데이트 왕복 실검증(구버전 앱에서 감지→설치)
 - [ ] README.md — 실사용 스크린샷 확보 후 작성(사용자 결정)
-- [ ] WebGPU 백엔드 — 조사 완료([webgpu-assessment.md](./webgpu-assessment.md)), 착수는 별도 phase 계약 작성부터
-- [ ] 로컬 보정 — PRD §12.2 보류, 초안만([local-adjustments-draft.md](./local-adjustments-draft.md))
-- [ ] Windows/Linux — 하드웨어 확보 전 차단
-- [ ] 미결 결정: export 경로 persisted-scope, store 플러그인 스코프 축소, Intel/유니버설 빌드, 필름스트립 아틀라스(실측 병목 확인 시)
+- [ ] 로컬 보정 — PRD §12.2 보류, 초안만([local-adjustments-draft.md](./local-adjustments-draft.md)), 별도 PRD 합의 필요
+- [ ] Windows/Linux — 하드웨어 확보 전 차단 / Intel·유니버설 빌드 — dnglab x86_64 확보 결정 필요
 
 ## SPEC-GAP 로그 (활성)
 - (build.rs) libjpeg 미링크: LibRaw의 lossy-JPEG 압축 DNG·일부 내장 썸네일 디코딩 불가 가능.

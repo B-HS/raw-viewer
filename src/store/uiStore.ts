@@ -11,8 +11,20 @@ const CROP_OVERLAY_ORDER: CropOverlayStyle[] = ['thirds', 'golden', 'diag', 'non
 
 export type ZoomPreset = 'fit' | 'actual'
 
+export type RenderCaps = { lowPrecision: boolean; displaySpace: string }
+
+export const shouldForceCpuRender = () => {
+    try {
+        return localStorage.getItem('rawviewer.forceCpuRender') === '1'
+    } catch {
+        return false
+    }
+}
+
 type UiState = {
     engine: EngineApi | null
+    renderCaps: RenderCaps | null
+    gpuError: boolean
     panelVisible: boolean
     isFullscreen: boolean
     zoomRequest: { preset: ZoomPreset; nonce: number } | null
@@ -28,6 +40,8 @@ type UiState = {
     tatActive: boolean
     tatBand: HslBand | null
     attachEngine: (engine: EngineApi | null) => void
+    setRenderCaps: (caps: RenderCaps | null) => void
+    setGpuError: (on: boolean) => void
     setFullscreen: (on: boolean) => void
     requestZoom: (preset: ZoomPreset) => void
     setPairSwap: (shownId: string, original: ImageEntry) => void
@@ -50,6 +64,8 @@ type UiState = {
 
 export const useUiStore = create<UiState>((set, get) => ({
     engine: null,
+    renderCaps: null,
+    gpuError: shouldForceCpuRender(),
     panelVisible: true,
     isFullscreen: false,
     zoomRequest: null,
@@ -73,6 +89,8 @@ export const useUiStore = create<UiState>((set, get) => ({
         engine.setSideBySide(state.sideBySide)
         engine.setCropEditMode(state.cropEditMode)
     },
+    setRenderCaps: (caps) => set({ renderCaps: caps }),
+    setGpuError: (on) => set({ gpuError: on }),
     setFullscreen: (on) => set({ isFullscreen: on }),
     requestZoom: (preset) => set((state) => ({ zoomRequest: { preset, nonce: (state.zoomRequest?.nonce ?? 0) + 1 } })),
     setSlideshow: (on) => set({ slideshowActive: on }),

@@ -10,6 +10,8 @@ import type { LensProfileSummary } from '../../types/LensProfileSummary'
 import { Section } from './Section'
 import { Slider } from './Slider'
 
+const LENS_SEARCH_DEBOUNCE_MS = 250
+
 const signed = (value: number) => (value > 0 ? `+${value}` : `${value}`)
 const percent = (value: number) => `${value}%`
 
@@ -29,25 +31,24 @@ export const LensSection: FC = () => {
     const match = useLens((state) => state.match)
     const loading = useLens((state) => state.loading)
     const [query, setQuery] = useState('')
-    const [results, setResults] = useState<LensProfileSummary[]>([])
+    const [results, setResults] = useState<{ query: string; list: LensProfileSummary[] }>({ query: '', list: [] })
+
+    const trimmedQuery = query.trim()
+    const visibleResults = trimmedQuery.length > 0 && results.query === trimmedQuery ? results.list : []
 
     useEffect(() => {
-        const trimmed = query.trim()
-        if (trimmed.length === 0) {
-            setResults([])
-            return
-        }
+        if (trimmedQuery.length === 0) return
         let alive = true
         const timer = setTimeout(() => {
-            listLensProfiles(trimmed)
-                .then((list) => alive && setResults(list))
-                .catch(() => alive && setResults([]))
-        }, 250)
+            listLensProfiles(trimmedQuery)
+                .then((list) => alive && setResults({ query: trimmedQuery, list }))
+                .catch(() => alive && setResults({ query: trimmedQuery, list: [] }))
+        }, LENS_SEARCH_DEBOUNCE_MS)
         return () => {
             alive = false
             clearTimeout(timer)
         }
-    }, [query])
+    }, [trimmedQuery])
 
     if (!lens) return null
 
@@ -69,7 +70,7 @@ export const LensSection: FC = () => {
             edit((draft) => void (draft.lens.profileId = profile.id), { label: t('history.lensProfile') })
             await useLens.getState().refreshCurrent()
             setQuery('')
-            setResults([])
+            setResults({ query: '', list: [] })
             useToast.getState().show(t('toast.lensRemembered', { name: profile.name }))
         } catch {
             useToast.getState().show(t('toast.lensNoInfo'))
@@ -143,9 +144,9 @@ export const LensSection: FC = () => {
                         placeholder={t('panel.lens.searchPlaceholder')}
                         className='w-full rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-100 outline-none focus:ring-1 focus:ring-neutral-500'
                     />
-                    {results.length > 0 && (
+                    {visibleResults.length > 0 && (
                         <div className='max-h-40 overflow-y-auto rounded border border-neutral-800 bg-neutral-950/60'>
-                            {results.map((profile) => (
+                            {visibleResults.map((profile) => (
                                 <button
                                     key={profile.id}
                                     type='button'

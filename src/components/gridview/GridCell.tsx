@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FC, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { aetherUrl } from '../../ipc/pixels'
@@ -36,12 +36,11 @@ export const GridCell: FC<GridCellProps> = ({
     onContextMenu,
 }) => {
     const { t } = useTranslation()
-    const [failed, setFailed] = useState(false)
+    const [failedSrc, setFailedSrc] = useState<string | null>(null)
 
     const src = `${aetherUrl(`pixels/${entry.imageId}/l0`)}${rev ? `?rev=${rev}` : ''}`
+    const failed = failedSrc === src
     const border = labelColor(label)
-
-    useEffect(() => setFailed(false), [src])
 
     return (
         <div className='p-1'>
@@ -59,7 +58,7 @@ export const GridCell: FC<GridCellProps> = ({
                         {entry.fileName}
                     </span>
                 ) : (
-                    <img src={src} loading='lazy' draggable={false} alt='' onError={() => setFailed(true)} className='h-full w-full object-cover' />
+                    <img src={src} loading='lazy' draggable={false} alt='' onError={() => setFailedSrc(src)} className='h-full w-full object-cover' />
                 )}
                 {entry.isRaw && (
                     <span className='pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 text-[9px] font-semibold text-sky-300'>

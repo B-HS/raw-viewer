@@ -24,11 +24,15 @@ type View = { zoom: number; panX: number; panY: number }
 
 const FIT_VIEW: View = { zoom: 1, panX: 0, panY: 0 }
 
+const currentImageId = () => {
+    const state = usePlaylist.getState()
+    return state.entries[state.currentIndex]?.imageId ?? null
+}
+
 export const CpuFallbackView: FC = () => {
     const { t } = useTranslation()
     const containerRef = useRef<HTMLDivElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
-    const currentIdRef = useRef<string | null>(null)
     const lastStateRef = useRef<unknown>(null)
     const editTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const dragRef = useRef<{ x: number; y: number } | null>(null)
@@ -39,49 +43,13 @@ export const CpuFallbackView: FC = () => {
     const [busy, setBusy] = useState(false)
 
     const imageId = usePlaylist((state) => state.entries[state.currentIndex]?.imageId ?? null)
-    currentIdRef.current = imageId
-
-    const maxEdge = () => {
-        const dpr = window.devicePixelRatio || 1
-        const long = Math.max(container.w, container.h)
-        if (long <= 0) return DEFAULT_MAX_EDGE
-        return Math.max(MIN_MAX_EDGE, Math.min(MAX_MAX_EDGE, Math.round(long * dpr)))
+    const [prevImageId, setPrevImageId] = useState(imageId)
+    if (imageId !== prevImageId) {
+        setPrevImageId(imageId)
+        setView(FIT_VIEW)
+        setFrame(null)
+        setBusy(imageId != null)
     }
-
-    const request = () => {
-        const id = currentIdRef.current
-        if (!id) return
-        setBusy(true)
-        renderCpuFrame(id, maxEdge())
-            .catch(() => undefined)
-            .finally(() => {
-                if (currentIdRef.current === id) setBusy(false)
-            })
-    }
-    const requestRef = useRef(request)
-    requestRef.current = request
-
-    const draw = async (imageIdForFrame: string, rev: number, flip: number) => {
-        if (imageIdForFrame !== currentIdRef.current) return
-        try {
-            const decoded = await fetchCpuFrame(imageIdForFrame, rev)
-            if (imageIdForFrame !== currentIdRef.current) return
-            const canvas = canvasRef.current
-            const ctx = canvas?.getContext('2d')
-            if (!canvas || !ctx) return
-            canvas.width = decoded.width
-            canvas.height = decoded.height
-            ctx.putImageData(new ImageData(decoded.data, decoded.width, decoded.height), 0, 0)
-            setFrame({ w: decoded.width, h: decoded.height, flip })
-        } catch {
-            if (imageIdForFrame === currentIdRef.current && failedIdRef.current !== imageIdForFrame) {
-                failedIdRef.current = imageIdForFrame
-                useToast.getState().show(i18n.t('toast.cpuFrameFailed'))
-            }
-        }
-    }
-    const drawRef = useRef(draw)
-    drawRef.current = draw
 
     const onPointerDown = (event: React.PointerEvent) => {
         if (event.button !== 0) return
@@ -119,38 +87,72 @@ export const CpuFallbackView: FC = () => {
     }, [])
 
     useEffect(() => {
+        const maxEdge = () => {
+            const element = containerRef.current
+            const dpr = window.devicePixelRatio || 1
+            const long = element ? Math.max(element.clientWidth, element.clientHeight) : 0
+            if (long <= 0) return DEFAULT_MAX_EDGE
+            return Math.max(MIN_MAX_EDGE, Math.min(MAX_MAX_EDGE, Math.round(long * dpr)))
+        }
+
+        const request = () => {
+            const id = currentImageId()
+            if (!id) return
+            renderCpuFrame(id, maxEdge())
+                .catch(() => undefined)
+                .finally(() => {
+                    if (currentImageId() === id) setBusy(false)
+                })
+        }
+
+        const draw = async (imageIdForFrame: string, rev: number, flip: number) => {
+            if (imageIdForFrame !== currentImageId()) return
+            try {
+                const decoded = await fetchCpuFrame(imageIdForFrame, rev)
+                if (imageIdForFrame !== currentImageId()) return
+                const canvas = canvasRef.current
+                const ctx = canvas?.getContext('2d')
+                if (!canvas || !ctx) return
+                canvas.width = decoded.width
+                canvas.height = decoded.height
+                ctx.putImageData(new ImageData(decoded.data, decoded.width, decoded.height), 0, 0)
+                setFrame({ w: decoded.width, h: decoded.height, flip })
+            } catch {
+                if (imageIdForFrame === currentImageId() && failedIdRef.current !== imageIdForFrame) {
+                    failedIdRef.current = imageIdForFrame
+                    useToast.getState().show(i18n.t('toast.cpuFrameFailed'))
+                }
+            }
+        }
+
         let disposed = false
         let unlisten: (() => void) | null = null
-        onCpuFrameReady((payload) => drawRef.current(payload.imageId, payload.rev, payload.flip))
+        onCpuFrameReady((payload) => draw(payload.imageId, payload.rev, payload.flip))
             .then((dispose) => (disposed ? dispose() : (unlisten = dispose)))
             .catch(() => undefined)
+
+        lastStateRef.current = useEditStore.getState().state
+        if (imageId) request()
+
+        const unsubscribe = useEditStore.subscribe((state) => {
+            if (state.state === lastStateRef.current) return
+            lastStateRef.current = state.state
+            if (state.imageId !== currentImageId()) return
+            if (editTimerRef.current) clearTimeout(editTimerRef.current)
+            editTimerRef.current = setTimeout(() => {
+                setBusy(true)
+                request()
+            }, EDIT_DEBOUNCE_MS)
+        })
+
         return () => {
             disposed = true
             unlisten?.()
-        }
-    }, [])
-
-    useEffect(() => {
-        lastStateRef.current = useEditStore.getState().state
-        setView(FIT_VIEW)
-        setFrame(null)
-        if (imageId) requestRef.current()
-        return () => {
+            unsubscribe()
             if (editTimerRef.current) clearTimeout(editTimerRef.current)
             editTimerRef.current = null
         }
     }, [imageId])
-
-    useEffect(() => {
-        const unsubscribe = useEditStore.subscribe((state) => {
-            if (state.state === lastStateRef.current) return
-            lastStateRef.current = state.state
-            if (state.imageId !== currentIdRef.current) return
-            if (editTimerRef.current) clearTimeout(editTimerRef.current)
-            editTimerRef.current = setTimeout(() => requestRef.current(), EDIT_DEBOUNCE_MS)
-        })
-        return unsubscribe
-    }, [])
 
     useEffect(() => {
         const element = containerRef.current

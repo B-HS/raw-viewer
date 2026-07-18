@@ -1,8 +1,8 @@
 # raw-viewer 프론트엔드 아키텍처 (src/)
 
-기준 커밋 시점: 2026-07 (dev 브랜치). 모든 경로는 저장소 루트 기준. 근거는 `파일:라인`.
+기준 커밋 시점: 2026-07-18 잔여 작업 웨이브(React Compiler 도입·useRenderEngine 재구조화·uiStore 엔진 단일화) 반영 (dev 브랜치). 모든 경로는 저장소 루트 기준. 근거의 `파일:라인`은 이 시점 기준이며 이후 시프트될 수 있다 — 구조 서술을 우선 신뢰.
 
-스택: Vite 6 + React 18 + TypeScript strict + zustand 5 + immer 11 + i18next/react-i18next + Tailwind 3 + @tanstack/react-virtual + Tauri v2 API (package.json:17-53). 스크립트: `dev`(vite) / `typecheck`(tsc --noEmit) / `test`(bun test src) / `lint`(eslint src) / `build` (package.json:9-17).
+스택: Vite 6 + React 18 + **React Compiler**(babel-plugin-react-compiler target 18 + react-compiler-runtime — vite.config.ts, 2026-07-18 도입) + TypeScript strict + zustand 5 + immer 11 + i18next/react-i18next + Tailwind 3 + @tanstack/react-virtual + Tauri v2 API (package.json). 스크립트: `dev`(vite) / `typecheck`(tsc --noEmit) / `test`(bun test src) / `lint`(eslint src) / `build`. eslint는 react-hooks v7 컴파일러 진단 포함(경고 0 유지 — `incompatible-library`만 config off, 사유는 acknowledge).
 
 진입: `src/main.tsx` — `useSettings.getState().hydrate()`를 await 없이 호출한 뒤 `I18nextProvider`로 `App`을 렌더 (main.tsx:9-20). FSD가 아니라 역할별 평면 디렉토리 구조다.
 
@@ -36,7 +36,7 @@ zustand 스토어 (create 사용):
 | `playlist.ts` | 핵심 목록 스토어. `entries`(ImageEntry[])·`currentIndex`·`dir`·`scanning/total`, **정렬**(`sortKey/sortOrder/sortAux` — setSort/mergeSortAux가 `sortEntries`로 재정렬하며 현재 항목 위치를 추적: playlist.ts:78-95), **선택**(`selection`(imageId[])·`selectionAnchor`, selectToggle/selectRange/selectAll/focusIndex: 167-198), **best 레벨**(`best: Record<imageId, LevelReadyPayload>` — `setLevel`은 LEVEL_RANK(l0<l1<l2)로 하위 레벨 도착을 무시: 12, 202-209), `errors`, `filteredIndices`. `WINDOW_RADIUS=3`(GPU 텍스처 윈도), `neighbors()` 유틸 (8, 14-26) |
 | `editStore.ts` | 현재 이미지의 `EditState` + `version`. `edit(recipe, {label, coalesceKey})`가 immer `produceWithPatches`로 패치 생성 → 엔진 push → 히스토리 기록 → **500ms 디바운스 저장**(SAVE_DEBOUNCE_MS: 15, scheduleSave/enqueueSave 직렬 체인: 73-85). 저장 충돌(`isConflictError`) 시 서버 상태 재로드 (57-70). `loadForImage`는 토큰으로 레이스 차단 (107-119). `flushPending`은 대기 저장 즉시 실행 (180-190). 모듈 말미에 **`connectHistoryTarget` 주입**으로 historyStore와 연결 (194-197) |
 | `historyStore.ts` | 이미지별 undo/redo 스택(`stacks: Record<imageId, {undo,redo}>`, 최대 100개: 4). coalesceKey+500ms 병합, 드래그 코얼레싱(beginCoalesce/endCoalesce: 48-49). **editStore를 직접 import하지 않고** `connectHistoryTarget({imageId, applyPatches})` 주입으로 순환 참조 회피 (31-40) |
-| `uiStore.ts` | **엔진 연결**: `engine: EngineApi \| null`, `attachEngine` 시 clipping/compare/sideBySide/cropEditMode를 엔진에 재동기화 (67-75). `zoomRequest: {preset, nonce}` — nonce 증가로 1회성 명령 전달 (18, 77). **`pairSwap: Record<보이는id, 원본 ImageEntry>`** (RAW↔JPEG 스왑 복원용: 19, 79-84). `slideshowActive`, `isFullscreen`, `activeSection`, clipping/compare/sideBySide(상호 배타: 93-106), cropEditMode/cropOverlay, eyedropper, TAT(`tatActive/tatBand`) |
+| `uiStore.ts` | **엔진 연결의 단일 출처**: `engine: EngineApi \| null` + `renderCaps`(lowPrecision/displaySpace) + `gpuError`(초기값 `shouldForceCpuRender()` — localStorage 플래그, 이 파일에 위치). `attachEngine` 시 clipping/compare/sideBySide/cropEditMode를 엔진에 재동기화. attach/detach·caps·gpuError 세팅의 소유자는 **useRenderEngine의 mount effect**다(2026-07-18 단일화 — 이전의 훅 로컬 state 복제 제거). `zoomRequest: {preset, nonce}` — nonce 증가로 1회성 명령 전달. **`pairSwap: Record<보이는id, 원본 ImageEntry>`** (RAW↔JPEG 스왑 복원용). `slideshowActive`, `isFullscreen`, `activeSection`, clipping/compare/sideBySide(상호 배타), cropEditMode/cropOverlay, eyedropper, TAT(`tatActive/tatBand`) |
 | `settings.ts` | 영속 설정. tauri plugin-store `settings.json` (46, 77-90). 언어·테마·뷰포트 배경·모니터 프로파일·`preloadRadius`·`l2Policy`·`isolatedDecode`·`openInNewWindow`·recentApps·filmstripHeight·gridCellSize·slideshowIntervalMs·**sortKey/sortOrder**·autoUpdateCheck·**shortcutOverrides**. `hydrate()`가 타입가드로 검증 후 applyLanguage/applyTheme/pushPerformance 부수효과 실행 (138-188). 성능 3종은 변경 시 `set_performance_settings` IPC로 백엔드 전파 (74-75) |
 | `exportStore.ts` | 내보내기 다이얼로그+실행. 설정은 localStorage `raw-viewer:export-settings` (43, 84-115). `start()`: flushPending → 대상별 `getEditState`+`ensureAethSource`(l2 대기, 12s 타임아웃: 45, 164-211) → `createExportEngine().prepare().stream()` 타일 전송 → 워터마크 PNG → `exportFinish` (290-375). DNG 단건/배치(`runDng/runDngBatch`), 외부 앱 핸드오프(`runEditedHandoff`: 16bit TIFF 임시 렌더 후 `openWithEdited`: 412-465), DNG 실패 시 TIFF 전환 프롬프트 (466-489) |
 | `organize.ts` | 별점/플래그/라벨. `entries: Record<imageId, OrganizeEntry>` + `edited` + `version`(구독자 리컴퓨트 트리거). 낙관적 갱신 + 실패 시 롤백 (36-56). LABELS 5색 정의 (8-14) |
@@ -52,7 +52,7 @@ zustand 스토어 (create 사용):
 | `overlays.ts` | settings/about/palette 열림 상태 + `isOverlayBlocking()` (키 핸들러 가드: 28-31) |
 | `contextMenu.ts` / `renameDialog.ts` / `toast.ts` | 컨텍스트 메뉴 좌표+대상 / 이름변경 대상 / 단일 토스트(1.8s 자동 소멸: toast.ts:8) |
 | `samplerPins.ts` | 이미지별 색상 샘플러 핀(최대 5개, 단위 percent/byte/hex 순환) |
-| `viewportProjection.ts` | 뷰포트 투영 발행: `model`(3x3 행렬)·clientW/H·imageId·nonce. useRenderEngine이 렌더마다 publish (useRenderEngine.ts:65-69), 오버레이·L2 줌 판정이 구독 |
+| `viewportProjection.ts` | 뷰포트 투영 발행: `model`(3x3 행렬)·clientW/H·imageId·nonce. useRenderEngine이 렌더마다 publish(`publishProjection` — mount effect 내부), 오버레이·L2 줌 판정이 구독 |
 | `viewportCommand.ts` | zustand가 아닌 리스너 버스. `requestZoom(command)` → 뷰포트 구독자 호출 (팔레트 줌 액션이 사용: shortcuts/actions.ts:66-68) |
 
 스토어가 아닌 모듈 (같은 폴더):
@@ -69,12 +69,12 @@ zustand 스토어 (create 사용):
 
 ### 3.1 GL 경로 (기본)
 
-1. `useRenderEngine`(components/viewport/useRenderEngine.ts)이 canvas에 `Renderer`(gl/renderer.ts) 생성, `createEngineApi`로 감싸 `setEngine` (120-136). 실패 시 `gpuError=true` (124-129).
+1. `useRenderEngine`(components/viewport/useRenderEngine.ts)은 **mount effect 하나**가 전부다(2026-07-18 재구조화): canvas에 `Renderer`(gl/renderer.ts) 생성 → `createEngineApi`로 감싸 `useUiStore.attachEngine` + `setRenderCaps`, 실패 시 `setGpuError(true)`. view/raf/drag/fetches는 effect 클로저 로컬 변수이고, playlist(현재 인덱스·창)·zoomRequest·histogram hover·monitor profile 반응은 전부 **store subscribe**로 이 effect 안에서 처리한다(훅 반환은 `{ canvasRef }`뿐). Viewport는 engine/renderCaps/gpuError를 uiStore 셀렉터로 읽는다.
 2. `onLevelReady` → 현재 인덱스 ±`WINDOW_RADIUS`(3) 안이면 `fetchAndUpload` (321-347). `fetchPixels`는 aether 프로토콜 fetch: macOS `aether://localhost/…`, Windows `http://aether.localhost/…` (ipc/pixels.ts:3-6).
 3. **L0 = JPEG 경로**: `level==='l0'`이면 응답을 그대로 `{kind:'jpeg', blob}`로 반환 (ipc/pixels.ts:22) → `createImageBitmap` 후 `renderer.uploadL0` — RGBA8 텍스처 (renderer.ts:448-474). L0은 편집 파이프라인을 **타지 않고** 원본 텍스처를 pass8에 `uSourceKind=1`로 직접 출력 (renderer.ts:839-842, 920; 셰이더 분기 shaders.ts:450, 472).
 4. **aeth = f16 경로**: l1/l2는 `AETH` 매직 + f16 RGB 바이너리를 파싱해 `Uint16Array` 반환 (ipc/pixels.ts:24-35, format=2/channels=3 검증) → `renderer.uploadAeth` — **RGB16F/HALF_FLOAT 텍스처** (renderer.ts:426). 최대 텍스처 초과 시 타일 축소 프록시 생성(`buildTiledProxy`, TILE_SIZE 2048/OVERLAP 32: renderer.ts:370-411, gl/tiles.ts:1-2). lowPrecision(EXT_color_buffer_float 없음)에서는 타일링 거부 (renderer.ts:415-416).
 5. 편집 파이프라인은 7스테이지: WB(0)→GEOMETRY(1)→TONE(2)→CURVE(3)→COLOR(4)→DETAIL(5)→EFFECTS(6) (gl/dirty.ts:5-13). **pass1(WB)에서 `uColorMatrix`(카메라→작업색공간 행렬, LevelReadyPayload.colorMatrix)와 WB 게인을 적용** (renderer.ts:590-592; shaders.ts:69-78 `o = vec4(uColorMatrix * (uWbGain * c), 1.0)`). `earliestDirtyStage` 비교로 바뀐 스테이지부터만 재실행(`rebuildFrom` 캐시: renderer.ts:320-334, 852-857). 비활성 스테이지는 건너뜀 (`stageActive`: dirty.ts:15-24).
-6. 최종 pass8: 모델 행렬 배치 + Rec2020→디스플레이(P3/sRGB) 변환 + 모니터 ICC 3D LUT(`useMonitorProfile`+`get_display_lut`: useRenderEngine.ts:138-150) + 클리핑 표시 + compare 분할 + 크롭 마스크 (renderer.ts:883-931). before/after는 중립 상태로 별도 base 텍스처 렌더 (`buildBase`: 762-792), side-by-side는 2뷰포트 (933-975).
+6. 최종 pass8: 모델 행렬 배치 + Rec2020→디스플레이(P3/sRGB) 변환 + 모니터 ICC 3D LUT(`useMonitorProfile` 설정 구독 + `get_display_lut` — useRenderEngine mount effect) + 클리핑 표시 + compare 분할 + 크롭 마스크 (renderer.ts:883-931). before/after는 중립 상태로 별도 base 텍스처 렌더 (`buildBase`: 762-792), side-by-side는 2뷰포트 (933-975).
 7. 히스토그램: 구독자가 있을 때만 1/8 축소 렌더를 readPixels → Web Worker 집계, 150ms 스로틀 (renderer.ts:794-823, gl/histogram.ts, gl/histogram.worker.ts).
 8. 뷰 조작(휠 줌/팬/스페이스 팬/Z 토글/샘플러 핀 shift-클릭)은 전부 useRenderEngine 내부 (158-295). 렌더마다 `useViewportProjection.publish` (65-79). WebGL 컨텍스트 로스트 복구는 `reinit()` + 재업로드 (262-275).
 
@@ -82,7 +82,7 @@ zustand 스토어 (create 사용):
 
 ### 3.2 CPU 폴백
 
-- 발동: WebGL2 생성 실패 또는 localStorage `rawviewer.forceCpuRender==='1'` (useRenderEngine.ts:22-28, 45) → `Viewport`가 `<CpuFallbackView />` 렌더 (Viewport.tsx:95-100).
+- 발동: WebGL2 생성 실패 또는 localStorage `rawviewer.forceCpuRender==='1'` (`shouldForceCpuRender` — store/uiStore.ts, gpuError 초기값) → `Viewport`가 `<CpuFallbackView />` 렌더.
 - 흐름: `render_cpu_frame(imageId, maxEdge)` invoke (ipc/commands.ts:48) → 백엔드가 `cpu:frame-ready` 이벤트 (ipc/events.ts:28-29) → `fetchCpuFrame`으로 aether `pixels/{id}/cpu` 에서 **u8 RGBA** AETH(format=0/channels=4)를 받아 `putImageData` (ipc/pixels.ts:37-53, CpuFallbackView.tsx:64-82).
 - 편집 변경은 editStore 구독 + 300ms 디바운스로 재요청 (CpuFallbackView.tsx:14, 144-153). 자체 줌/팬 구현(CSS transform). 이 모드에서는 `engine`이 null이므로 히스토그램·클리핑·compare·eyedropper 등 엔진 의존 기능이 조용히 비활성.
 
@@ -130,7 +130,7 @@ zustand 스토어 (create 사용):
 - **App.tsx의 키 핸들러 2개**:
   1. **비메타 내비 핸들러** (App.tsx:374-406): `event.metaKey`면 즉시 리턴 (382). nav.previous/next/first/last/pageBack/pageForward만 처리하고, 연타 시 `pendingIndexRef`+`requestAnimationFrame`으로 프레임당 1회 focusIndex 커밋 (374-380, 397-398). 그리드 활성·오버레이 열림·빈 목록이면 무시 (383-384).
   2. **일반 핸들러** (App.tsx:408-594): **capture 단계**(`addEventListener('keydown', onKeyDown, true)`: 588)로 등록되어 1번보다 먼저 실행. 메타 포함 액션 전부(undo/redo/복사/내보내기/패널 토글/플래그/크롭/비교 등)를 `matchAction` else-if 체인으로 분기. 숫자키는 액션 테이블 밖 하드코딩: meta+0-5=라벨 (450-455), alt+1-9=프리셋 (521-524), 0-5=별점 (525-528). `inspect.before`는 keydown에 `engine.setEditState(null)`, keyup에서 원복 (559-561, 585-587). 크롭 모드 한정 A/X/O는 고정 KEYMAP 사용 (568-578).
-- 뷰포트 줌/팬 키(Z, ⌘0/1/2, Space)는 App이 아니라 useRenderEngine의 자체 핸들러 (useRenderEngine.ts:223-260). 공통 가드는 `isEditableTarget`(입력 필드)과 `isOverlayBlocking()`.
+- 뷰포트 줌/팬 키(Z, ⌘0/1/2, Space)는 App이 아니라 useRenderEngine의 자체 핸들러(mount effect 내 `onKeyDown`). 공통 가드는 `isEditableTarget`(입력 필드)과 `isOverlayBlocking()`.
 
 ---
 
@@ -147,7 +147,7 @@ zustand 스토어 (create 사용):
 ## 7. i18n
 
 - `i18n/i18n.ts`: i18next 초기화가 **모듈 import 시점에 실행**된다 (i18n.ts:20-26). `AppLanguage = 'system'|'ko'|'en'|'ja'`, system은 `navigator.language`로 해석 (11-18), `fallbackLng: 'en'`. `applyLanguage`는 settings hydrate/setLanguage에서 호출 (settings.ts:181, 191).
-- 리소스: `en.ts`(756줄)·`ko.ts`(755줄)·`ja.ts`(757줄) — 각각 `export const en = { common: {...}, app: {...}, panel: {...}, … , shortcut: {...} }` 형태의 **평범한 중첩 객체**. `satisfies typeof en` 같은 상호 타입 제약이 **없다** (ko.ts:1, ja.ts:1). 따라서 **새 키는 3파일 모두에 수동 추가**해야 하며, 빠뜨려도 타입 에러가 나지 않고 en 폴백으로 조용히 넘어간다.
+- 리소스: `en.ts`·`ko.ts`·`ja.ts` — 각각 `export const en = { common: {...}, app: {...}, panel: {...}, … , shortcut: {...} }` 형태의 **평범한 중첩 객체**. `satisfies typeof en` 같은 상호 타입 제약이 **없다** (ko.ts:1, ja.ts:1). 따라서 **새 키는 3파일 모두에 수동 추가**해야 하며, 빠뜨려도 타입 에러가 나지 않고 en 폴백으로 조용히 넘어간다.
 - 검증 스니펫 (저장소 루트에서 `bun run …`으로 실행, 출력 없으면 일치):
 
 ```ts
@@ -185,17 +185,17 @@ for (const [name, keys] of [['ko', new Set(flat(ko))], ['ja', new Set(flat(ja))]
 
 1. **i18n import 부수효과**: `i18n/i18n.ts`를 import하는 순간 i18next `init`이 실행된다 (i18n.ts:20-26). 스토어 대부분이 `i18n`을 import하므로, 스토어 모듈을 테스트에서 import만 해도 i18next가 초기화된다. 언어 결정에 `navigator`를 참조 (13).
 2. **playlist 정렬 경로가 이원화**: 정렬의 SSOT는 `useSettings.sortKey/sortOrder`이고, App.tsx effect가 이를 `usePlaylist.setSort`로 반영 + captureDate면 `probe_capture_dates`로 aux 채움 + rating이면 organize 구독으로 aux 동기화 (App.tsx:656-678). `usePlaylist.setSort`를 직접 부르면 영속되지 않고 effect가 되돌린다. 정렬 변경은 반드시 `useSettings.setSort`로.
-3. **zoomRequest는 nonce 채널**: `useUiStore.requestZoom(preset)`은 nonce를 증가시키는 1회성 명령이고 (uiStore.ts:77), useRenderEngine이 nonce 변화만 감지해 적용한다 (useRenderEngine.ts:349-356). 별개로 `store/viewportCommand.ts` 리스너 버스(`requestZoom(command)`)도 존재하며 팔레트가 이를 쓴다 — **줌 명령 경로가 2개**다.
+3. **zoomRequest는 nonce 채널**: `useUiStore.requestZoom(preset)`은 nonce를 증가시키는 1회성 명령이고, useRenderEngine이 store subscribe로 nonce 변화만 감지해 적용한다. 별개로 `store/viewportCommand.ts` 리스너 버스(`requestZoom(command)`)도 존재하며 팔레트가 이를 쓴다 — **줌 명령 경로가 2개**다.
 4. **closingRef 닫기 흐름**: 창 닫기는 `onCloseRequested`에서 `preventDefault` 후 `editStore.flushPending()`+`flushOrganize()`를 await하고 `destroy()` (App.tsx:275-297). `closingRef`로 재진입 차단, destroy 실패 시에만 해제. 종료 직전 저장 유실 이슈는 반드시 이 경로를 본다.
 5. **편집 저장은 디바운스+직렬 체인+버전 충돌 처리**: 500ms 디바운스, `chain` 프라미스로 순서 보장, conflict 에러 시 서버 상태로 덮어씀 (editStore.ts:38-99). 백엔드에 편집을 복사/적용하는 모든 코드(editClipboard·presetStore·exportStore·smartCopy)는 **먼저 `flushPending()`을 await** 한다 — 새 코드도 동일 규약 필수.
 6. **best 레벨은 단조 증가**: `setLevel`은 이미 더 높은 레벨이 있으면 무시 (playlist.ts:202-209). 파일 수정 감지 시 `invalidate`로 best를 비워야 재디코드 결과가 반영된다 (App.tsx:311-325).
 7. **pairSwap은 엔트리 치환 방식**: RAW↔JPEG 토글은 playlist 엔트리 자체를 JPEG 엔트리로 `replaceEntryAt` 치환하고, 원본 RAW 엔트리를 `uiStore.pairSwap[보이는 jpeg id]`에 보관한다 (App.tsx:136-156). 이후 선택·필터·삭제는 치환된 엔트리 기준으로 동작한다.
 8. **키 핸들러 우선순위**: 일반 핸들러가 capture(true)라 비메타 내비 핸들러(버블)보다 먼저 실행 (App.tsx:588 vs 400). meta+숫자는 `stopImmediatePropagation`까지 사용 (452). 숫자키(별점·라벨·프리셋)와 크롭 모드 A/X/O, 뷰포트 Z/⌘0/1/2/Space는 `SHORTCUT_ACTIONS`에 없어서 **설정에서 리매핑 불가**.
 9. **filteredIndices 재계산 트리거**: entries **참조** 변경, filter 전체, organize의 `version` 증가 3가지 구독으로 재계산 (App.tsx:347-372). organize를 확장할 때 version을 올리지 않으면 필터가 갱신되지 않는다 (organize.ts markEdited도 version++: 80-83).
-10. **engine 수명주기**: `uiStore.engine`은 Viewport 마운트 후에만 존재. editStore의 `pushEngine`은 null이면 무음 no-op (editStore.ts:43), attach 시 Viewport effect가 현재 상태를 재push (Viewport.tsx:64-74). CPU 폴백·애니메이션 뷰에서는 engine이 null이므로 엔진 의존 기능이 전부 조용히 꺼진다.
+10. **engine 수명주기**: `uiStore.engine`은 Viewport 마운트 후에만 존재. attach/detach는 useRenderEngine mount effect 소유, editStore의 `pushEngine`은 null이면 무음 no-op (editStore.ts:43), attach 후 Viewport의 [engine] effect가 편집 상태·렌즈를 재push. CPU 폴백·애니메이션 뷰에서는 engine이 null이므로 엔진 의존 기능이 전부 조용히 꺼진다.
 11. **L2 승격 히스테리시스**: `l2Policy==='zoom'`일 때 viewportProjection 구독으로 줌 비율 계산, 0.999 이상 진입 시 `request_l2`, 0.95 미만에서 해제 (App.tsx:176-177, 740-762). `l2ZoomRef`가 이미지당 1회 요청 가드.
 12. **영속 저장소가 3계층**: tauri plugin-store `settings.json`(설정 전반), localStorage(`raw-viewer:layout`, `raw-viewer:meta-collapsed`, `raw-viewer:export-settings`, `raw-viewer:export-gps-notice`, `rawviewer.forceCpuRender`), 백엔드 DB(편집 상태·organize·recents). 어디에 저장되는지 먼저 확인할 것.
 13. **기본 EditState가 2벌**: `store/editDefaults.ts`의 `DEFAULT_EDIT_STATE`(스토어/isDefault용)와 `gl/stateDefaults.ts`의 `NEUTRAL_EDIT_STATE`(렌더러의 null 대체·before 비교용, renderer.ts:104). 필드를 추가하면 **양쪽 + Rust 타입(ts-rs 재생성) + editDefaults의 stateSignature/cloneDefaultSection + gl/dirty.ts의 stageParamsEqual**을 함께 갱신해야 한다.
 14. **settings hydrate는 비동기**: main.tsx가 await 없이 호출 (main.tsx:9). 초기 렌더 몇 프레임은 DEFAULTS(정렬 name/asc, 단축키 기본값)로 동작하고 `hydrated` 플래그 이후 값이 바뀐다.
 15. **open 요청 이벤트는 main 창 한정**: `file:open-request`/`dock:open` 구독은 `getCurrentWindow().label === 'main'`일 때만 등록 (App.tsx:596-597). 보조 창(`window-*`)에서는 동작하지 않는 것이 의도.
-16. **preloadRadius(설정, navigate 프리로드 힌트)와 WINDOW_RADIUS=3(GPU 텍스처 보존 윈도)은 별개** (App.tsx:640 vs useRenderEngine.ts:361-370). GPU 윈도 밖 텍스처는 `setWindow`에서 즉시 삭제된다 (renderer.ts:310-318).
+16. **preloadRadius(설정, navigate 프리로드 힌트)와 WINDOW_RADIUS=3(GPU 텍스처 보존 윈도)은 별개** (App.tsx의 navigate 힌트 vs useRenderEngine `syncWindow`). GPU 윈도 밖 텍스처는 `setWindow`에서 즉시 삭제된다 (renderer.ts:310-318).

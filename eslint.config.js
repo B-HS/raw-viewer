@@ -14,6 +14,7 @@ export default tseslint.config(
             ...reactHooks.configs.recommended.rules,
             'react-hooks/set-state-in-effect': 'warn',
             'react-hooks/refs': 'warn',
+            'react-hooks/incompatible-library': 'off',
             'no-empty': ['error', { allowEmptyCatch: true }],
             'no-restricted-syntax': [
                 'error',
