@@ -6,6 +6,8 @@
 
 ---
 
+> 부트스트랩 추가(2026-07-18): main.rs가 LibRaw 로드 전에 `OMP_NUM_THREADS=4`·`KMP_BLOCKTIME=0`을 설정(미설정 시에만)해 OpenMP 팀 크기를 캡한다. macOS 표시명은 `src-tauri/Info.plist` 병합(CFBundleDisplayName/CFBundleName = "Raw Viewer")로 지정 — productName은 raw-viewer 유지(업데이터 자산명 보호).
+
 ## 1. 모듈 맵
 
 | 모듈 | 책임 (1줄) | 핵심 파일 |
@@ -180,7 +182,8 @@ CORS: 모든 응답에 `Access-Control-Allow-Origin`을 빌드별 고정 웹뷰 
 | `open_path` | 파일 canonicalize→registry 등록→edit on_navigate→pipeline.navigate. `OpenResult{entry,dir}` 반환(`commands.rs:73-87`) |
 | `open_in_new_window` | 새 라벨 발급 후 창별 큐에 경로 적재, WebviewWindow 생성(`commands.rs:56-71`) |
 | `scan_directory` | 디렉토리 스캔을 `Channel<ScanBatch>`(100개 배치)로 스트리밍(`commands.rs:89-101`, `scan/mod.rs:112-149`) |
-| `navigate` | 현재/이웃 id로 pipeline.navigate + edit 플러시 트리거(`commands.rs:103-115`) |
+| `navigate` | 현재/이웃 id로 pipeline.navigate + edit 플러시 트리거 |
+| `preload_l0` | 전방 미로딩 사진들의 L0을 light 큐에 대량 큐잉(PRIO_PRELOAD_BASE=200+i, L0 세대 플래그 — 2026-07-18) |
 | `get_edit_state` / `set_edit_state` / `reset_edit_state` | 편집 상태 조회/저장(낙관적 버전, 불일치 시 `AppError::Conflict`)/초기화(`commands.rs:117-142`) |
 | `flush_edits` | 편집 즉시 플러시(`commands.rs:144-148`) |
 | `get_metadata` | EXIF+LibRaw probe 합성 메타데이터(`commands.rs:150-156`) |

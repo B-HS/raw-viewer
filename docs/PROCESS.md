@@ -1,119 +1,89 @@
 # PROCESS — raw-viewer 작업 상태 (세션 연속성 단일 진입점)
 
-> **프로젝트명 = raw-viewer** (사용자 확정, 2026-07-15). PRD 내 "AetherLens"는 문서상 가칭 — 코드·번들 식별자는 전부 raw-viewer(`app.raw-viewer`), `aether://` 스킴 등 아키텍처 명칭은 스펙 유지.
+> **프로젝트명 = raw-viewer** (사용자 확정, 2026-07-15). 표시명은 **"Raw Viewer"**(Info.plist, 2026-07-18 — 파일·식별자는 raw-viewer 유지). PRD 내 "AetherLens"는 문서상 가칭 — 코드·번들 식별자는 전부 raw-viewer(`app.raw-viewer`), `aether://` 스킴 등 아키텍처 명칭은 스펙 유지.
 > ai-process §2 규칙에 따른 세션 간 연속성 문서. 매 스텝마다 체크 상태를 갱신한다. 완료 이력이 쌓이면 docs/history/ 로 이관한다.
+> Claude 외 에이전트는 루트 [AGENTS.md](../AGENTS.md)부터 읽는다.
 
 ## 새 세션 시작 순서
 
 1. 이 문서 전체 → 아래 "현재 상태 스냅샷"과 "남은 작업"으로 상황 파악.
 2. [docs/architecture-backend.md](./architecture-backend.md) · [docs/architecture-frontend.md](./architecture-frontend.md) — 코드를 재탐색하지 않고 구조·계약·함정을 파악.
 3. [docs/acknowledge/decisions.md](./acknowledge/decisions.md) — 사용자 결정 전체(왜 이렇게 돼 있는지). 결정을 재질문하지 않는다.
-4. 필요 시: [docs/release.md](./release.md)(배포·시크릿), docs/bug/(과거 버그 원인·교훈), docs/history/(완료 이력 상세).
+4. 필요 시: [docs/release.md](./release.md)(배포·시크릿·캐시 워밍), docs/bug/(과거 버그 원인·교훈), docs/history/(완료 이력 상세).
 
 ## 문서 지도
 
 | 문서 | 내용 |
 |------|------|
-| [PRD.md](./PRD.md) | **확정 스펙 v2.0** — 모든 구현 판단의 단일 출처. 절대 규칙 R1~R7. §11 체크리스트는 실제 상태 반영됨(미구현 4건만 남음) |
-| [architecture-backend.md](./architecture-backend.md) | Rust 백엔드 모듈맵·디코드 파이프라인·색 계약·커맨드/이벤트 전수·함정 |
-| [architecture-frontend.md](./architecture-frontend.md) | 프론트 디렉토리맵·스토어 전수·렌더 경로·단축키 시스템·함정 |
+| [PRD.md](./PRD.md) | **확정 스펙 v2.0** — 모든 구현 판단의 단일 출처. 절대 규칙 R1~R7. §11 체크리스트는 실제 상태 반영됨 |
+| [architecture-backend.md](./architecture-backend.md) | Rust 백엔드 모듈맵·디코드 파이프라인(워커 레인·OMP 캡·preload_l0)·색 계약·커맨드/이벤트 전수·함정 |
+| [architecture-frontend.md](./architecture-frontend.md) | 프론트 디렉토리맵·스토어 전수·렌더 경로(WebGL2/WebGPU/CPU)·단축키 시스템·함정 |
 | [acknowledge/decisions.md](./acknowledge/decisions.md) | 사용자 결정 시간순 전체 |
-| [release.md](./release.md) | CI/릴리스 파이프라인·시크릿 현황·릴리스 절차·자동 업데이트 |
+| [release.md](./release.md) | CI/릴리스 파이프라인·캐시 워밍·시크릿 현황·릴리스 절차·자동 업데이트 |
 | [i18n.md](./i18n.md) | 다국어(한/영/일) 구조·번역 PR 기여 절차 |
+| [phase6-contract.md](./phase6-contract.md) | WebGPU 백엔드 계약 — 6a~6i 전부 구현·수치 패리티 18벡터 ALL PASS, 시각 검증만 잔여 |
 | [phase5-contract.md](./phase5-contract.md) | Phase 5 구현 계약(완료) + 부록 A: 오류 삼킴 전수 분류 |
 | phase1~3e-contract.md | 과거 Phase 구현 계약(완료) |
-| [webgpu-assessment.md](./webgpu-assessment.md) / [local-adjustments-draft.md](./local-adjustments-draft.md) | 장기 과제 조사·초안 (미착수) |
-| bug/ | 버그별 증상·원인·해결·교훈 (release dylib, close 권한, Open With 크래시 등) |
-| history/ | 완료 이력 아카이브 — [phases-0-4-complete.md](./history/phases-0-4-complete.md)에 Phase 0~5 상세 체크리스트·커밋 해시 |
-| quality-assurance/ | 수동 검증 체크리스트(§8.2 35항목 등)·JXL 평가 |
+| [webgpu-assessment.md](./webgpu-assessment.md) / [local-adjustments-draft.md](./local-adjustments-draft.md) | WebGPU 사전 조사(phase6로 계승) / 로컬 보정 초안(미착수) |
+| bug/ | 버그별 증상·원인·해결·교훈 (release dylib, close 권한, Open With 크래시, 슬라이드쇼 자체 취소, 디코드 CPU 초과구독) |
+| history/ | 완료 이력 아카이브 — [phases-0-4-complete.md](./history/phases-0-4-complete.md)(Phase 0~5), [2026-07-18-quality-waves.md](./history/2026-07-18-quality-waves.md)(v0.5.0~v0.5.2 웨이브 상세) |
+| quality-assurance/ | 수동 검증 체크리스트([v0.5.0-manual-checklist.md](./quality-assurance/v0.5.0-manual-checklist.md) 진행 중, §8.2 35항목, 필름스트립 실측)·JXL 평가 |
 
 ## 기준 문서 (규칙)
-- `~/.claude/convention/*.md` — 코드 컨벤션 (arrow-fn only, 주석 금지(JSDoc·SPEC-GAP 예외), 타입 유도, FSD 등)
+- `~/.claude/convention/*.md` — 코드 컨벤션 (arrow-fn only, 주석 금지(JSDoc·SPEC-GAP 예외), 타입 유도, React Compiler 전제 등)
 - 커밋: Conventional Commits(type 영어·설명 한국어), author = Hyunseok Byun 단독, Co-Authored-By/AI 트레일러 절대 금지, `git add -A` 금지(선별 스테이징), force push 금지.
-- git: dev에서 작업, 웨이브 완료 시 검증 후 dev push. prod 병합·릴리스 태그는 확립된 흐름([release.md](./release.md) 절차)을 따른다.
-- 검증 사다리(종료 전 필수): `bunx tsc --noEmit` → `bun run lint` → `bun test src` → `cargo test`(src-tauri) → 필요 시 실기동 스모크(`scripts/e2e-decode.sh`, 디버그 번들).
+- git: dev에서 작업, 웨이브 완료 시 검증 후 dev push. prod 병합·릴리스 태그는 확립된 흐름([release.md](./release.md) 절차 — **워밍 완료 후 태그**)을 따른다.
+- 검증 사다리(종료 전 필수): `bunx tsc --noEmit` → `bun run lint` → `bun test src` → `cargo test`(src-tauri) → i18n 키 diff(en/ko/ja 일치) → 필요 시 실기동 스모크(tauri dev 생존·패닉 0, WebGPU 변경 시 parity.html 하니스).
 
 ## 환경 (2026-07-16 신규 머신 이전)
 | 항목 | 값 |
 |------|-----|
-| 기기 | macOS 26.5.2 arm64 (Apple Silicon) — WebGPU 요건(26+) 충족 |
+| 기기 | macOS 26.5.2 arm64 (M5 Max, 논리코어 18) — WebGPU 요건 충족 |
 | Rust | 1.97.0 (rustup, `~/.cargo/bin` — 셸 프로필 미수정, `export PATH="$HOME/.cargo/bin:$PATH"` 필요) |
 | Bun | 1.3.14 (Node 24.18.0 병존) |
-| libomp | Homebrew — 정적 libomp.a 링크. 없으면 LibRaw가 OpenMP 없이 빌드되어 X-Trans 병렬화 무효 (`export LIBOMP_PREFIX="$(brew --prefix libomp)"` 권장) |
+| libomp | Homebrew — 정적 libomp.a 링크 (`export LIBOMP_PREFIX="$(brew --prefix libomp)"` 권장). 런타임 팀 크기는 main.rs가 OMP_NUM_THREADS=4로 캡 |
 | 프로젝트 루트 | `/Users/hyunseokbyun/development/raw-viewer` |
 | gh CLI | 인증됨 (계정 B-HS) |
+| 실사진 테스트 폴더 | `/Volumes/SSD/202309 osaka/DCIM/100CANON` (CR2 153장, 사용자 허가) |
 
 신규 클론 복원: `bun install` → rustup → `brew install libomp` → `scripts/sync-vendor.sh`(libraw) → `scripts/sync-lensfun.sh` → `scripts/fetch-dnglab.sh` → `scripts/fetch-fixtures.sh`(tier1 16종 약 600MB, 테스트용).
 
-## 현재 상태 스냅샷 (2026-07-18 저녁 기준)
+## 현재 상태 스냅샷 (2026-07-18 심야 기준)
 
-- **저장소**: 공개(public), MIT 라이선스 인식됨, 언어 통계 정상(TS 51%/Rust 47%). 브랜치 dev=prod 동기화 상태.
-- **최신 릴리스 태그**: **v0.5.0** (draft — publish는 사용자 담당. WebGPU 백엔드+compute NR 포함, 실화면 검증은 이 빌드로 수행 예정). v0.3.1부터 자동 업데이트 자산 포함. v0.1.1~v0.4.0 draft는 의도적 유지.
-- **시크릿**: Apple 서명·공증 5종 + `TAURI_SIGNING_PRIVATE_KEY` 등록 완료. updater 개인키 = `~/raw-viewer-updater.key`(재생성 금지·백업 필요).
-- **테스트**: Rust 324건 + 프론트 bun test 17건 + E2E 디코드 스모크 12건. eslint 에러 0(경고 31 — C2-후속). CI(PR·수동)와 릴리스 워크플로 모두 그린.
-- **기능 상태**: RAW 16기종 + 일반 포맷(jpg/png/webp/tiff/bmp/gif/heic/heif/avif, 임베디드 ICC 반영) 뷰잉·비파괴 편집·프리셋·Export(래스터 배치+DNG)·정렬 5종·슬라이드쇼·전체화면·커스텀 타이틀바·파일 조작(rename/move/copy)·애니메이션 재생·다국어(한/영/일)·자동 업데이트.
-- **Phase 진행**: Phase 0~5 완료(상세: [history/phases-0-4-complete.md](./history/phases-0-4-complete.md)). 2026-07-18 사용자 피드백 웨이브 6건(F1~F6) 완료 — 닫기 버그·Open With 크래시 원인/수정은 [bug/](./bug/) 참조.
+- **저장소**: 공개(public), MIT. dev=prod 동기화, 최신 커밋 `893c164`(v0.5.2 상향).
+- **최신 릴리스 태그**: **v0.5.2** (draft 빌드 직후 — publish는 사용자 담당). v0.1.1~v0.5.1 draft는 의도적 유지. 자동 업데이트는 published 최신만 바라봄(아직 publish 0개 → 업데이트 확인은 "미공개 릴리스" 안내).
+- **시크릿**: Apple 서명·공증 5종 + `TAURI_SIGNING_PRIVATE_KEY` 등록 완료. updater 개인키 = `~/raw-viewer-updater.key`(재생성 금지·**백업은 아직 사용자 미완**).
+- **테스트**: Rust 324건 + 프론트 bun test 17건 + E2E 디코드 스모크 12건 + WebGPU 패리티 하니스 18벡터(parity.html, headless Chrome). eslint 에러 0·경고 0.
+- **CI**: PR CI + 릴리스(태그) + **prod push 캐시 워밍**(warm-release-cache.yml — 릴리스 콜드 빌드 해소, 14.5분→~11분).
+- **기능 상태**: RAW 16기종 + 일반 포맷 뷰잉·비파괴 편집·프리셋·Export(래스터 배치+DNG)·정렬·슬라이드쇼·커스텀 타이틀바·파일 조작·애니메이션·다국어(한/영/일)·자동 업데이트·**WebGPU 렌더 백엔드(실험적 옵트인, compute NR)**·**전방 L0 선로딩 파이프라인**·편집 패널 검색·줌 슬라이더·새 아이콘(라인 조리개).
+- **성능**: 디코드 파이프라인 재설계(2026-07-18)로 CR2 153장 실측 유휴 CPU 0.0%(이전 지속 99%). 상세는 architecture-backend.md 파이프라인 절 + bug/2026-07-18-decode-cpu-oversubscription.md.
+- **직전 이력**: 2026-07-18 하루 동안 v0.5.0(WebGPU 6a~6i+NR compute) → 실사용 검증(A/B 체크리스트) → v0.5.1(이슈 6건) → v0.5.2(파이프라인 재설계+마무리 9건). 상세는 [history/2026-07-18-quality-waves.md](./history/2026-07-18-quality-waves.md).
 
-## 완료: 남은 작업 일괄 소진 (2026-07-18 사용자 지시 — 멈추라 할 때까지, 커밋은 마지막 1회)
+## 남은 작업
 
-- [x] W1. C2-후속: react-hooks 경고 31건 → 0건. React Compiler(babel-plugin-react-compiler, target 18) 도입(컨벤션 전제 누락 발견), 파생 상태·렌더 중 조정·모듈 함수 승격으로 근본 수정, useRenderEngine은 mount effect 단일화 + playlist 구독 전환, engine/caps/gpuError는 uiStore로 단일화. incompatible-library 룰만 config off(react-virtual 정보성 진단 — 사유는 acknowledge). 실화면 검증은 W5에서
-- [x] W2. store 플러그인 권한을 default(14커맨드)에서 실사용 4커맨드(load/get/set/save)로 축소. persisted-scope는 **불요 종결** — fs 플러그인 자체가 없고 Export는 Rust 커맨드가 직접 파일을 쓴다(스코프 검사 대상 아님)
-- [x] W3. 필름스트립 아틀라스: 측정 하니스 문서화([quality-assurance/filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 스크롤 fps 실측은 사용자 재석 항목, "병목 확인 전 미착수" 결정 유지
-- [x] W4. WebGPU: [phase6-contract.md](./phase6-contract.md) 작성(스파이크 결론: WebGL↔WebGPU 텍스처 공유 불가 → 하이브리드 배제, 전체 이식 로드맵 6a~6i) + 6a 감지 계층 구현(`src/gl/webgpu/detect.ts`, 설정>성능 진단 표시, i18n 3개국어). 6b부터는 실기동 시각 검증 필수라 사용자 재석 대기
-- [x] W5. 검증 사다리 전체 통과 — tsc 0에러, eslint 0에러·0경고, bun test 17, cargo test 324, 프로덕션 빌드(compiler 적용 확인), tauri dev 실기동 스모크(frontend ready 도달·15초 생존·패닉 0) 후 단일 커밋
-- 사용자 필요로 제외: Phase 3 수동 35항목(재석), v0.4.0 publish·업데이트 왕복(사용자 publish), README(스크린샷), Windows/Linux(하드웨어), Intel 빌드(dnglab x86_64 결정), 로컬 보정(PRD §12.2 — 별도 PRD 합의 필요)
+### 사용자 확인 대기 (v0.5.2 빌드로)
+- [ ] v0.5.2 실사용 확인: CR2 폴더 성능(썸네일 자동 채움·먼 사진 클릭·CPU/팬), 새 아이콘·표시명 "Raw Viewer", 선택 표시(필름스트립/그리드), About(작성자·링크), 업데이트 실패 문구, 편집 패널 검색, 줌 슬라이더, 디코드 진행 점, Perf 오버레이(팔레트), 슬라이드쇼 S 자동 넘김(B11), B6(고ISO NR 비교 — CR2 폴더로 가능), B10(fps 비교)
+- [ ] C 그룹: Phase 3 §8.2 수동 35항목([phase3-acceptance.md](./quality-assurance/phase3-acceptance.md)) — 픽스처 항목별 안내 가능
+- [ ] 필름스트립 성능 실측([filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 병목이면 아틀라스 착수
+- [ ] WebGPU 시각 검증(phase6 §2.1) — 옵트인 후 육안·fps. 통과 시 기본 백엔드화 여부 결정
+- [ ] 릴리스 publish(사용자) → 자동 업데이트 왕복 실검증
 
-## 완료: WebGPU 6b~6i 일괄 구현 (2026-07-18 사용자 지시 — "테스트만 남기고 구현 전부 먼저", 커밋은 마지막 1회)
-
-- [x] V1. WGSL 전체 이식(`src/gl/webgpu/wgsl.ts`) — pass1~8·NR·샤프닝·orient·히스토그램 compute, GLSL과 수식 일대일 대응(uniformity 제약은 textureSampleLevel로 회피)
-- [x] V2. `WebGpuRenderer`(`src/gl/webgpu/webgpuRenderer.ts`) — Renderer 동일 공개 표면: 업로드(f16 RGBA 패딩·청크), dirty 스테이지 캐시, pass8 뷰포트(compare/side-by-side/crop/clipping/LUT), buildBase, 히스토그램 compute+mapAsync, samplePixel 비동기 미러, renderExport(패리티·export 경로)
-- [x] V3. 백엔드 선택 배관 — settings `renderBackend`(기본 webgl2, 설정>성능에서 WebGPU 실험적 옵트인), useRenderEngine async 초기화 + WebGPU 실패 시 WebGL2→CPU 강등, engineApi는 `EngineBackend`(Pick 유도)로 중립화
-- [x] V4. 패리티 하니스(parity.html + parityMain.ts) — headless Chrome(Metal)에서 17벡터 **ALL PASS**: 12벡터 완전 일치, geometry 0.00366·lens 0.00098(보간 미세차)·grain 0.086(hash 미세차, 관용 내). orient flip5/6 매핑 오류를 수식 유도로 발견·수정 후 재실행 확정
-- [x] V5. 검증 — tsc·eslint 0/0, bun test 17, 프로덕션 빌드, i18n diff 0, tauri dev 실기동(기본 WebGL2 경로 생존·frontend ready·패닉 0). Rust 무변경(cargo 생략). phase6-contract 상태 갱신 후 단일 커밋
-
-## 완료: 6h + v0.5.0 (2026-07-18 사용자 지시 — "6h·docs 마치고 0.5.0으로 커밋, 나머지 테스트는 빌드판에서")
-
-- [x] N1. 6h NR compute — workgroup 공유 메모리 9×9 양방향 필터(WebGPU 전용, WebGL2는 기존 유지). 하니스에 TS 참조 구현 대조 벡터 추가 → 18벡터 ALL PASS(nr-compute 0.00098)
-- [x] N2. 하니스 디버깅 부산물 — 최악 픽셀 진단 출력, uncaptured error 리포팅(`device.onuncapturederror` — 제품에도 반입), "baseCurve='standard'는 중립에서도 CURVE 활성" 함정을 phase6-contract에 기록
-- [x] N3. docs 최신화 — phase6-contract(6h·검증 상태), architecture-frontend, release.md, decisions.md
-- [x] N4. v0.5.0 상향(3파일+lock) → 검증 사다리(tsc·lint 0/0, bun test 17, 빌드, i18n 0, tauri dev 스모크) → 커밋·push → prod 병합 → v0.5.0 태그
-
-## 진행 중: v0.5.1 검증 후 마무리 웨이브 (2026-07-18 사용자 지시 9건)
-
-- [x] F1. 선택·hover 표시 재설계 — ring/outline이 자식·inline boxShadow에 밀리던 구조를 셀 최상위 오버레이 border(span absolute inset-0)로 교체 (필름스트립·그리드)
-- [x] F2. 앱 표시명 "Raw Viewer" — 파일명(productName)까지 바꾸면 GitHub 자산명 공백 치환으로 업데이터 URL이 깨질 위험 → src-tauri/Info.plist 병합(CFBundleDisplayName/CFBundleName)으로 표시명만 변경. 창 title·타이틀바·새 창 title도 정리
-- [x] F3+F6(About). AboutSummary 컴포넌트(소개·작성자 Hyunseok Byun @B-HS·저장소 링크, opener 스코프에 github.com/B-HS 추가) — About 다이얼로그 상단 + 설정>정보 탭 공용
-- [x] F4. 업데이트 실패 사유 상세화 — describeUpdateError(미공개 릴리스/네트워크/기타 분류) + 원문 축약 병기
-- [x] F5·F6. 디코드 파이프라인 개선 (조사 워크플로 3관점 → 구현):
-  - CPU 폭주 근본 원인 = 워커 17×OMP 18팀 초과구독: OMP_NUM_THREADS=4·KMP_BLOCKTIME=0 캡(main.rs) + 워커 레인 분리(light L0 전용 2개 / heavy L1·L2 (logical/4).clamp(2,4)개)
-  - 이웃 L1 투기 프리로드 제거(neighbor_jobs) — 사용자 전략 "L1/L2는 선택 시"와 일치
-  - 전방 L0 전체 선로딩: preload_l0 커맨드(+L0 세대 플래그로 navigate 취소에서 보호), 프론트 스캔 완료·이동 디바운스(800ms) 시 전방 미로딩분 최대 500장 요청, 창 밖 L0 ready는 setLevel만 반영(필름스트립 썸네일 자동 갱신)
-  - 낭비 컷: IDLE_DELAY 150→400ms, 큐에 남은 스테일 L2(현재 사진 아님)는 실행 직전 스킵, f16 변환 루프에 취소 체크 삽입
-  - 재방문 플래시: stale best 가드에 renderer.hasImage 결합 — 텍스처 없으면 L0 먼저 표시 후 L1 스왑
-  - 진행 UI: 뷰포트 배지에 L0·L1·L2 3단 점 표시
-- [x] F7. 우측 편집 패널 검색 — 섹션별 라벨 키 인덱스 기반 필터(검색 시 매칭 섹션만 표시·재마운트로 펼침), 3개국어
-- [x] F8. 앱 아이콘 — 시안 3종(라인 조리개/채움 조리개/렌즈 링) 제작·사용자 선택(시안 A 라인 조리개) → 투명 배경 1024 렌더 → `tauri icon`으로 전체 세트 재생성
-- [x] F9. 검증 — tsc·eslint 0/0, bun test 17, vite build, cargo test 324, i18n diff 0, 실폴더(CR2 153장) 실기동 실측: 전방 L0 프리로드 65장 자동 실행·패닉 0·**유휴 CPU 0.0%**(이전 지속 99% 해소 실증). 커밋은 지시 대기
-- 조사 상세: 워크플로 3관점(큐 우선순위/CPU 폭주/캐시 재방문) 보고서 — 근본 원인·권고 전문은 이 세션 기록, 핵심은 architecture-backend.md 파이프라인 절에 반영
-
-## 남은 작업 (전부 사용자 재석·결정 대기 — 자율 진행 가능 항목은 2026-07-18 웨이브에서 소진)
-
-- [ ] Phase 3 수동 검증: §8.2 수동 35항목(quality-assurance 문서), Z8 고효율 NEF 육안, 신규 UI(타이틀바·CPU 폴백·그리드·TAT) 시각 확인 + 2026-07-18 웨이브 회귀 확인(패널·필름스트립·CPU 폴백·샘플러 핀·팔레트) — 사용자 재석 필요
-- [ ] 필름스트립 성능 실측([quality-assurance/filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 병목이면 아틀라스 착수
-- [ ] WebGPU 6b~6i([phase6-contract.md](./phase6-contract.md)) — 단계마다 실기동 시각 검증 필수, 사용자 재석 시 진행
-- [ ] v0.4.0 릴리스 publish 후 자동 업데이트 왕복 실검증(구버전 앱에서 감지→설치)
-- [ ] README.md — 실사용 스크린샷 확보 후 작성(사용자 결정)
-- [ ] 로컬 보정 — PRD §12.2 보류, 초안만([local-adjustments-draft.md](./local-adjustments-draft.md)), 별도 PRD 합의 필요
+### 사용자 결정·외부 조건 대기
+- [ ] README.md — 실사용 스크린샷 확보 후 작성
+- [ ] 로컬 보정 — PRD §12.2 보류, [초안](./local-adjustments-draft.md)만. 별도 PRD 합의 필요
 - [ ] Windows/Linux — 하드웨어 확보 전 차단 / Intel·유니버설 빌드 — dnglab x86_64 확보 결정 필요
+- [ ] updater 개인키(`~/raw-viewer-updater.key`) 백업 — 사용자 할 일 (분실 시 기존 사용자 업데이트 영구 불능)
 
 ## SPEC-GAP 로그 (활성)
 - (build.rs) libjpeg 미링크: LibRaw의 lossy-JPEG 압축 DNG·일부 내장 썸네일 디코딩 불가 가능.
+- (pipeline) 워커 사이징 계약 변경: 구 "논리코어-1"은 단일 스레드 디코드 전제였음 — 현행은 light 2 + heavy (logical/4).clamp(2,4) × OMP 팀 4 캡.
 - 비-RAW: AVIF irot/imir 회전 미반영(EXIF만), 애니메이션 webp/gif는 정지 시 첫 프레임 편집.
 - RAW/JPEG 페어 토글 바인딩 = ⌘J (PRD의 ⌥J는 클리핑 검사가 선점).
 - X-Trans 동시 디코드 경계 픽셀 비결정성 — 관용치 13/1023로 게이트(fixtures_test 주석 참조).
 - CPU 폴백: 기하/렌즈·NR/샤프닝 미지원, sRGB 고정.
+- L2는 디스크 캐시 미대상(재방문 시 재디코드 — 도입 시 장당 ~120MB 저장 비용, 별도 결정 필요).
 
 ## 사용자 상시 지시
 - 중단 지시 전까지 Phase/작업 경계에서 멈추지 않고 연속 진행.
-- 시각 검증(실렌더 확인)은 사용자 재석 시 수행.
-- prod 병합·릴리스는 확립된 흐름대로, 릴리스 publish는 사용자가 직접.
+- 시각 검증(실렌더 확인)은 사용자 재석 시 수행. 테스트는 가급적 빌드된 릴리스판에서.
+- prod 병합·릴리스는 확립된 흐름대로(워밍 후 태그), 릴리스 publish는 사용자가 직접.

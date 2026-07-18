@@ -43,6 +43,16 @@
 - **6h 구현 지시**: "6h 하고 docs 최신·고도화, 나머지 테스트(실화면·실측·publish)는 빌드된 버전에서" — compute NR(9×9 양방향, 공유 메모리 타일) 구현, WebGPU 백엔드 전용(WebGL2는 기존 프래그먼트 NR 유지 — 백엔드 간 NR 출력 상이 수용). 검증은 TS 참조 구현 대조(하니스 18벡터 ALL PASS).
 - **v0.5.0 상향 후 커밋·push** — 이후 테스트는 v0.5.0 빌드로 수행.
 
+## 2026-07-18 (v0.5.1~v0.5.2 검증·마무리)
+- **v0.5.0 수동 검증 방식**: A(웨이브 회귀)·B(WebGPU)·C(Phase3 픽스처) 체크리스트로 사용자와 왕복 — 기록은 quality-assurance/v0.5.0-manual-checklist.md.
+- **CI 캐시 워밍 도입**: 태그 실행은 기본 브랜치(prod) 캐시만 fallback → prod push 시 릴리스 프로필을 미리 컴파일(warm-release-cache.yml). 릴리스 절차에 "워밍 완료 후 태그" 추가.
+- **표시명 "Raw Viewer"**: productName(파일명) 변경은 GitHub 자산명 공백 치환으로 업데이터 URL 파손 위험 → Info.plist 병합(CFBundleDisplayName/CFBundleName)으로 표시명만 변경. 식별자·파일명은 raw-viewer 유지.
+- **디코드 파이프라인 전략(사용자 지정)**: "L0은 전방 미로딩분 일괄 선로딩, L1/L2는 실제 선택 시" — v0.5.2에 구현(bug/2026-07-18-decode-cpu-oversubscription.md).
+- **편집 패널 검색**: 위치는 우측 편집 패널로 확정(설정 다이얼로그 아님).
+- **앱 아이콘**: 시안 3종 중 **A(라인 조리개)** 선택 — tauri icon 전체 세트 재생성.
+- **실사진 테스트 폴더**: `/Volumes/SSD/202309 osaka/DCIM/100CANON` (CR2 153장) 테스트 사용 허가.
+- **B10(fps 비교)·A16(CPU 폴백)은 스킵 허용**, B6(NR 화질)은 고ISO 확보 후.
+
 ## 보류·미결로 확정된 것
 - WebGPU 백엔드: 조사 문서만(docs/webgpu-assessment.md), 착수는 별도 지시 대기.
 - 로컬 보정: PRD §12.2 보류 유지, 스키마 초안만(docs/local-adjustments-draft.md).
