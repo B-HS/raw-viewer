@@ -78,6 +78,7 @@ export const SettingsDialog: FC = () => {
     const preloadRadius = useSettings((state) => state.preloadRadius)
     const l2Policy = useSettings((state) => state.l2Policy)
     const isolatedDecode = useSettings((state) => state.isolatedDecode)
+    const renderBackend = useSettings((state) => state.renderBackend)
     const showAddress = useSettings((state) => state.showAddress)
     const openInNewWindow = useSettings((state) => state.openInNewWindow)
     const slideshowIntervalMs = useSettings((state) => state.slideshowIntervalMs)
@@ -359,6 +360,16 @@ export const SettingsDialog: FC = () => {
                                               : `${t('settings.webgpuUnavailable')} (${webGpu.reason})`}
                                     </span>
                                 </div>
+                                <Field label={t('settings.renderBackend')}>
+                                    <Segmented
+                                        value={renderBackend}
+                                        onChange={(value) => useSettings.getState().setRenderBackend(value)}
+                                        options={[
+                                            ['webgl2', 'WebGL2'],
+                                            ['webgpu', t('settings.renderBackendWebgpu')],
+                                        ]}
+                                    />
+                                </Field>
                                 <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.webgpuNote')}</p>
                             </>
                         )}

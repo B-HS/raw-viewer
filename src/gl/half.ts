@@ -23,3 +23,12 @@ export const packHalfArray = (values: Float32Array) => {
     for (let i = 0; i < values.length; i++) out[i] = floatToHalf(values[i])
     return out
 }
+
+export const halfToFloat = (half: number) => {
+    const sign = (half & 0x8000) >> 15
+    const exponent = (half & 0x7c00) >> 10
+    const mantissa = half & 0x03ff
+    if (exponent === 0) return (sign ? -1 : 1) * Math.pow(2, -14) * (mantissa / 1024)
+    if (exponent === 31) return mantissa ? Number.NaN : (sign ? -1 : 1) * Number.POSITIVE_INFINITY
+    return (sign ? -1 : 1) * Math.pow(2, exponent - 15) * (1 + mantissa / 1024)
+}

@@ -80,6 +80,13 @@ zustand 스토어 (create 사용):
 
 편집 상태 전달: editStore가 상태 변경 시 `useUiStore.getState().engine?.setEditState(next)` (editStore.ts:43, 96, 127). 엔진 attach는 `Viewport`의 effect (Viewport.tsx:64-74) — attach 시 현재 상태·렌즈를 재push.
 
+### 3.1.1 WebGPU 백엔드 (실험적, 2026-07-18)
+
+- `src/gl/webgpu/` — `detect.ts`(진단), `wgsl.ts`(pass1~8·NR·샤프닝·orient·히스토그램 compute WGSL), `webgpuRenderer.ts`(`WebGpuRenderer` — Renderer와 동일 공개 표면), `parityMain.ts`(+루트 parity.html — dev 전용 WebGL2↔WebGPU 수치 비교 하니스, 17벡터).
+- 선택: settings `renderBackend`(기본 `webgl2`). `webgpu`면 useRenderEngine이 `WebGpuRenderer.create`를 시도하고 실패 시 WebGL2→CPU로 강등. engineApi는 `EngineBackend`(Renderer에서 Pick 유도) 계약이라 양쪽을 수용.
+- WebGL2와 다른 점: lowPrecision 항상 false, 히스토그램은 compute+atomics 풀해상도(mapAsync 비동기), `samplePixel`은 비동기 미러(≤1024, 120ms 스로틀)라 최신 프레임보다 1비트 늦을 수 있음, 초대형 이미지는 GPU 타일 프록시 대신 CPU box 다운스케일.
+- 수치 패리티는 phase6-contract §2.1 참조(headless Chrome 17벡터 ALL PASS). WKWebView 시각 검증 전이라 기본값은 WebGL2.
+
 ### 3.2 CPU 폴백
 
 - 발동: WebGL2 생성 실패 또는 localStorage `rawviewer.forceCpuRender==='1'` (`shouldForceCpuRender` — store/uiStore.ts, gpuError 초기값) → `Viewport`가 `<CpuFallbackView />` 렌더.
