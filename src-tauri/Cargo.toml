@@ -1,6 +1,6 @@
 [package]
 name = "raw-viewer"
-version = "0.5.2"
+version = "0.5.3"
 description = "Cross-platform RAW image viewer and non-destructive editor"
 authors = ["Hyunseok Byun"]
 edition = "2021"
