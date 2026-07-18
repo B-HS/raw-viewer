@@ -4,8 +4,8 @@
 
 ## 현재 상태 스냅샷 (2026-07-18)
 
-- 최신 태그: **v0.5.2** (파이프라인 재설계·마무리 UI 9건·새 아이콘·표시명 Raw Viewer). 릴리스는 draft — **publish는 사용자가 직접**. v0.1.1~v0.5.1 draft는 의도적 유지.
-- **파일명 전환(미태그)**: productName="Raw Viewer" — 다음 릴리스부터 번들은 `Raw Viewer.app`, DMG 로컬명은 `Raw Viewer_<ver>_aarch64.dmg`. GitHub 자산명은 공백을 점으로 치환하므로 워크플로가 **업로드 전에 선제 리네임**(`Raw.Viewer_*`)해 latest.json URL·SHA256SUMS와 서빙 자산명을 일치시킨다. 자기완결성 가드는 `.app` 글롭(+부재 시 실패)으로 교정. 기설치본의 구 `raw-viewer.app`은 새 DMG 설치 시 수동 삭제 필요.
+- 최신 태그: **v0.5.3** (UX 고도화 8건·파일명 "Raw Viewer" 전환). 릴리스는 draft — **publish는 사용자가 직접**. v0.1.1~v0.5.2 draft는 의도적 유지. 워밍 적중 실측: Verify 228s + 번들 빌드 240s.
+- **파일명 전환(v0.5.3부터)**: productName="Raw Viewer" — 번들은 `Raw Viewer.app`, DMG 로컬명은 `Raw Viewer_<ver>_aarch64.dmg`. GitHub 자산명은 공백을 점으로 치환하므로 워크플로가 **업로드 전에 선제 리네임**(`Raw.Viewer_*`)해 latest.json URL·SHA256SUMS와 서빙 자산명을 일치시킨다(v0.5.3 draft에서 URL 일치 실검증 완료). 자기완결성 가드는 `.app` 글롭(+부재 시 실패)으로 교정. 기설치본의 구 `raw-viewer.app`은 새 DMG 설치 시 수동 삭제 필요.
 - v0.3.1부터 updater 자산(`latest.json`·`.app.tar.gz`·`.sig`) 포함 — 서명 시크릿 등록 완료 상태.
 - 자동 업데이트는 **published 릴리스 중 최신**(`releases/latest`)을 본다 — draft만 있으면 업데이트 확인이 실패(무해)하므로, 배포하려면 최신 릴리스를 publish해야 한다.
 - 등록된 시크릿 (총 6): `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `TAURI_SIGNING_PRIVATE_KEY`.

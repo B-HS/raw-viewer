@@ -50,8 +50,8 @@
 
 ## 현재 상태 스냅샷 (2026-07-18 심야 기준)
 
-- **저장소**: 공개(public), MIT. dev=prod 동기화, 최신 커밋 `893c164`(v0.5.2 상향).
-- **최신 릴리스 태그**: **v0.5.2** (draft 빌드 직후 — publish는 사용자 담당). v0.1.1~v0.5.1 draft는 의도적 유지. 자동 업데이트는 published 최신만 바라봄(아직 publish 0개 → 업데이트 확인은 "미공개 릴리스" 안내).
+- **저장소**: 공개(public), MIT. dev=prod 동기화.
+- **최신 릴리스 태그**: **v0.5.3** (UX 고도화 8건+파일명 "Raw Viewer" 전환, draft — publish는 사용자 담당). 자산명은 점 표기(`Raw.Viewer_0.5.3_aarch64.dmg`·`Raw.Viewer.app.tar.gz`)이며 latest.json URL 일치 검증 완료. v0.1.1~v0.5.2 draft는 의도적 유지. 자동 업데이트는 published 최신만 바라봄(아직 publish 0개).
 - **시크릿**: Apple 서명·공증 5종 + `TAURI_SIGNING_PRIVATE_KEY` 등록 완료. updater 개인키 = `~/raw-viewer-updater.key`(재생성 금지·**백업은 아직 사용자 미완**).
 - **테스트**: Rust 324건 + 프론트 bun test 17건 + E2E 디코드 스모크 12건 + WebGPU 패리티 하니스 18벡터(parity.html, headless Chrome). eslint 에러 0·경고 0.
 - **CI**: PR CI + 릴리스(태그) + **prod push 캐시 워밍**(warm-release-cache.yml — 릴리스 콜드 빌드 해소, 14.5분→~11분).
@@ -61,7 +61,7 @@
 
 ## 남은 작업
 
-### 진행 중 — UX 고도화 웨이브 (2026-07-18, v0.5.2 실사용 피드백 8건)
+### 완료 — UX 고도화 웨이브 (2026-07-18, v0.5.2 실사용 피드백 8건 → v0.5.3)
 - [x] 1. 메뉴 드롭다운 밖 클릭·Escape 닫힘 — 공용 훅 lib/useDismissOnOutside.ts, 두 메뉴 호버 전환 포함
 - [x] 2. 우측 패널 재오픈 토글 — 우측 엣지 중앙 셰브론, lastRightPanel(persist) 복원
 - [x] 3. 타이틀바 더블클릭 최대화 — 조사 결과 Tauri 2.11.5 네이티브 제공(권한 기본 포함)이라 **코드 무추가**가 정답(핸들러 추가 시 이중 토글). 실기기 재확인만 잔여
@@ -72,8 +72,11 @@
 - [x] 8. 컨텍스트 메뉴 위치 번쩍임 — 렌더 시점 좌표 동기화 + useLayoutEffect 클램프(ContextMenu.tsx)
 - [x] 검증: tsc 0 · eslint 0 · bun test 17 · cargo test 통과(exit 0) · i18n 3파일 676키 diff 0 · dev 실기동 스모크(CR2 153장 로드, 퀵 바·UI 메뉴·배지 렌더 확인, 패닉 0)
 - [x] 리뷰 워크플로(4관점+적대 검증) 확정 2건·저심각 4건 전부 반영 — Escape capture+stopPropagation(그리드 동시 닫힘 회귀), 메뉴 role='menu'/'menuitem'+✓ aria-hidden, 컨텍스트 메뉴 재오픈 시 서브메뉴 리셋, 반전 아이콘 SVG(⇄ 의미 충돌 해소), 재오픈 버튼 히트 24px, disabled 호버 제거. 재검증 tsc·eslint·test 통과
-- [ ] 사용자 커밋 지시 대기
-- [ ] v0.5.2 실사용 확인: CR2 폴더 성능(썸네일 자동 채움·먼 사진 클릭·CPU/팬), 새 아이콘·표시명 "Raw Viewer", 선택 표시(필름스트립/그리드), About(작성자·링크), 업데이트 실패 문구, 편집 패널 검색, 줌 슬라이더, 디코드 진행 점, Perf 오버레이(팔레트), 슬라이드쇼 S 자동 넘김(B11), B6(고ISO NR 비교 — CR2 폴더로 가능), B10(fps 비교)
+- [x] 커밋 `23b0717` → dev·prod push → v0.5.3 상향(`5d3f7e3`) → 워밍 적중 릴리스(Verify 228s+빌드 240s) → draft 자산 5종·latest.json URL 정합 확인
+
+### 사용자 확인 대기 (v0.5.3 빌드로)
+- [ ] UX 웨이브 확인: 파일명 `Raw Viewer.app`(구 raw-viewer.app 수동 삭제), Dock 아이콘 투명 배경, 메뉴 밖 클릭 닫힘, UI 메뉴 토글, 퀵 바, 패널 재오픈 셰브론, 컨텍스트 메뉴 위치, **타이틀바 더블클릭 최대화(코드 무추가 — Tauri 네이티브 동작 확인, 안 되면 재조사)**
+- [ ] v0.5.2 이월 확인: CR2 폴더 성능(썸네일 자동 채움·먼 사진 클릭·CPU/팬), 선택 표시(필름스트립/그리드), About(작성자·링크), 업데이트 실패 문구, 편집 패널 검색, 줌 슬라이더, 디코드 진행 점, Perf 오버레이(팔레트), 슬라이드쇼 S 자동 넘김(B11), B6(고ISO NR 비교 — CR2 폴더로 가능), B10(fps 비교)
 - [ ] C 그룹: Phase 3 §8.2 수동 35항목([phase3-acceptance.md](./quality-assurance/phase3-acceptance.md)) — 픽스처 항목별 안내 가능
 - [ ] 필름스트립 성능 실측([filmstrip-performance.md](./quality-assurance/filmstrip-performance.md)) — 병목이면 아틀라스 착수
 - [ ] WebGPU 시각 검증(phase6 §2.1) — 옵트인 후 육안·fps. 통과 시 기본 백엔드화 여부 결정
