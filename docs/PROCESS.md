@@ -82,7 +82,7 @@
 - [x] WebGPU 시각 검증(phase6 §2.1) — pass. **잔여 결정: 기본 백엔드화 여부**
 
 ### 사용자 결정·외부 조건 대기
-- [ ] WebGPU 기본 백엔드화 여부 — 시각 검증 pass, 사용자 결정 대기
+- [x] WebGPU 기본 백엔드화 — **옵트인 유지 결정**(2026-07-18): 시각 검증 pass했으나 사용 데이터 축적 후 재결정
 - [ ] 로컬 보정 — PRD §12.2 보류, [초안](./local-adjustments-draft.md)만. 별도 PRD 합의 필요
 - [ ] Windows/Linux — 하드웨어 확보 전 차단 / Intel·유니버설 빌드 — dnglab x86_64 확보 결정 필요
 - [x] updater 개인키 위치 정리 — `~/environment/raw-viewer-updater.key`로 이동(2026-07-18, 바이트 비교 검증). 머신 외부 백업은 여전히 권장
