@@ -61,6 +61,11 @@
 - **우측 패널 재오픈**: 접힘 시 우측 엣지 중앙 셰브론 탭. 마지막 패널(lastRightPanel persist) 복원.
 - **아이콘 흰 배경 버그(사용자 발견)**: qlmanage 렌더가 SVG 알파를 버리고 흰 배경을 구움 — v0.5.2 아이콘부터 존재. **재생성은 반드시 headless Chrome `--default-background-color=00000000`** 경로 사용(bug/2026-07-18-icon-opaque-background.md). 시안 A 유지, 소형 가독성 위해 선 두께 30→50·배경 대비 상향. 소스 SVG는 docs/assets/app-icon.svg로 저장소에 보존.
 
+## 2026-07-18 (v0.5.3 publish 후)
+- **v0.5.3 사용자 검증 전부 pass**: UX 웨이브 8건(더블클릭 최대화 포함 — 코드 무추가 판단 적중)·자동 업데이트 왕복(0.5.2→0.5.3)·v0.5.2 이월분·WebGPU 시각 검증.
+- **WebGPU는 옵트인 유지**: 시각 검증 pass에도 기본 백엔드화는 보류 — 사용 데이터 축적 후 재결정.
+- **updater 개인키 이동**: `~/environment/raw-viewer-updater.key` (자격증명 폴더 통합). 머신 외부 백업은 여전히 권장.
+
 ## 보류·미결로 확정된 것
 - WebGPU 백엔드: 조사 문서만(docs/webgpu-assessment.md), 착수는 별도 지시 대기.
 - 로컬 보정: PRD §12.2 보류 유지, 스키마 초안만(docs/local-adjustments-draft.md).
