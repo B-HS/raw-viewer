@@ -35,12 +35,11 @@ const rank = (query: string, action: PaletteAction) => {
     return best
 }
 
-export const CommandPalette: FC<CommandPaletteProps> = ({ onOpenFile, onOpenPath }) => {
+const PaletteDialog: FC<CommandPaletteProps> = ({ onOpenFile, onOpenPath }) => {
     const dialogRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const listRef = useRef<HTMLDivElement>(null)
     const { t } = useTranslation()
-    const open = useOverlays((state) => state.paletteOpen)
     const [query, setQuery] = useState('')
     const [index, setIndex] = useState(0)
     const [recents, setRecents] = useState<RecentEntry[]>([])
@@ -77,21 +76,16 @@ export const CommandPalette: FC<CommandPaletteProps> = ({ onOpenFile, onOpenPath
     }
 
     useEffect(() => {
-        if (!open) return
-        setQuery('')
-        setIndex(0)
         getRecents()
             .then(setRecents)
             .catch(() => setRecents([]))
-    }, [open])
+    }, [])
 
     useEffect(() => {
         listRef.current?.querySelector('[data-selected="true"]')?.scrollIntoView({ block: 'nearest' })
     }, [clamped, query])
 
     useModalDismiss(dialogRef, close)
-
-    if (!open) return null
 
     return (
         <div className='fixed inset-0 z-[65] flex items-start justify-center bg-black/50 pt-[12vh]' onClick={close}>
@@ -139,4 +133,9 @@ export const CommandPalette: FC<CommandPaletteProps> = ({ onOpenFile, onOpenPath
             </div>
         </div>
     )
+}
+
+export const CommandPalette: FC<CommandPaletteProps> = ({ onOpenFile, onOpenPath }) => {
+    const open = useOverlays((state) => state.paletteOpen)
+    return open ? <PaletteDialog onOpenFile={onOpenFile} onOpenPath={onOpenPath} /> : null
 }

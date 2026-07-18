@@ -126,7 +126,7 @@ export const CropOverlay: FC = () => {
         return { x: left, y: top, w: right - left, h: bottom - top }
     }
 
-    const onDown = (handle: Handle) => (event: React.PointerEvent) => {
+    const onDown = (handle: Handle, event: React.PointerEvent) => {
         event.stopPropagation()
         dragRef.current = { handle, sx: event.clientX, sy: event.clientY, rect }
         useHistoryStore.getState().beginCoalesce('crop.rect')
@@ -160,7 +160,7 @@ export const CropOverlay: FC = () => {
     return (
         <div ref={rootRef} className='absolute inset-0 touch-none' onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
             <div className='absolute border border-white/80' style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
-                <div className='absolute inset-0 cursor-move' onPointerDown={onDown('move')} />
+                <div className='absolute inset-0 cursor-move' onPointerDown={(event) => onDown('move', event)} />
                 {lines.map((fraction) => (
                     <div
                         key={`v-${fraction}`}
@@ -189,7 +189,7 @@ export const CropOverlay: FC = () => {
                         key={handle}
                         role='button'
                         aria-label={t('panel.crop.handleAria', { handle })}
-                        onPointerDown={onDown(handle)}
+                        onPointerDown={(event) => onDown(handle, event)}
                         className='absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-neutral-900 bg-white'
                         style={{ left: position.left, top: position.top, cursor: `${handle}-resize` }}
                     />

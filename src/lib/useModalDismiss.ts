@@ -40,5 +40,5 @@ export const useModalDismiss = (ref: RefObject<HTMLElement | null>, onClose: () 
             container?.removeEventListener('keydown', onKey)
             previous?.focus?.()
         }
-    }, [])
+    }, [ref, onClose])
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useHistoryStore } from '../../store/historyStore'
@@ -83,10 +83,6 @@ export const Slider: FC<SliderProps> = ({ label, value, min, max, step, defaultV
         if (!Number.isNaN(parsed)) commit(parsed)
     }
 
-    useEffect(() => {
-        if (!editing) setText(display)
-    }, [display, editing])
-
     return (
         <div className={`flex flex-col gap-1 ${disabled ? 'opacity-40' : ''}`}>
             <div className='flex items-center justify-between text-xs'>
@@ -94,10 +90,13 @@ export const Slider: FC<SliderProps> = ({ label, value, min, max, step, defaultV
                     {label}
                 </span>
                 <input
-                    value={text}
+                    value={editing ? text : display}
                     disabled={disabled}
                     inputMode='decimal'
-                    onFocus={() => setEditing(true)}
+                    onFocus={() => {
+                        setText(display)
+                        setEditing(true)
+                    }}
                     onBlur={() => setEditing(false)}
                     onChange={onInputChange}
                     onKeyDown={(event) => {

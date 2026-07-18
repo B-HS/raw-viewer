@@ -170,6 +170,35 @@ const selectAllFiltered = () => {
     usePlaylist.getState().selectAll(activeFilteredList().map((index) => state.entries[index].imageId))
 }
 
+const openImagePath = async (path: string, setOpenError: (message: string) => void) => {
+    setOpenError('')
+    try {
+        const result = await openPath(path)
+        usePlaylist.getState().openWith(result.entry, result.dir)
+        useOrganize.getState().loadMany([result.entry.imageId])
+        noteRecent(path).catch(() => undefined)
+        watchDirectory(result.dir).catch(() => undefined)
+        const summary = await scanDirectory(result.dir, (batch) => {
+            usePlaylist.getState().addEntries(batch.entries, batch.done)
+            useOrganize.getState().loadMany(batch.entries.map((entry) => entry.imageId))
+        })
+        usePlaylist.getState().setScanTotal(summary.total)
+        usePairs.getState().load(result.dir)
+    } catch (error) {
+        setOpenError(error instanceof Error ? error.message : i18n.t('app.openFailed'))
+    }
+}
+
+const pickAndOpenImage = async (setOpenError: (message: string) => void) => {
+    const selected = await openDialog({
+        multiple: false,
+        directory: false,
+        title: i18n.t('app.openTitle'),
+        filters: [{ name: i18n.t('app.imageFilter'), extensions: IMAGE_EXTENSIONS }],
+    }).catch(() => null)
+    if (typeof selected === 'string') openImagePath(selected, setOpenError)
+}
+
 const PANEL_TABS: readonly Exclude<RightPanel, 'none'>[] = ['edit', 'meta', 'preset', 'history']
 
 const META_LOAD_DEBOUNCE_MS = 150
@@ -180,7 +209,6 @@ export const App: FC = () => {
     const pendingIndexRef = useRef<number | null>(null)
     const rafRef = useRef<number | null>(null)
     const closingRef = useRef(false)
-    const handleOpenRef = useRef<(path: string) => void>(() => {})
     const l2ZoomRef = useRef<string | null>(null)
     const [pathInput, setPathInput] = useState('')
     const [openError, setOpenError] = useState('')
@@ -204,35 +232,9 @@ export const App: FC = () => {
     const sortOrder = useSettings((state) => state.sortOrder)
     const { t } = useTranslation()
 
-    const handleOpen = async (path: string) => {
-        setOpenError('')
-        try {
-            const result = await openPath(path)
-            usePlaylist.getState().openWith(result.entry, result.dir)
-            useOrganize.getState().loadMany([result.entry.imageId])
-            noteRecent(path).catch(() => undefined)
-            watchDirectory(result.dir).catch(() => undefined)
-            const summary = await scanDirectory(result.dir, (batch) => {
-                usePlaylist.getState().addEntries(batch.entries, batch.done)
-                useOrganize.getState().loadMany(batch.entries.map((entry) => entry.imageId))
-            })
-            usePlaylist.getState().setScanTotal(summary.total)
-            usePairs.getState().load(result.dir)
-        } catch (error) {
-            setOpenError(error instanceof Error ? error.message : t('app.openFailed'))
-        }
-    }
-    handleOpenRef.current = handleOpen
+    const handleOpen = (path: string) => openImagePath(path, setOpenError)
 
-    const pickAndOpen = async () => {
-        const selected = await openDialog({
-            multiple: false,
-            directory: false,
-            title: t('app.openTitle'),
-            filters: [{ name: t('app.imageFilter'), extensions: IMAGE_EXTENSIONS }],
-        }).catch(() => null)
-        if (typeof selected === 'string') handleOpenRef.current(selected)
-    }
+    const pickAndOpen = () => pickAndOpenImage(setOpenError)
 
     const openContextMenu = (event: MouseEvent) => {
         event.preventDefault()
@@ -254,12 +256,12 @@ export const App: FC = () => {
         let unlistenDrop: (() => void) | null = null
         frontendReady()
             .then((pending) => {
-                if (!disposed && pending[0]) handleOpenRef.current(pending[0].path)
+                if (!disposed && pending[0]) openImagePath(pending[0].path, setOpenError)
             })
             .catch(() => undefined)
         getCurrentWebview()
             .onDragDropEvent((event) => {
-                if (event.payload.type === 'drop' && event.payload.paths[0]) handleOpenRef.current(event.payload.paths[0])
+                if (event.payload.type === 'drop' && event.payload.paths[0]) openImagePath(event.payload.paths[0], setOpenError)
             })
             .then((unlisten) => {
                 if (disposed) unlisten()
@@ -407,9 +409,9 @@ export const App: FC = () => {
 
     useEffect(() => {
         const rotate = (delta: number) =>
-            useEditStore
-                .getState()
-                .edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), { label: t('history.rotate') })
+            useEditStore.getState().edit((draft) => void (draft.geometry.rotate90 = (((draft.geometry.rotate90 + delta) % 4) + 4) % 4), {
+                label: i18n.t('history.rotate'),
+            })
         const cycleAspect = () => {
             const aspect = useEditStore.getState().state?.crop?.aspect ?? 'original'
             applyCropAspect(CROP_ASPECTS[(CROP_ASPECTS.indexOf(aspect) + 1) % CROP_ASPECTS.length])
@@ -455,7 +457,7 @@ export const App: FC = () => {
                 if (event.shiftKey) advanceToNextFiltered()
             } else if (matchAction(event, 'file.open')) {
                 event.preventDefault()
-                pickAndOpen()
+                pickAndOpenImage(setOpenError)
             } else if (matchAction(event, 'view.fullscreen')) {
                 event.preventDefault()
                 toggleFullscreen()
@@ -485,7 +487,7 @@ export const App: FC = () => {
                 if (current)
                     navigator.clipboard
                         .writeText(current.path)
-                        .then(() => useToast.getState().show(t('toast.pathCopied')))
+                        .then(() => useToast.getState().show(i18n.t('toast.pathCopied')))
                         .catch(() => undefined)
             } else if (matchAction(event, 'clip.copyEdit')) {
                 event.preventDefault()
@@ -599,7 +601,7 @@ export const App: FC = () => {
         const unlisteners: Array<() => void> = []
         const handle = (payload: { path: string }) => {
             if (useSettings.getState().openInNewWindow) openInNewWindow(payload.path).catch(() => undefined)
-            else handleOpenRef.current(payload.path)
+            else openImagePath(payload.path, setOpenError)
         }
         onOpenRequest(handle)
             .then((dispose) => (disposed ? dispose() : unlisteners.push(dispose)))
@@ -883,7 +885,7 @@ export const App: FC = () => {
             <ExportDialog />
             <SettingsDialog />
             <AboutDialog />
-            <CommandPalette onOpenFile={pickAndOpen} onOpenPath={(path) => handleOpenRef.current(path)} />
+            <CommandPalette onOpenFile={pickAndOpen} onOpenPath={handleOpen} />
         </main>
     )
 }

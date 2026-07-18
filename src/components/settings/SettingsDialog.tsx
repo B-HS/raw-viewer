@@ -2,6 +2,8 @@ import { getVersion } from '@tauri-apps/api/app'
 import { useEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { detectWebGpuSupport } from '../../gl/webgpu/detect'
+import type { WebGpuSupport } from '../../gl/webgpu/detect'
 import { clearCache, getCacheStats } from '../../ipc/about'
 import { hasDisplayIccProfile } from '../../ipc/display'
 import { checkForUpdate, installUpdateAndRelaunch } from '../../ipc/updater'
@@ -103,6 +105,7 @@ export const SettingsDialog: FC = () => {
     const [version, setVersion] = useState('')
     const [stats, setStats] = useState<CacheStats | null>(null)
     const [monitorAvailable, setMonitorAvailable] = useState(false)
+    const [webGpu, setWebGpu] = useState<WebGpuSupport | null>(null)
 
     const close = () => useOverlays.getState().closeSettings()
 
@@ -134,6 +137,9 @@ export const SettingsDialog: FC = () => {
         hasDisplayIccProfile()
             .then(setMonitorAvailable)
             .catch(() => setMonitorAvailable(false))
+        detectWebGpuSupport()
+            .then(setWebGpu)
+            .catch(() => setWebGpu(null))
     }, [open])
 
     useModalDismiss(dialogRef, close)
@@ -342,6 +348,18 @@ export const SettingsDialog: FC = () => {
                                 </Field>
                                 <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.isolatedDecodeNote')}</p>
                                 <p className='text-[10px] text-neutral-500'>{t('settings.performanceNote')}</p>
+                                <SectionTitle>{t('settings.webgpu')}</SectionTitle>
+                                <div className='flex justify-between text-xs text-neutral-400'>
+                                    <span>{t('settings.webgpuStatus')}</span>
+                                    <span className='font-mono text-neutral-300'>
+                                        {!webGpu
+                                            ? '—'
+                                            : webGpu.status === 'available'
+                                              ? `${t('settings.webgpuAvailable')} (${webGpu.adapterInfo}${webGpu.shaderF16 ? ', f16' : ''})`
+                                              : `${t('settings.webgpuUnavailable')} (${webGpu.reason})`}
+                                    </span>
+                                </div>
+                                <p className='text-[10px] leading-relaxed text-neutral-500'>{t('settings.webgpuNote')}</p>
                             </>
                         )}
 

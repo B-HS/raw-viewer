@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { CSSProperties, FC, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { aetherUrl } from '../../ipc/pixels'
@@ -36,12 +36,11 @@ export const FilmstripCell: FC<FilmstripCellProps> = ({
     onContextMenu,
 }) => {
     const { t } = useTranslation()
-    const [failed, setFailed] = useState(false)
+    const [failedSrc, setFailedSrc] = useState<string | null>(null)
 
     const src = `${aetherUrl(`pixels/${entry.imageId}/l0`)}${rev ? `?rev=${rev}` : ''}`
+    const failed = failedSrc === src
     const border = labelColor(label)
-
-    useEffect(() => setFailed(false), [src])
 
     return (
         <div style={style} className='p-1'>
@@ -61,7 +60,7 @@ export const FilmstripCell: FC<FilmstripCellProps> = ({
                             loading='lazy'
                             draggable={false}
                             alt=''
-                            onError={() => setFailed(true)}
+                            onError={() => setFailedSrc(src)}
                             className='h-full w-full object-contain'
                         />
                     )}

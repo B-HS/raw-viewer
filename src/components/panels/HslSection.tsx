@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { HSL_BANDS } from '../../store/editDefaults'
@@ -27,15 +27,17 @@ const ZERO: HslAdjust = { hue: 0, sat: 0, lum: 0 }
 export const HslSection: FC = () => {
     const { t } = useTranslation()
     const [band, setBand] = useState<HslBand>('red')
+    const [prevTatBand, setPrevTatBand] = useState<HslBand | null>(null)
     const hsl = useEditStore((state) => state.state?.color.hsl)
     const bw = useEditStore((state) => state.state?.color.bw)
     const edit = useEditStore((state) => state.edit)
     const tatActive = useUiStore((state) => state.tatActive)
     const tatBand = useUiStore((state) => state.tatBand)
 
-    useEffect(() => {
+    if (tatBand !== prevTatBand) {
+        setPrevTatBand(tatBand)
         if (tatBand) setBand(tatBand)
-    }, [tatBand])
+    }
 
     if (!hsl || bw === undefined) return null
 

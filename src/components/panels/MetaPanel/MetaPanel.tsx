@@ -51,33 +51,31 @@ export const MetaPanel: FC = () => {
     const edited = useOrganize((state) => (metaImageId ? (state.edited[metaImageId] ?? false) : false))
     const editMeta = useEditStore((state) => (state.imageId === metaImageId ? (state.state?.meta ?? null) : null))
     const showAddress = useSettings((state) => state.showAddress)
-    const [address, setAddress] = useState<string | null>(null)
+    const [addressFor, setAddressFor] = useState<{ imageId: string; name: string | null } | null>(null)
 
     const gps = metadata?.gps ?? null
+    const hasGps = gps != null
+    const address = addressFor && addressFor.imageId === metaImageId ? addressFor.name : null
 
     useEffect(() => {
-        if (!gps) {
-            setMapComponent(null)
-            return
-        }
+        if (!hasGps || MapComponent) return
         let alive = true
-        import('./GpsMap').then((module) => alive && setMapComponent(() => module.GpsMap)).catch(() => alive && setMapComponent(null))
+        import('./GpsMap').then((module) => alive && setMapComponent(() => module.GpsMap)).catch(() => undefined)
         return () => {
             alive = false
         }
-    }, [gps != null])
+    }, [hasGps, MapComponent])
 
     useEffect(() => {
-        setAddress(null)
-        if (!showAddress || !gps || gpsCollapsed || !metaImageId) return
+        if (!showAddress || !hasGps || gpsCollapsed || !metaImageId) return
         let alive = true
         getReverseGeocode(metaImageId)
-            .then((name) => alive && setAddress(name))
-            .catch(() => alive && setAddress(null))
+            .then((name) => alive && setAddressFor({ imageId: metaImageId, name }))
+            .catch(() => alive && setAddressFor({ imageId: metaImageId, name: null }))
         return () => {
             alive = false
         }
-    }, [metaImageId, showAddress, gpsCollapsed, gps != null])
+    }, [metaImageId, showAddress, gpsCollapsed, hasGps])
 
     return (
         <aside className='flex h-full w-80 flex-col border-l border-neutral-800 bg-neutral-900 text-neutral-200'>

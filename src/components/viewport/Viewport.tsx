@@ -17,7 +17,10 @@ import { useRenderEngine } from './useRenderEngine'
 
 export const Viewport: FC = () => {
     const { t } = useTranslation()
-    const { canvasRef, caps, gpuError, engine } = useRenderEngine()
+    const { canvasRef } = useRenderEngine()
+    const engine = useUiStore((state) => state.engine)
+    const caps = useUiStore((state) => state.renderCaps)
+    const gpuError = useUiStore((state) => state.gpuError)
     const currentIndex = usePlaylist((state) => state.currentIndex)
     const entries = usePlaylist((state) => state.entries)
     const best = usePlaylist((state) => state.best)
@@ -62,15 +65,10 @@ export const Viewport: FC = () => {
     }
 
     useEffect(() => {
-        useUiStore.getState().attachEngine(engine)
-        if (engine) {
-            const state = useEditStore.getState().state
-            if (state) engine.setEditState(state)
-            useLens.getState().syncEngine()
-        }
-        return () => {
-            useUiStore.getState().attachEngine(null)
-        }
+        if (!engine) return
+        const state = useEditStore.getState().state
+        if (state) engine.setEditState(state)
+        useLens.getState().syncEngine()
     }, [engine])
 
     useEffect(() => {
