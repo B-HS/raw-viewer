@@ -169,6 +169,7 @@ pub fn run() {
             commands::set_performance_settings,
             commands::get_performance_settings,
             commands::request_l2,
+            commands::preload_l0,
             commands::get_reverse_geocode,
             export::commands::export_begin,
             export::commands::export_tile,

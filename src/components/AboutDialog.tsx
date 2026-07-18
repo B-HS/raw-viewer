@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { getLicenses } from '../ipc/about'
 import { useModalDismiss } from '../lib/useModalDismiss'
 import { useOverlays } from '../store/overlays'
+import { AboutSummary } from './AboutSummary'
 
 export const AboutDialog: FC = () => {
     const dialogRef = useRef<HTMLDivElement>(null)
@@ -40,10 +41,7 @@ export const AboutDialog: FC = () => {
                 onClick={(event) => event.stopPropagation()}
                 className='flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-200 shadow-2xl outline-none'>
                 <div className='flex items-center justify-between border-b border-neutral-800 px-5 py-3'>
-                    <h2 className='text-sm font-semibold'>
-                        {t('about.title')}
-                        {version && <span className='ml-2 font-mono text-[11px] text-neutral-500'>{`${t('about.version')} ${version}`}</span>}
-                    </h2>
+                    <h2 className='text-sm font-semibold'>{t('about.title')}</h2>
                     <button
                         type='button'
                         onClick={close}
@@ -52,6 +50,10 @@ export const AboutDialog: FC = () => {
                         className='rounded px-2 py-0.5 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'>
                         ✕
                     </button>
+                </div>
+                <AboutSummary version={version} />
+                <div className='border-t border-neutral-800 px-5 py-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>
+                    {t('about.licensesTitle')}
                 </div>
                 <div className='min-h-0 flex-1 bg-white'>
                     {html ? (

@@ -2,11 +2,12 @@ import { getVersion } from '@tauri-apps/api/app'
 import { useEffect, useRef, useState } from 'react'
 import type { FC, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AboutSummary } from '../AboutSummary'
 import { detectWebGpuSupport } from '../../gl/webgpu/detect'
 import type { WebGpuSupport } from '../../gl/webgpu/detect'
 import { clearCache, getCacheStats } from '../../ipc/about'
 import { hasDisplayIccProfile } from '../../ipc/display'
-import { checkForUpdate, installUpdateAndRelaunch } from '../../ipc/updater'
+import { checkForUpdate, describeUpdateError, installUpdateAndRelaunch } from '../../ipc/updater'
 import { useModalDismiss } from '../../lib/useModalDismiss'
 import { useOverlays } from '../../store/overlays'
 import { useSettings } from '../../store/settings'
@@ -97,9 +98,16 @@ export const SettingsDialog: FC = () => {
             }
             setUpdateState('installing')
             await installUpdateAndRelaunch(update)
-        } catch {
+        } catch (error) {
             setUpdateState('idle')
-            useToast.getState().show(t('toast.updateFailed'))
+            const detail = describeUpdateError(error)
+            const reason =
+                detail.kind === 'noRelease'
+                    ? t('toast.updateFailedNoRelease')
+                    : detail.kind === 'network'
+                      ? t('toast.updateFailedNetwork')
+                      : t('toast.updateFailed')
+            useToast.getState().show(`${reason} — ${detail.message}`)
         }
     }
     const tab = useSettingsTab((state) => state.tab)
@@ -419,9 +427,9 @@ export const SettingsDialog: FC = () => {
                         {tab === 'about' && (
                             <>
                                 <SectionTitle>{t('settings.info')}</SectionTitle>
-                                <Field label={t('settings.version')}>
-                                    <span className='font-mono text-xs text-neutral-300'>{version || '—'}</span>
-                                </Field>
+                                <div className='-mx-5'>
+                                    <AboutSummary version={version} />
+                                </div>
                                 <div>
                                     <button
                                         type='button'

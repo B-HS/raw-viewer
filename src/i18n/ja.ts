@@ -34,6 +34,8 @@ export const ja = {
     },
     panel: {
         adjust: '現像',
+        searchPlaceholder: '調整項目を検索',
+        searchNoResults: '一致する調整項目がありません',
         resetAll: 'すべてリセット (⌘R)',
         sectionReset: '{{title}}をリセット',
         section: {
@@ -191,6 +193,7 @@ export const ja = {
             l2: 'L2 · 100%',
         },
         decoding: 'デコード中',
+        decodeProgress: 'デコード段階 (L0·L1·L2)',
         lowPrecision: '⚠ 低精度モード',
         noProfile: '⚠ プロファイルなし (色が不正確)',
         gpuUnavailable: 'GPUアクセラレーションを使用できません',
@@ -551,7 +554,11 @@ export const ja = {
         shortcutsResetOne: '{{name}}をデフォルトに戻す',
     },
     about: {
-        title: 'オープンソースライセンス',
+        title: '情報',
+        tagline: 'macOS向けのRAW・画像ビューア — 非破壊編集、プリセット、書き出しに対応。',
+        author: '作者',
+        repository: 'リポジトリ',
+        licensesTitle: 'オープンソースライセンス',
         version: 'バージョン',
         loading: '読み込み中...',
         close: '閉じる',
@@ -659,6 +666,8 @@ export const ja = {
         cpuFrameFailed: 'この画像のCPUレンダリングに失敗しました',
         updateAvailable: 'アップデート {{version}} が利用可能です - 設定からインストールしてください',
         updateFailed: 'アップデートの確認に失敗しました',
+        updateFailedNoRelease: 'まだ公開されたリリースがありません',
+        updateFailedNetwork: 'ネットワーク接続を確認してください',
         renameDone: '名前を変更しました',
         renameFailed: '名前の変更に失敗しました: {{message}}',
         moveDone: '{{count}}件のファイルを移動しました',

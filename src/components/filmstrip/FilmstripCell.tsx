@@ -48,7 +48,7 @@ export const FilmstripCell: FC<FilmstripCellProps> = ({
                 onClick={onSelect}
                 onContextMenu={onContextMenu}
                 style={border ? { boxShadow: `inset 0 0 0 2px ${border}` } : undefined}
-                className={`relative flex h-full cursor-pointer flex-col overflow-hidden rounded outline-2 -outline-offset-2 ${active ? 'outline outline-sky-400' : selected ? 'outline outline-sky-400/40' : 'hover:outline hover:outline-neutral-600'}`}>
+                className='group relative flex h-full cursor-pointer flex-col overflow-hidden rounded'>
                 <div className='relative min-h-0 flex-1 bg-neutral-950'>
                     {failed ? (
                         <div className='flex h-full items-center justify-center px-1 text-center text-[9px] leading-tight text-neutral-500'>
@@ -91,6 +91,9 @@ export const FilmstripCell: FC<FilmstripCellProps> = ({
                     )}
                     <div className='truncate text-center text-[9px] text-neutral-400'>{entry.fileName}</div>
                 </div>
+                <span
+                    className={`pointer-events-none absolute inset-0 rounded border-2 ${active ? 'border-sky-400' : selected ? 'border-sky-400/50' : 'border-transparent group-hover:border-neutral-500/70'}`}
+                />
             </div>
         </div>
     )

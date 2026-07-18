@@ -9,7 +9,11 @@
         "opener:allow-reveal-item-in-dir",
         {
             "identifier": "opener:allow-open-url",
-            "allow": [{ "url": "https://www.google.com/maps/**" }, { "url": "https://maps.apple.com/**" }]
+            "allow": [
+                { "url": "https://www.google.com/maps/**" },
+                { "url": "https://maps.apple.com/**" },
+                { "url": "https://github.com/B-HS/**" }
+            ]
         },
         "store:allow-load",
         "store:allow-get",

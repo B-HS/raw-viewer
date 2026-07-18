@@ -78,6 +78,24 @@
 - [x] N3. docs 최신화 — phase6-contract(6h·검증 상태), architecture-frontend, release.md, decisions.md
 - [x] N4. v0.5.0 상향(3파일+lock) → 검증 사다리(tsc·lint 0/0, bun test 17, 빌드, i18n 0, tauri dev 스모크) → 커밋·push → prod 병합 → v0.5.0 태그
 
+## 진행 중: v0.5.1 검증 후 마무리 웨이브 (2026-07-18 사용자 지시 9건)
+
+- [x] F1. 선택·hover 표시 재설계 — ring/outline이 자식·inline boxShadow에 밀리던 구조를 셀 최상위 오버레이 border(span absolute inset-0)로 교체 (필름스트립·그리드)
+- [x] F2. 앱 표시명 "Raw Viewer" — 파일명(productName)까지 바꾸면 GitHub 자산명 공백 치환으로 업데이터 URL이 깨질 위험 → src-tauri/Info.plist 병합(CFBundleDisplayName/CFBundleName)으로 표시명만 변경. 창 title·타이틀바·새 창 title도 정리
+- [x] F3+F6(About). AboutSummary 컴포넌트(소개·작성자 Hyunseok Byun @B-HS·저장소 링크, opener 스코프에 github.com/B-HS 추가) — About 다이얼로그 상단 + 설정>정보 탭 공용
+- [x] F4. 업데이트 실패 사유 상세화 — describeUpdateError(미공개 릴리스/네트워크/기타 분류) + 원문 축약 병기
+- [x] F5·F6. 디코드 파이프라인 개선 (조사 워크플로 3관점 → 구현):
+  - CPU 폭주 근본 원인 = 워커 17×OMP 18팀 초과구독: OMP_NUM_THREADS=4·KMP_BLOCKTIME=0 캡(main.rs) + 워커 레인 분리(light L0 전용 2개 / heavy L1·L2 (logical/4).clamp(2,4)개)
+  - 이웃 L1 투기 프리로드 제거(neighbor_jobs) — 사용자 전략 "L1/L2는 선택 시"와 일치
+  - 전방 L0 전체 선로딩: preload_l0 커맨드(+L0 세대 플래그로 navigate 취소에서 보호), 프론트 스캔 완료·이동 디바운스(800ms) 시 전방 미로딩분 최대 500장 요청, 창 밖 L0 ready는 setLevel만 반영(필름스트립 썸네일 자동 갱신)
+  - 낭비 컷: IDLE_DELAY 150→400ms, 큐에 남은 스테일 L2(현재 사진 아님)는 실행 직전 스킵, f16 변환 루프에 취소 체크 삽입
+  - 재방문 플래시: stale best 가드에 renderer.hasImage 결합 — 텍스처 없으면 L0 먼저 표시 후 L1 스왑
+  - 진행 UI: 뷰포트 배지에 L0·L1·L2 3단 점 표시
+- [x] F7. 우측 편집 패널 검색 — 섹션별 라벨 키 인덱스 기반 필터(검색 시 매칭 섹션만 표시·재마운트로 펼침), 3개국어
+- [x] F8. 앱 아이콘 — 시안 3종(라인 조리개/채움 조리개/렌즈 링) 제작·사용자 선택(시안 A 라인 조리개) → 투명 배경 1024 렌더 → `tauri icon`으로 전체 세트 재생성
+- [x] F9. 검증 — tsc·eslint 0/0, bun test 17, vite build, cargo test 324, i18n diff 0, 실폴더(CR2 153장) 실기동 실측: 전방 L0 프리로드 65장 자동 실행·패닉 0·**유휴 CPU 0.0%**(이전 지속 99% 해소 실증). 커밋은 지시 대기
+- 조사 상세: 워크플로 3관점(큐 우선순위/CPU 폭주/캐시 재방문) 보고서 — 근본 원인·권고 전문은 이 세션 기록, 핵심은 architecture-backend.md 파이프라인 절에 반영
+
 ## 남은 작업 (전부 사용자 재석·결정 대기 — 자율 진행 가능 항목은 2026-07-18 웨이브에서 소진)
 
 - [ ] Phase 3 수동 검증: §8.2 수동 35항목(quality-assurance 문서), Z8 고효율 NEF 육안, 신규 UI(타이틀바·CPU 폴백·그리드·TAT) 시각 확인 + 2026-07-18 웨이브 회귀 확인(패널·필름스트립·CPU 폴백·샘플러 핀·팔레트) — 사용자 재석 필요

@@ -55,7 +55,7 @@ export const TitleBar: FC<TitleBarProps> = ({ onOpenFile }) => {
         <header
             data-tauri-drag-region
             className='relative z-[45] flex h-9 shrink-0 select-none items-center border-b border-neutral-800 bg-neutral-900 pl-3 text-xs text-neutral-300'>
-            <span className='pointer-events-none font-medium text-neutral-200'>raw-viewer</span>
+            <span className='pointer-events-none font-medium text-neutral-200'>Raw Viewer</span>
             <div ref={menuRef} className='relative ml-3'>
                 <button
                     type='button'

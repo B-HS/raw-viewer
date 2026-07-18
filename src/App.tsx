@@ -36,7 +36,7 @@ import {
     toggleFullscreen,
 } from './ipc/commands'
 import { onDecodeCrashLoop, onDockOpen, onFsChanged, onOpenRequest } from './ipc/events'
-import { requestL2 } from './ipc/performance'
+import { preloadL0, requestL2 } from './ipc/performance'
 import { watchDirectory } from './ipc/fs'
 import { flushOrganize } from './ipc/organize'
 import { copyFilesToClipboard, noteRecent } from './ipc/platform'
@@ -202,6 +202,8 @@ const pickAndOpenImage = async (setOpenError: (message: string) => void) => {
 const PANEL_TABS: readonly Exclude<RightPanel, 'none'>[] = ['edit', 'meta', 'preset', 'history']
 
 const META_LOAD_DEBOUNCE_MS = 150
+const PRELOAD_L0_BATCH = 500
+const PRELOAD_L0_DEBOUNCE_MS = 800
 const L2_ZOOM_ENTER_RATIO = 0.999
 const L2_ZOOM_EXIT_RATIO = 0.95
 
@@ -646,6 +648,20 @@ export const App: FC = () => {
         }
         run().catch(() => undefined)
     }, [currentImageId, scanning])
+
+    useEffect(() => {
+        if (scanning || entryCount === 0) return
+        const timer = setTimeout(() => {
+            const state = usePlaylist.getState()
+            const pending = state.entries
+                .slice(state.currentIndex + 1)
+                .filter((entry) => !state.best[entry.imageId])
+                .slice(0, PRELOAD_L0_BATCH)
+                .map((entry) => entry.imageId)
+            if (pending.length > 0) preloadL0(pending).catch(() => undefined)
+        }, PRELOAD_L0_DEBOUNCE_MS)
+        return () => clearTimeout(timer)
+    }, [scanning, entryCount, currentImageId])
 
     useEffect(() => {
         if (!useSettings.getState().autoUpdateCheck) return

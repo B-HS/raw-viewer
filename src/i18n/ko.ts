@@ -34,6 +34,8 @@ export const ko = {
     },
     panel: {
         adjust: '보정',
+        searchPlaceholder: '보정 항목 검색',
+        searchNoResults: '일치하는 보정 항목이 없습니다',
         resetAll: '전체 초기화 (⌘R)',
         sectionReset: '{{title}} 초기화',
         section: {
@@ -191,6 +193,7 @@ export const ko = {
             l2: 'L2 · 100%',
         },
         decoding: '디코딩 중',
+        decodeProgress: '디코딩 단계 (L0·L1·L2)',
         lowPrecision: '⚠ 저정밀 모드',
         noProfile: '⚠ 프로파일 없음 (색 부정확)',
         gpuUnavailable: 'GPU 가속을 사용할 수 없습니다',
@@ -549,7 +552,11 @@ export const ko = {
         shortcutsResetOne: '{{name}} 기본값으로',
     },
     about: {
-        title: '오픈소스 라이선스',
+        title: '정보',
+        tagline: 'macOS용 RAW·이미지 뷰어 — 비파괴 편집, 프리셋, Export를 지원합니다.',
+        author: '만든 사람',
+        repository: '저장소',
+        licensesTitle: '오픈소스 라이선스',
         version: '버전',
         loading: '불러오는 중...',
         close: '닫기',
@@ -657,6 +664,8 @@ export const ko = {
         cpuFrameFailed: '이 이미지의 CPU 렌더링에 실패했습니다',
         updateAvailable: '업데이트 {{version}} 사용 가능 - 설정에서 설치하세요',
         updateFailed: '업데이트 확인에 실패했습니다',
+        updateFailedNoRelease: '아직 공개된 릴리스가 없습니다',
+        updateFailedNetwork: '네트워크 연결을 확인하세요',
         renameDone: '이름을 변경했습니다',
         renameFailed: '이름 변경 실패: {{message}}',
         moveDone: '{{count}}개 파일 이동됨',

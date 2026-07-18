@@ -105,12 +105,12 @@ CPU 렌더 프레임은 **별도 변형**: fmt=0(u8), channels=4(RGBA), 동일 �
 
 ### 2.6 큐/캐시/PixelStore 흐름 (pipeline/mod.rs)
 
-상태 구성: `Services { registry, store(PixelStore), cache(DiskCache), revs(RevCounters) }`(`pipeline/mod.rs:30-46`), `Pipeline`은 워커 스레드(`worker_count()` = 논리코어-1, 최소 2 — `pipeline/mod.rs:212-216`) + 유휴 타이머 스레드 1개를 spawn(`pipeline/mod.rs:156-181`).
+상태 구성: `Services { registry, store(PixelStore), cache(DiskCache), revs(RevCounters) }`(`pipeline/mod.rs:30-46`). `Pipeline`은 **워커 레인 2개**(2026-07-18 재설계) — light 워커 2개(L0 전용 큐)와 heavy 워커 `(logical/4).clamp(2,4)`개(L1/L2 큐) + 유휴 타이머 1개를 spawn. LibRaw OpenMP 팀 크기는 main.rs에서 `OMP_NUM_THREADS=4`(+`KMP_BLOCKTIME=0`)로 캡 — heavy 동시성 × 팀 크기 ≈ 코어 수 불변식(과거 논리코어-1 워커 × 무제한 OMP 팀의 초과구독이 CPU 99% 폭주 원인이었다).
 
 우선순위(작을수록 먼저, 동순위 FIFO — `queue.rs:28-32`):
 
 - `PRIO_CURRENT_L0=0`, `PRIO_CURRENT_L1=10`, `PRIO_CURRENT_L2=20`, `PRIO_NEIGHBOR_BASE=100`(`pipeline/mod.rs:21-24`)
-- 이웃: prev/next 각 리스트에서 index별 `100+2i`(L0), 인접 2장(index<=1)만 `+1`(L1)도 추가(`pipeline/mod.rs:228-238`)
+- 이웃: prev/next 각 리스트에서 index별 `100+2i`(**L0만** — 이웃 L1 투기 프리로드는 2026-07-18 제거). 별도로 `preload_l0` 커맨드가 전방 미로딩 L0을 `PRIO_PRELOAD_BASE(200)+i`로 light 큐에 대량 큐잉(L0 잡은 세대 플래그를 써서 navigate의 cancel_outside에 죽지 않고, 새 preload 호출이 이전 세대를 일괄 무효화)
 
 navigate 흐름(`pipeline/mod.rs:267-302`):
 
@@ -119,7 +119,7 @@ navigate 흐름(`pipeline/mod.rs:267-302`):
 3. 창별 desired 셋의 합집합 밖 image_id의 CancelFlag를 set(`cancel_outside` — `pipeline/mod.rs:337-347`)
 4. `store.set_current(current)` — LRU 축출 보호(`store.rs:128-145`: current id는 절대 축출 안 됨)
 5. `L2Policy::Always`이고 rapid가 아니면 즉시 L2도 enqueue(`pipeline/mod.rs:258-260,298-300`)
-6. 150ms(IDLE_DELAY) 후 유휴 타이머가 `plan_idle`(현재 L1→L2→이웃)을 enqueue. `L2Policy::Zoom`이면 유휴 L2 억제(`pipeline/mod.rs:249-264,551-593`)
+6. 400ms(IDLE_DELAY — 훑기 중 L2 낭비를 줄이려 150→400 상향) 후 유휴 타이머가 `plan_idle`(현재 L1→L2→이웃 L0)을 enqueue. `L2Policy::Zoom`이면 유휴 L2 억제. 큐에 남은 스테일 L2(현재 사진이 아니게 된 것)는 run_job 진입 시 스킵
 
 enqueue 시 dedup: `PendingSet`이 (id, level)당 살아있는 잡 1개만 허용(취소된 owner는 대체 가능 — `pipeline/mod.rs:106-135`). 이미 `store.contains`면 현재 이미지는 메타 재-emit(`reemit`, rev 증가), 이웃은 무시(`pipeline/mod.rs:359-397`).
 
