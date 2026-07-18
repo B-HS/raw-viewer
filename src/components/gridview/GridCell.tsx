@@ -52,7 +52,7 @@ export const GridCell: FC<GridCellProps> = ({
                 aria-label={entry.fileName}
                 aria-pressed={selected}
                 style={border ? { boxShadow: `inset 0 0 0 2px ${border}` } : undefined}
-                className={`relative flex aspect-square w-full flex-col overflow-hidden rounded bg-neutral-950 outline-2 -outline-offset-2 ${active ? 'outline outline-sky-400' : selected ? 'outline outline-sky-400/40' : 'hover:outline hover:outline-neutral-600 focus-visible:outline focus-visible:outline-sky-400'}`}>
+                className='group relative flex aspect-square w-full flex-col overflow-hidden rounded bg-neutral-950 outline-none'>
                 {failed ? (
                     <span className='flex h-full items-center justify-center px-2 text-center text-[10px] leading-tight text-neutral-500'>
                         {entry.fileName}
@@ -82,6 +82,9 @@ export const GridCell: FC<GridCellProps> = ({
                         <span className='text-neutral-700'>{'★'.repeat(5 - rating)}</span>
                     </span>
                 )}
+                <span
+                    className={`pointer-events-none absolute inset-0 rounded border-2 ${active ? 'border-sky-400' : selected ? 'border-sky-400/50' : 'border-transparent group-hover:border-neutral-500/70 group-focus-visible:border-sky-400'}`}
+                />
             </button>
         </div>
     )

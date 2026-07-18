@@ -34,6 +34,8 @@ export const en = {
     },
     panel: {
         adjust: 'Develop',
+        searchPlaceholder: 'Search adjustments',
+        searchNoResults: 'No matching adjustments',
         resetAll: 'Reset all (⌘R)',
         sectionReset: 'Reset {{title}}',
         section: {
@@ -191,6 +193,7 @@ export const en = {
             l2: 'L2 · 100%',
         },
         decoding: 'Decoding',
+        decodeProgress: 'Decode stage (L0·L1·L2)',
         lowPrecision: '⚠ Low precision mode',
         noProfile: '⚠ No profile (inaccurate color)',
         gpuUnavailable: 'GPU acceleration is unavailable',
@@ -550,7 +553,11 @@ export const en = {
         shortcutsResetOne: 'Reset {{name}} to default',
     },
     about: {
-        title: 'Open Source Licenses',
+        title: 'About',
+        tagline: 'A RAW and image viewer for macOS with non-destructive editing, presets, and export.',
+        author: 'Author',
+        repository: 'Repository',
+        licensesTitle: 'Open Source Licenses',
         version: 'Version',
         loading: 'Loading...',
         close: 'Close',
@@ -658,6 +665,8 @@ export const en = {
         cpuFrameFailed: 'CPU rendering failed for this image',
         updateAvailable: 'Update {{version}} available - install from Settings',
         updateFailed: 'Update check failed',
+        updateFailedNoRelease: 'No published release yet',
+        updateFailedNetwork: 'Check your network connection',
         renameDone: 'Renamed',
         renameFailed: 'Rename failed: {{message}}',
         moveDone: '{{count}} file(s) moved',
