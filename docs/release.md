@@ -52,7 +52,7 @@
 ### 자동 업데이트 (등록 완료)
 
 - 플러그인: `tauri-plugin-updater`+`tauri-plugin-process`. 엔드포인트 `https://github.com/B-HS/raw-viewer/releases/latest/download/latest.json`, 공개키는 tauri.conf.json 커밋.
-- **개인키 = `~/raw-viewer-updater.key`** (이 머신, 비밀번호 없음). **재생성 금지** — 커밋된 공개키와 쌍이 깨지면 기존 설치 사용자 업데이트 불가. **백업 필수.** 시크릿 `TAURI_SIGNING_PRIVATE_KEY` = 파일 내용(비밀번호 시크릿은 불필요 — 워크플로가 빈 값 처리).
+- **개인키 = `~/environment/raw-viewer-updater.key`** (2026-07-18 `~/raw-viewer-updater.key`에서 이동 — 자격증명 폴더 통합, 비밀번호 없음). **재생성 금지** — 커밋된 공개키와 쌍이 깨지면 기존 설치 사용자 업데이트 불가. 같은 머신 내 이동이므로 **머신 외부 백업은 여전히 권장.** 시크릿 `TAURI_SIGNING_PRIVATE_KEY` = 파일 내용(비밀번호 시크릿은 불필요 — 워크플로가 빈 값 처리).
 - 앱 동작: 시작 시 자동 확인(설정에서 끔 가능) → toast 알림 → 설정 > 업데이트 확인에서 설치·재시작.
 - 로컬 릴리스 빌드는 키 env 없으면 `bun run tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'`.
 
