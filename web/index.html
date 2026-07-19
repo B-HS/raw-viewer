@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Raw Viewer — fast, keyboard-driven RAW viewer and editor for macOS</title>
+        <meta name="description" content="A fast, keyboard-driven RAW photo viewer and non-destructive editor for macOS (Apple silicon)." />
+        <meta name="color-scheme" content="dark" />
+        <link rel="canonical" href="https://b-hs.github.io/raw-viewer/" />
+        <meta property="og:title" content="Raw Viewer" />
+        <meta property="og:description" content="A fast, keyboard-driven RAW photo viewer and non-destructive editor for macOS." />
+        <meta property="og:url" content="https://b-hs.github.io/raw-viewer/" />
+        <meta property="og:image" content="https://raw.githubusercontent.com/B-HS/raw-viewer/prod/docs/assets/screenshot.jpg" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <link rel="icon" href="https://raw.githubusercontent.com/B-HS/raw-viewer/prod/src-tauri/icons/32x32.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #0b0b0d;
+                --bg-alt: #101013;
+                --line: #232327;
+                --text: #e8e8ec;
+                --muted: #8b8b93;
+                --faint: #55555c;
+                --accent-a: #fbbf24;
+                --accent-b: #f4762c;
+                --nav-h: 52px;
+            }
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                border-radius: 0;
+            }
+            html {
+                scroll-snap-type: y mandatory;
+                scroll-behavior: smooth;
+            }
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                -webkit-font-smoothing: antialiased;
+                overflow-x: hidden;
+            }
+            ::selection {
+                background: var(--accent-b);
+                color: #0b0b0d;
+            }
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
+            img {
+                max-width: 100%;
+                display: block;
+            }
+
+            .topbar {
+                position: fixed;
+                inset: 0 0 auto 0;
+                height: var(--nav-h);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 24px;
+                border-bottom: 1px solid var(--line);
+                background: rgba(11, 11, 13, 0.82);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                z-index: 50;
+            }
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-weight: 600;
+                font-size: 14px;
+                letter-spacing: 0.02em;
+            }
+            .brand svg {
+                width: 22px;
+                height: 22px;
+            }
+            .topbar nav {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .topbar nav a {
+                font-size: 12.5px;
+                color: var(--muted);
+                padding: 8px 12px;
+                border: 1px solid transparent;
+                transition: color 0.15s, border-color 0.15s;
+            }
+            .topbar nav a:hover {
+                color: var(--text);
+                border-color: var(--line);
+            }
+            .topbar nav a.solid {
+                color: #0b0b0d;
+                background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
+                font-weight: 600;
+                border: none;
+            }
+            .topbar nav a.solid:hover {
+                filter: brightness(1.08);
+            }
+
+            section {
+                min-height: 100dvh;
+                scroll-snap-align: start;
+                scroll-snap-stop: always;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: calc(var(--nav-h) + 32px) 24px 48px;
+                position: relative;
+            }
+            main section:nth-child(even) {
+                background: var(--bg-alt);
+            }
+
+            .kicker {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                letter-spacing: 0.28em;
+                text-transform: uppercase;
+                color: var(--faint);
+                margin-bottom: 20px;
+            }
+            h1,
+            h2 {
+                font-weight: 800;
+                letter-spacing: -0.03em;
+                text-align: center;
+                line-height: 1.05;
+            }
+            h1 {
+                font-size: clamp(44px, 8vw, 92px);
+            }
+            h2 {
+                font-size: clamp(28px, 4.5vw, 48px);
+                margin-bottom: 14px;
+            }
+            .grad {
+                background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+            }
+            .sub {
+                color: var(--muted);
+                font-size: clamp(15px, 1.6vw, 19px);
+                line-height: 1.65;
+                text-align: center;
+                max-width: 560px;
+            }
+
+            .hero-icon {
+                width: clamp(72px, 9vw, 104px);
+                height: clamp(72px, 9vw, 104px);
+                margin-bottom: 28px;
+            }
+            .cta-row {
+                display: flex;
+                gap: 12px;
+                margin-top: 36px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 13px 26px;
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.01em;
+                border: 1px solid var(--line);
+                color: var(--text);
+                transition: border-color 0.15s, background 0.15s, filter 0.15s;
+            }
+            .btn:hover {
+                border-color: var(--faint);
+                background: var(--bg-alt);
+            }
+            .btn.primary {
+                background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
+                color: #0b0b0d;
+                border: none;
+            }
+            .btn.primary:hover {
+                filter: brightness(1.08);
+            }
+            .meta-line {
+                margin-top: 22px;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11.5px;
+                color: var(--faint);
+                letter-spacing: 0.06em;
+                text-align: center;
+            }
+            .scroll-hint {
+                position: absolute;
+                bottom: 26px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 10px;
+                letter-spacing: 0.3em;
+                text-transform: uppercase;
+                color: var(--faint);
+            }
+
+            .shot-frame {
+                width: min(1060px, 100%);
+                border: 1px solid var(--line);
+                margin-top: 34px;
+                background: #000;
+            }
+            .shot-frame img {
+                width: 100%;
+            }
+            .shot-caption {
+                display: flex;
+                justify-content: space-between;
+                gap: 16px;
+                width: min(1060px, 100%);
+                margin-top: 12px;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                color: var(--faint);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+
+            .feature-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                width: min(1060px, 100%);
+                margin-top: 40px;
+                border-top: 1px solid var(--line);
+                border-left: 1px solid var(--line);
+            }
+            .feature {
+                border-right: 1px solid var(--line);
+                border-bottom: 1px solid var(--line);
+                padding: 26px 24px 30px;
+                background: var(--bg);
+            }
+            .feature .no {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 10.5px;
+                color: var(--faint);
+                letter-spacing: 0.2em;
+            }
+            .feature h3 {
+                font-size: 15.5px;
+                font-weight: 600;
+                margin: 12px 0 8px;
+                letter-spacing: -0.01em;
+            }
+            .feature p {
+                font-size: 13px;
+                line-height: 1.6;
+                color: var(--muted);
+            }
+
+            .usage-wrap {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0;
+                width: min(1060px, 100%);
+                margin-top: 40px;
+                border: 1px solid var(--line);
+            }
+            .usage-col {
+                padding: 32px;
+            }
+            .usage-col + .usage-col {
+                border-left: 1px solid var(--line);
+            }
+            .usage-col h3 {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                letter-spacing: 0.24em;
+                text-transform: uppercase;
+                color: var(--faint);
+                margin-bottom: 22px;
+            }
+            .step {
+                display: flex;
+                gap: 16px;
+                padding: 14px 0;
+                border-bottom: 1px solid var(--line);
+            }
+            .step:last-child {
+                border-bottom: none;
+            }
+            .step .no {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 12px;
+                color: var(--accent-b);
+            }
+            .step div p {
+                font-size: 13.5px;
+                color: var(--muted);
+                line-height: 1.6;
+            }
+            .step div strong {
+                display: block;
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 3px;
+            }
+            .keys {
+                display: grid;
+                grid-template-columns: auto 1fr;
+                gap: 9px 18px;
+                align-items: center;
+            }
+            .keys kbd {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11.5px;
+                color: var(--text);
+                background: var(--bg-alt);
+                border: 1px solid var(--line);
+                border-bottom-color: var(--faint);
+                padding: 3px 8px;
+                white-space: nowrap;
+                justify-self: start;
+            }
+            .keys span {
+                font-size: 12.5px;
+                color: var(--muted);
+            }
+
+            .formats {
+                margin-top: 26px;
+                width: min(1060px, 100%);
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                line-height: 2;
+                letter-spacing: 0.06em;
+                color: var(--faint);
+                text-align: center;
+                text-transform: uppercase;
+            }
+            .footer-links {
+                display: flex;
+                gap: 28px;
+                margin-top: 40px;
+                font-size: 13px;
+                color: var(--muted);
+            }
+            .footer-links a:hover {
+                color: var(--text);
+            }
+            .fine {
+                position: absolute;
+                bottom: 26px;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 10.5px;
+                letter-spacing: 0.1em;
+                color: var(--faint);
+            }
+
+            .dots {
+                position: fixed;
+                right: 22px;
+                top: 50%;
+                transform: translateY(-50%);
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                z-index: 40;
+            }
+            .dots button {
+                width: 8px;
+                height: 8px;
+                border: 1px solid var(--faint);
+                background: transparent;
+                cursor: pointer;
+                padding: 0;
+                transition: background 0.2s, border-color 0.2s, transform 0.2s;
+            }
+            .dots button.active {
+                background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
+                border-color: transparent;
+                transform: scale(1.25);
+            }
+
+            @media (max-width: 1024px) {
+                html {
+                    scroll-snap-type: y proximity;
+                }
+                .feature-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+            @media (max-width: 680px) {
+                html {
+                    scroll-snap-type: none;
+                }
+                section {
+                    padding: calc(var(--nav-h) + 24px) 18px 40px;
+                }
+                .topbar {
+                    padding: 0 16px;
+                }
+                .topbar nav a:not(.solid) {
+                    display: none;
+                }
+                .feature-grid {
+                    grid-template-columns: 1fr;
+                }
+                .usage-wrap {
+                    grid-template-columns: 1fr;
+                }
+                .usage-col + .usage-col {
+                    border-left: none;
+                    border-top: 1px solid var(--line);
+                }
+                .dots {
+                    display: none;
+                }
+                .scroll-hint,
+                .fine {
+                    position: static;
+                    transform: none;
+                    margin-top: 34px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="topbar">
+            <a class="brand" href="#top" aria-label="Raw Viewer home">
+                <svg viewBox="0 0 1024 1024" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="bgg" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#43434d" />
+                            <stop offset="1" stop-color="#1e1e24" />
+                        </linearGradient>
+                        <linearGradient id="acc" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#fbbf24" />
+                            <stop offset="1" stop-color="#f4762c" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bgg)" />
+                    <circle cx="512" cy="512" r="306" fill="none" stroke="#f4f4f7" stroke-width="58" />
+                    <line x1="789.7" y1="421.8" x2="579.1" y2="611.5" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="729" y1="707.4" x2="459.4" y2="619.9" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="451.3" y1="797.6" x2="392.3" y2="520.4" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="234.3" y1="602.2" x2="444.9" y2="412.5" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="295" y1="316.6" x2="564.6" y2="404.1" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="572.7" y1="226.4" x2="631.7" y2="503.6" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <circle cx="512" cy="512" r="96" fill="url(#acc)" />
+                </svg>
+                Raw Viewer
+            </a>
+            <nav>
+                <a href="#showcase">Showcase</a>
+                <a href="#features">Features</a>
+                <a href="#usage">Usage</a>
+                <a href="https://github.com/B-HS/raw-viewer" target="_blank" rel="noreferrer">GitHub</a>
+                <a class="solid" href="https://github.com/B-HS/raw-viewer/releases/latest" target="_blank" rel="noreferrer">Download</a>
+            </nav>
+        </header>
+
+        <main>
+            <section id="top">
+                <svg class="hero-icon" viewBox="0 0 1024 1024" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="hbg" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#43434d" />
+                            <stop offset="1" stop-color="#1e1e24" />
+                        </linearGradient>
+                        <linearGradient id="hacc" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#fbbf24" />
+                            <stop offset="1" stop-color="#f4762c" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#hbg)" />
+                    <circle cx="512" cy="512" r="306" fill="none" stroke="#f4f4f7" stroke-width="58" />
+                    <line x1="789.7" y1="421.8" x2="579.1" y2="611.5" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="729" y1="707.4" x2="459.4" y2="619.9" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="451.3" y1="797.6" x2="392.3" y2="520.4" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="234.3" y1="602.2" x2="444.9" y2="412.5" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="295" y1="316.6" x2="564.6" y2="404.1" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <line x1="572.7" y1="226.4" x2="631.7" y2="503.6" stroke="#f4f4f7" stroke-width="50" stroke-linecap="round" />
+                    <circle cx="512" cy="512" r="96" fill="url(#hacc)" />
+                </svg>
+                <h1 data-reveal>Raw <span class="grad">Viewer</span></h1>
+                <p class="sub" data-reveal style="margin-top: 22px">
+                    A fast, keyboard-driven RAW photo viewer and non-destructive editor for macOS. Browsing a full shoot feels like flipping JPEGs.
+                </p>
+                <div class="cta-row" data-reveal>
+                    <a class="btn primary" href="https://github.com/B-HS/raw-viewer/releases/latest" target="_blank" rel="noreferrer">
+                        Download for macOS
+                    </a>
+                    <a class="btn" href="https://github.com/B-HS/raw-viewer" target="_blank" rel="noreferrer">View on GitHub</a>
+                </div>
+                <p class="meta-line" data-reveal>macOS 13+ · Apple silicon · Signed &amp; notarized · MIT</p>
+                <span class="scroll-hint">Scroll</span>
+            </section>
+
+            <section id="showcase">
+                <p class="kicker" data-reveal>Showcase</p>
+                <h2 data-reveal>Develop, <span class="grad">before and after</span></h2>
+                <p class="sub" data-reveal>Staged decode pipeline: instant preview, edit quality, then 100% — with forward preloading and near-zero idle CPU.</p>
+                <figure class="shot-frame" data-reveal>
+                    <img
+                        src="https://raw.githubusercontent.com/B-HS/raw-viewer/prod/docs/assets/screenshot.jpg"
+                        alt="Raw Viewer before/after compare view with develop panel"
+                        loading="lazy"
+                    />
+                </figure>
+                <div class="shot-caption" data-reveal>
+                    <span>Before / After split</span>
+                    <span>CR2 · 153 photos · L2 100%</span>
+                </div>
+            </section>
+
+            <section id="features">
+                <p class="kicker" data-reveal>Features</p>
+                <h2 data-reveal>Everything a shoot needs, <span class="grad">nothing else</span></h2>
+                <div class="feature-grid">
+                    <article class="feature" data-reveal>
+                        <span class="no">01</span>
+                        <h3>Fast RAW browsing</h3>
+                        <p>Staged decode (preview → edit quality → 100%), forward preloading of upcoming photos, near-zero idle CPU on large folders.</p>
+                    </article>
+                    <article class="feature" data-reveal>
+                        <span class="no">02</span>
+                        <h3>Non-destructive develop</h3>
+                        <p>White balance, tone curve, HSL, noise reduction, sharpening, lens correction, effects, crop — originals are never touched.</p>
+                    </article>
+                    <article class="feature" data-reveal>
+                        <span class="no">03</span>
+                        <h3>GPU pipeline</h3>
+                        <p>WebGL2 renderer with an experimental WebGPU backend, including compute-shader noise reduction.</p>
+                    </article>
+                    <article class="feature" data-reveal>
+                        <span class="no">04</span>
+                        <h3>Culling workflow</h3>
+                        <p>Star ratings, pick/reject flags, color labels, filters, RAW+JPEG pairing, grid view and slideshow.</p>
+                    </article>
+                    <article class="feature" data-reveal>
+                        <span class="no">05</span>
+                        <h3>Export</h3>
+                        <p>Batch JPEG/PNG/TIFF (8/16-bit) and DNG, edit presets, copy and paste settings between photos.</p>
+                    </article>
+                    <article class="feature" data-reveal>
+                        <span class="no">06</span>
+                        <h3>Localized</h3>
+                        <p>English, 한국어 and 日本語 — fully translated interface with remappable shortcuts.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="usage">
+                <p class="kicker" data-reveal>Usage</p>
+                <h2 data-reveal>Install once, <span class="grad">fly on keys</span></h2>
+                <div class="usage-wrap" data-reveal>
+                    <div class="usage-col">
+                        <h3>Getting started</h3>
+                        <div class="step">
+                            <span class="no">01</span>
+                            <div>
+                                <strong>Download the DMG</strong>
+                                <p>Grab the latest release from GitHub — signed and notarized for Apple silicon.</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <span class="no">02</span>
+                            <div>
+                                <strong>Drag into Applications</strong>
+                                <p>Open the DMG and drop Raw Viewer into your Applications folder.</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <span class="no">03</span>
+                            <div>
+                                <strong>Open a folder of RAWs</strong>
+                                <p>Drag a file or folder onto the window. Updates arrive through the built-in updater.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="usage-col">
+                        <h3>Essential shortcuts</h3>
+                        <div class="keys">
+                            <kbd>← →</kbd><span>Previous / next photo</span>
+                            <kbd>0–5</kbd><span>Star rating</span>
+                            <kbd>P / X / U</kbd><span>Pick / reject / clear flag</span>
+                            <kbd>G</kbd><span>Grid view</span>
+                            <kbd>C</kbd><span>Crop</span>
+                            <kbd>Y</kbd><span>Before / after split</span>
+                            <kbd>Tab</kbd><span>Edit panel</span>
+                            <kbd>F</kbd><span>Fullscreen</span>
+                            <kbd>⌘⇧P</kbd><span>Command palette</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="get">
+                <p class="kicker" data-reveal>Get started</p>
+                <h2 data-reveal>Your shoot is <span class="grad">waiting</span></h2>
+                <p class="sub" data-reveal>Free and open source under MIT. One DMG, no accounts, no telemetry.</p>
+                <div class="cta-row" data-reveal>
+                    <a class="btn primary" href="https://github.com/B-HS/raw-viewer/releases/latest" target="_blank" rel="noreferrer">
+                        Download for macOS
+                    </a>
+                    <a class="btn" href="https://github.com/B-HS/raw-viewer" target="_blank" rel="noreferrer">Star on GitHub</a>
+                </div>
+                <p class="formats" data-reveal>
+                    CR2 · CR3 · ARW · NEF · NRW · RAF · ORF · RW2 · PEF · X3F · DNG<br />
+                    JPEG · PNG · TIFF · HEIC · AVIF · WEBP · BMP · GIF
+                </p>
+                <div class="footer-links" data-reveal>
+                    <a href="https://github.com/B-HS/raw-viewer" target="_blank" rel="noreferrer">GitHub</a>
+                    <a href="https://github.com/B-HS/raw-viewer/releases" target="_blank" rel="noreferrer">Releases</a>
+                    <a href="https://github.com/B-HS" target="_blank" rel="noreferrer">@B-HS</a>
+                </div>
+                <span class="fine">MIT © Hyunseok Byun</span>
+            </section>
+        </main>
+
+        <nav class="dots" aria-label="Section navigation"></nav>
+
+        <script type="module">
+            import { animate, stagger } from 'https://cdn.jsdelivr.net/npm/motion@12/+esm'
+
+            const REVEAL_DISTANCE_PX = 28
+            const REVEAL_DURATION_S = 0.7
+            const REVEAL_STAGGER_S = 0.09
+            const SECTION_ENTER_AMOUNT = 0.45
+
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            const sections = [...document.querySelectorAll('main section')]
+            const revealTargets = sections.map((sectionEl) => [...sectionEl.querySelectorAll('[data-reveal]')])
+
+            const dotNav = document.querySelector('.dots')
+            sections.forEach((sectionEl, index) => {
+                const dot = document.createElement('button')
+                dot.setAttribute('aria-label', `Go to section ${index + 1}`)
+                dot.addEventListener('click', () => sectionEl.scrollIntoView({ behavior: 'smooth' }))
+                dotNav.append(dot)
+            })
+            const dots = [...dotNav.children]
+
+            const hide = (els) =>
+                els.forEach((el) => {
+                    el.style.opacity = '0'
+                    el.style.transform = `translateY(${REVEAL_DISTANCE_PX}px)`
+                })
+
+            if (!reduceMotion) revealTargets.forEach(hide)
+
+            const shown = sections.map(() => false)
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    for (const entry of entries) {
+                        const index = sections.indexOf(entry.target)
+                        if (entry.isIntersecting && entry.intersectionRatio >= SECTION_ENTER_AMOUNT) {
+                            dots.forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === index))
+                            if (!reduceMotion && !shown[index]) {
+                                shown[index] = true
+                                animate(
+                                    revealTargets[index],
+                                    { opacity: 1, transform: 'translateY(0px)' },
+                                    { duration: REVEAL_DURATION_S, delay: stagger(REVEAL_STAGGER_S), ease: [0.22, 1, 0.36, 1] },
+                                )
+                            }
+                        } else if (!entry.isIntersecting && shown[index]) {
+                            shown[index] = false
+                            if (!reduceMotion) hide(revealTargets[index])
+                        }
+                    }
+                },
+                { threshold: [0, SECTION_ENTER_AMOUNT] },
+            )
+            sections.forEach((sectionEl) => observer.observe(sectionEl))
+        </script>
+    </body>
+</html>
