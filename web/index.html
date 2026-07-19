@@ -659,11 +659,7 @@
             })
             const dots = [...dotNav.children]
 
-            const hide = (els) =>
-                els.forEach((el) => {
-                    el.style.opacity = '0'
-                    el.style.transform = `translateY(${REVEAL_DISTANCE_PX}px)`
-                })
+            const hide = (els) => animate(els, { opacity: 0, transform: `translateY(${REVEAL_DISTANCE_PX}px)` }, { duration: 0 })
 
             if (!reduceMotion) revealTargets.forEach(hide)
 
