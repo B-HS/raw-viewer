@@ -68,6 +68,7 @@
 - [x] gh api 로 Pages 활성화(build_type=workflow) → **https://b-hs.github.io/raw-viewer/** 배포·200 확인
 - [x] 검증(tsc 0·eslint 0·bun test 17) → 커밋 `4dec1b3`(web)·`050d376`(ci) → dev·prod push → 워크플로 success(18s)
 - 참고: headless Chrome `--screenshot` 은 fragment(#section) 로드 시 검은 캡처를 내는 아티팩트가 있음(페이지 문제 아님) — 섹션 검증은 min-height 고정 사본 + 세로 4500px 단일 캡처로 수행
+- [x] 역스크롤 reveal 미동작(사용자 발견) — motion 캐시와 인라인 hide 의 desync 가 원인, hide 를 duration 0 animate 로 교체. 정·역방향+인터럽트 검증 pass. 상세 [bug/2026-07-19-web-reveal-reverse-scroll.md](./bug/2026-07-19-web-reveal-reverse-scroll.md)
 
 ### 완료 — UX 고도화 웨이브 (2026-07-18, v0.5.2 실사용 피드백 8건 → v0.5.3)
 - [x] 1. 메뉴 드롭다운 밖 클릭·Escape 닫힘 — 공용 훅 lib/useDismissOnOutside.ts, 두 메뉴 호버 전환 포함
