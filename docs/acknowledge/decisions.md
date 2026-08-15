@@ -73,3 +73,17 @@
 - `catch {}` 오류 삼킴 정책(분류 완료 — phase5-contract 부록 A): 현상 유지. persisted-scope는 불요 종결·store 권한 축소는 적용 완료(위 항목 참조).
 - 필름스트립 아틀라스: 실측에서 병목 확인 전 미착수.
 - react-hooks compiler 경고: 31건 → 0건 해소(2026-07-18 W1, React Compiler 도입·근본 수정). set-state-in-effect·refs 룰은 warn 유지(재발 감지용).
+
+## 2026-08-15 (신규 3작업 — 회전 버그·스캔·Drawer)
+- **rotate90 버그 수정 방식**: 뷰 레벨 flip 합성(composeFlip)으로 확정 — 워프(pass2) 편입안은 가로세로 교환 불가로 배제. 상세 bug/2026-08-15-rotate90-not-applied.md.
+- **스캔(문서 펴기) 모드**: 사용자 선택 = **구김까지 메시 디워프**. v1 구현은 4코너 + 4엣지 곡률 핸들의 **Coons patch**(엣지당 quadratic Bézier) — 휘어짐·말림·접힘형 굴곡을 커버. 무작위 잔구김(비평면 랜덤 크리즈)의 완전 평탄화는 내부 그리드 제어점 확장(v2 후보)으로 명시 이월. AI 추정 디워프는 범위 외.
+- **Drawer 모드**: 사용자 선택 = **Photoshop 수준**. 단, 단일 세션 구현 불가 규모임을 고지했고, 합의된 진행 순서(스캔 → Drawer → 레이어별 보정)에 따라 **단계별 PRD를 먼저 확정 후 순차 구현**한다. 레이어별 보정은 드로잉 레이어별 보정(Photoshop식)으로 — 기존 local-adjustments-draft(마스크식)는 별도 축으로 보류 유지.
+- **진행 순서**: 스캔 모드 → Drawer → 레이어별 보정 (각 단계 검증 후 연속 진행, ai-process 상시 지시).
+- **스캔 상태 스키마**: `EditState.scan: Option<ScanState>` + `#[serde(default)]` — version 2 유지(additive optional 필드라 마이그레이션 불필요, 구 사이드카는 None 파싱). 프리셋 마스크는 geometry 섹션에 포함.
+
+## 2026-08-15 (Drawer D2~D4 — 사용자 "멈추지 말고 끝까지" 지시에 따른 자체 결정)
+- **플러드 필 저장 방식**: 재계산(리플레이) + 레이어 캐시로 확정 — fill 오브젝트는 {색, 시드, 클립}만 저장하고 래스터라이즈 시 flood fill을 재실행. 레이어 콘텐츠는 WeakMap 2단 캐시(objects 참조 키 = 원본, layer 참조 키 = 보정 적용본)로 변경된 레이어만 재계산. 스냅샷 보조 파일안은 사이드카 생태계 복잡도로 배제.
+- **D4 복제 도장·블러 브러시 = 라이브 재생 모델**: 스트로크는 {점열, 오프셋, 크기}만 저장하고, 래스터라이즈 시점의 **보정 완료된 사진(processed, 드로잉 합성 전)** 픽셀을 참조해 재생. 사진 보정을 바꾸면 복제/블러 결과도 따라간다(베이크 방식보다 비파괴 철학에 부합, 사이드카 비대 없음). 뷰는 renderer readProcessedSrgb(GL=proc 해상도 readPixels, WebGPU=mirror 1024 캡), 익스포트는 GL prepare 내부에서 체인 출력 readback 후 드로어 팩토리 호출.
+- **블렌드 모드 합성 공간**: 레이어 블렌드(곱하기·스크린·오버레이)와 레이어 보정(밝기·대비·채도·색조)은 Canvas2D **sRGB 공간**에서 수행(Photoshop legacy 방식과 동일 계열). 사진과의 최종 알파 합성만 linear Rec.2020에서.
+- **SPEC-GAP**: WebGPU renderExport 는 드로어 사진 팩토리(복제/블러) 미지원 — 프로덕션 익스포트 경로는 GL 엔진이므로 실사용 영향 없음. 뷰의 WebGPU 백엔드 복제/블러 프리뷰는 mirror 1024px 캡 해상도(익스포트는 풀해상도).
+- **dead code 제거**: store/crop.ts 의 미사용 export `currentImageFlip` 삭제(사용자 지시).

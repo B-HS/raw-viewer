@@ -62,6 +62,29 @@
 
 ## 남은 작업
 
+### 진행 중 — 회전 버그 + 스캔/Drawer/보정 3기능 (2026-08-15)
+
+사용자 결정(acknowledge/decisions.md 2026-08-15): 스캔=구김까지 메시 디워프(v1 Coons patch), Drawer=Photoshop 수준(단계별 PRD 후 순차), 레이어별 보정=드로잉 레이어별. 순서: 스캔 → Drawer → 보정.
+
+- [x] a. rotate90 미동작 버그 수정 — composeFlip(뷰 flip 합성), 소비처 7파일 + 테스트 5건. 상세 bug/2026-08-15-rotate90-not-applied.md. tsc·eslint·bun test 22 pass
+- [x] b. 스캔 모드 Rust — ScanState + EditState.scan(serde default·version 2 유지) + defaults/is_default/mask + 신규 테스트 3건 + ts-rs 재생성. cargo test 전체 pass
+- [x] c. 스캔 모드 렌더 — FRAG_PASS2/WGSL_PASS2 Coons patch(4코너+4엣지 중점 핸들), scanEditMode 시 뷰만 스킵, scanOutputDims(뷰 metrics·모델·프로젝션·크롭 오버레이·익스포트 GL/WebGPU), dirty/stateSignature/stageActive 반영. 부수 발견: GL 익스포트 orient 쿼드가 버퍼 치수 기준이라 치수 변경 시 중앙 확대 → 타깃 치수 기준으로 교정
+- [x] d. 스캔 모드 UI — ScanOverlay(코너 4+엣지 4 드래그, 코너 이동 시 인접 엣지 절반 추종, 히스토리 코얼레싱), CropGeometrySection 내 문서 스캔 구획(편집/적용/해제), uiStore.scanEditMode(크롭 편집과 상호 배타), i18n en/ko/ja 각 11키(687키 diff 0)
+- [x] e. 검증 — tsc 0 · eslint 0 · bun test 28 · prettier pass · cargo test pass · i18n diff 0 · **패리티 19벡터 ALL PASS**(scan 벡터 신규, max 0.00073). 실기동 시각 검증은 사용자 재석 시(스펙 §6)
+- [x] f. Drawer 모드 — 단계별 PRD 작성(docs/drawer-mode-prd.md, D1~D4 로드맵) + **D1 구현 완료**:
+  - Rust: DrawerState/DrawerLayer/DrawerObject(태그 union: stroke·shape·text) + EditState.drawer(serde default) + 왕복·마스크 제외 테스트. 프리셋 마스크에서 의도적 제외(그림 복사 사고 방지)
+  - 렌더: 드로잉은 보정 체인과 독립 — 뷰는 pass8(GL/WGSL)에서 sRGB→linear Rec.2020 변환 후 알파 합성(l0 프리뷰 제외), 익스포트는 orient 직전 합성 패스(FRAG_DRAWER/WGSL_DRAWER). exportStore 2경로·클립보드 연동. 래스터라이즈는 Canvas2D(drawerRaster.ts, 4096 캡, 지우개=destination-out으로 자기 레이어만)
+  - UI: EditPanel "드로잉" 섹션(도구 8종: 브러시·연필·지우개·직선·화살표·사각형·타원·텍스트, 색·크기·채움, 레이어 목록: 표시·불투명도·순서·삭제·활성), DrawerOverlay(uv 좌표 스트로크·도형 드래그·텍스트 플로팅 입력, 스트로크 1회=히스토리 1엔트리), crop/scan/drawer 편집 모드 상호 배타, i18n 3개국 31키(718키 diff 0)
+  - 검증: tsc 0 · eslint 0 · bun test 33 · prettier · cargo test lib pass · 패리티 19벡터 ALL PASS(회귀 없음)
+- [x] g. Drawer D2·D3·D4 구현 완료 (2026-08-15, 사용자 "멈추지 말고 끝까지" 지시 — 미결 사항은 자체 결정 후 acknowledge 기록):
+  - D2: 레이어 블렌드(곱하기/스크린/오버레이) · 이동 도구+배치 슬라이더(X/Y/배율/회전) · 올가미 선택(오브젝트별 clip 저장) · 채우기(flood fill 재계산+WeakMap 레이어 2단 캐시)
+  - D3: 레이어별 보정(밝기·대비·채도·색조 CPU 픽셀 패스) — 활성 레이어 슬라이더
+  - D4: 복제 도장(소스 클릭 지정)·블러 브러시 — **라이브 재생**(보정 완료 사진 참조, 베이크 없음). 뷰 GL=processed readback, WebGPU=mirror(1024 캡), 익스포트=GL prepare 내 체인 출력 readback→팩토리. 힐링 브러시는 후속(PRD §5)
+  - 도구 13종·i18n 3개국 744키 diff 0. dead code 제거: store/crop.ts currentImageFlip
+  - 검증: tsc 0 · eslint 0 · bun test 42 · prettier · cargo test 338 · 패리티 19벡터 ALL PASS 유지. 실기동 시각 검증은 사용자 재석 시
+
+기준 문서: docs/scan-mode-spec.md · ~/.claude/convention/*.md · 이 문서 §기준 문서 (규칙)
+
 ### 완료 — 랜딩 페이지 + GitHub Pages 배포 (2026-07-19)
 - [x] web/index.html 검토 — 단축키 9종(keymap.ts)·포맷·macOS 13+(tauri.conf) 사실 대조 일치, headless Chrome 전 섹션 렌더 확인. canonical·og:url·color-scheme·twitter:card 메타 보강
 - [x] .github/workflows/deploy-web.yml — prod push마다 web/ 을 actions/deploy-pages 로 배포 (checkout → configure-pages → upload-pages-artifact → deploy-pages)
