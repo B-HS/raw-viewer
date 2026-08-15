@@ -11,9 +11,12 @@ import { LEVEL_RANK, usePlaylist } from '../../store/playlist'
 import { useUiStore } from '../../store/uiStore'
 import { CpuFallbackView } from './CpuFallbackView'
 import { CropOverlay } from './CropOverlay'
+import { DrawerOverlay } from './DrawerOverlay'
 import { HistogramHoverOverlay } from './HistogramHoverOverlay'
 import { SamplerPinsOverlay } from './SamplerPinsOverlay'
+import { ScanOverlay } from './ScanOverlay'
 import { TatOverlay } from './TatOverlay'
+import { useDrawerComposite } from './useDrawerComposite'
 import { useRenderEngine } from './useRenderEngine'
 import { ZoomControl } from './ZoomControl'
 
@@ -30,6 +33,8 @@ export const Viewport: FC = () => {
     const best = usePlaylist((state) => state.best)
     const errors = usePlaylist((state) => state.errors)
     const cropEditMode = useUiStore((state) => state.cropEditMode)
+    const scanEditMode = useUiStore((state) => state.scanEditMode)
+    const drawerEditMode = useUiStore((state) => state.drawerEditMode)
     const compare = useUiStore((state) => state.compare)
     const sideBySide = useUiStore((state) => state.sideBySide)
     const eyedropper = useUiStore((state) => state.eyedropper)
@@ -84,6 +89,8 @@ export const Viewport: FC = () => {
             useHistogram.getState().setData(null)
         }
     }, [engine])
+
+    useDrawerComposite(engine)
 
     if (current?.isAnimated)
         return (
@@ -146,6 +153,8 @@ export const Viewport: FC = () => {
             {tatActive && engine && !sideBySide && <TatOverlay />}
 
             {cropEditMode && <CropOverlay />}
+            {scanEditMode && <ScanOverlay />}
+            {drawerEditMode && <DrawerOverlay />}
 
             <div className='pointer-events-none absolute left-3 top-3 flex flex-col gap-2'>
                 {caps?.lowPrecision && (

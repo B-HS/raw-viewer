@@ -148,6 +148,139 @@ pub struct CropState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
+pub struct ScanState {
+    pub enabled: bool,
+    pub corners: [[f64; 2]; 4],
+    pub edges: [[f64; 2]; 4],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum DrawerTool {
+    Brush,
+    Pencil,
+    Eraser,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum DrawerShapeKind {
+    Line,
+    Arrow,
+    Rect,
+    Ellipse,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum DrawerBlendMode {
+    #[default]
+    Normal,
+    Multiply,
+    Screen,
+    Overlay,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DrawerTransform {
+    pub offset_x: f64,
+    pub offset_y: f64,
+    pub scale: f64,
+    pub rotate: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DrawerAdjust {
+    pub brightness: f64,
+    pub contrast: f64,
+    pub saturation: f64,
+    pub hue: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+#[ts(export)]
+pub enum DrawerObject {
+    Stroke {
+        tool: DrawerTool,
+        color: String,
+        size: f64,
+        opacity: f64,
+        points: Vec<[f64; 2]>,
+        #[serde(default)]
+        clip: Option<Vec<[f64; 2]>>,
+    },
+    Shape {
+        shape: DrawerShapeKind,
+        color: String,
+        size: f64,
+        fill: bool,
+        from: [f64; 2],
+        to: [f64; 2],
+        #[serde(default)]
+        clip: Option<Vec<[f64; 2]>>,
+    },
+    Text {
+        text: String,
+        color: String,
+        size: f64,
+        position: [f64; 2],
+    },
+    Fill {
+        color: String,
+        seed: [f64; 2],
+        #[serde(default)]
+        clip: Option<Vec<[f64; 2]>>,
+    },
+    Clone {
+        points: Vec<[f64; 2]>,
+        offset: [f64; 2],
+        size: f64,
+        #[serde(default)]
+        clip: Option<Vec<[f64; 2]>>,
+    },
+    Blur {
+        points: Vec<[f64; 2]>,
+        size: f64,
+        #[serde(default)]
+        clip: Option<Vec<[f64; 2]>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DrawerLayer {
+    pub id: String,
+    pub name: String,
+    pub visible: bool,
+    pub opacity: f64,
+    pub objects: Vec<DrawerObject>,
+    #[serde(default)]
+    pub blend: DrawerBlendMode,
+    #[serde(default)]
+    pub transform: Option<DrawerTransform>,
+    #[serde(default)]
+    pub adjust: Option<DrawerAdjust>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DrawerState {
+    pub layers: Vec<DrawerLayer>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct ToneState {
     pub exposure: f64,
     pub contrast: f64,
@@ -266,6 +399,10 @@ pub struct EditState {
     pub lens: LensState,
     pub geometry: GeometryState,
     pub crop: Option<CropState>,
+    #[serde(default)]
+    pub scan: Option<ScanState>,
+    #[serde(default)]
+    pub drawer: Option<DrawerState>,
     pub tone: ToneState,
     pub base_curve: BaseCurveMode,
     pub curves: CurvesState,

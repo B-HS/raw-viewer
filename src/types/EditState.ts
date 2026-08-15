@@ -4,11 +4,13 @@ import type { ColorState } from "./ColorState";
 import type { CropState } from "./CropState";
 import type { CurvesState } from "./CurvesState";
 import type { DetailState } from "./DetailState";
+import type { DrawerState } from "./DrawerState";
 import type { EditMeta } from "./EditMeta";
 import type { EffectsState } from "./EffectsState";
 import type { GeometryState } from "./GeometryState";
 import type { LensState } from "./LensState";
+import type { ScanState } from "./ScanState";
 import type { ToneState } from "./ToneState";
 import type { WbState } from "./WbState";
 
-export type EditState = { version: number, wb: WbState, lens: LensState, geometry: GeometryState, crop: CropState | null, tone: ToneState, baseCurve: BaseCurveMode, curves: CurvesState, color: ColorState, detail: DetailState, effects: EffectsState, meta: EditMeta, };
+export type EditState = { version: number, wb: WbState, lens: LensState, geometry: GeometryState, crop: CropState | null, scan: ScanState | null, drawer: DrawerState | null, tone: ToneState, baseCurve: BaseCurveMode, curves: CurvesState, color: ColorState, detail: DetailState, effects: EffectsState, meta: EditMeta, };

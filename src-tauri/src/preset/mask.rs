@@ -17,6 +17,7 @@ pub fn apply_mask(dst: &mut EditState, src: &EditState, mask: &[String]) {
             "geometry" => {
                 dst.geometry = src.geometry.clone();
                 dst.crop = src.crop.clone();
+                dst.scan = src.scan.clone();
             }
             "tone" => dst.tone = src.tone.clone(),
             "curves" => {
@@ -97,7 +98,7 @@ mod tests {
 
     #[test]
     fn geometry_section_carries_crop_and_curves_section_carries_base_curve() {
-        use crate::types::{BaseCurveMode, CropState};
+        use crate::types::{BaseCurveMode, CropState, ScanState};
 
         let mut source = default_edit_state();
         source.geometry.rotate90 = 1;
@@ -109,6 +110,12 @@ mod tests {
             bottom: 0.9,
             aspect: "16:9".to_owned(),
         });
+        source.scan = Some(ScanState {
+            enabled: true,
+            corners: [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]],
+            edges: [[0.5, 0.1], [0.9, 0.5], [0.5, 0.9], [0.1, 0.5]],
+        });
+        source.drawer = Some(crate::types::DrawerState { layers: vec![] });
         source.base_curve = BaseCurveMode::Filmic;
 
         let mut dst = default_edit_state();
@@ -116,6 +123,8 @@ mod tests {
 
         assert_eq!(dst.geometry.rotate90, 1);
         assert!(dst.crop.is_some());
+        assert!(dst.scan.as_ref().is_some_and(|scan| scan.enabled));
+        assert!(dst.drawer.is_none());
         assert_eq!(dst.base_curve, BaseCurveMode::Filmic);
     }
 

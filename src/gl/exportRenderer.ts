@@ -1,12 +1,15 @@
 import { buildBaseCurveLut } from './baseCurveLut'
-import { IDENTITY3, toColumnMajor } from './colorSpaces'
+import { IDENTITY3, SRGB_TO_REC2020, toColumnMajor } from './colorSpaces'
 import { STAGE_COLOR, STAGE_COUNT, STAGE_CURVE, STAGE_DETAIL, STAGE_GEOMETRY, STAGE_TONE, STAGE_WB, stageActive } from './dirty'
 import { buildGeometryWarp } from './geometry'
 import { createProgram, uniformLocations } from './glContext'
 import { floatToHalf } from './half'
 import { applyLensUniforms, buildLensPass, PASS2_UNIFORMS } from './lensUniforms'
 import { effectsUniforms, hslUniforms, nrUniforms, sharpenUniforms, toneUniforms } from './passUniforms'
+import { floatRgbaToSrgbBytes, halfRgbaToSrgbBytes } from './photoConvert'
+import { scanCornerArray, scanEdgeArray, scanOutputDims } from './scan'
 import {
+    FRAG_DRAWER,
     FRAG_NR,
     FRAG_PASS1,
     FRAG_PASS2,
@@ -22,8 +25,9 @@ import {
 } from './shaders'
 import { extractTile, planTiles, TILE_OVERLAP, TILE_SIZE } from './tiles'
 import { buildToneCurveLut, TONE_LUT_SIZE } from './toneCurveLut'
-import { dispDims, flipAngle } from './viewTransform'
+import { composeFlip, dispDims, flipAngle } from './viewTransform'
 import { wbGainsFromState } from './wbModel'
+import type { DrawerPhoto } from './drawerRaster'
 import type { LensPass } from './lensUniforms'
 import type { EditState } from '../types/EditState'
 import type { LensProfileMatch } from '../types/LensProfileMatch'
@@ -40,8 +44,10 @@ export type ExportJob = {
     release: () => void
 }
 
+export type ExportDrawerInput = HTMLCanvasElement | ((photo: DrawerPhoto) => HTMLCanvasElement | null) | null
+
 export type ExportEngine = {
-    prepare: (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null) => ExportJob
+    prepare: (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null, drawer?: ExportDrawerInput) => ExportJob
     dispose: () => void
 }
 
@@ -72,12 +78,13 @@ const flipRows = (data: Uint16Array, width: number, height: number) => {
     return out
 }
 
-const orientModelMatrix = (renderW: number, renderH: number, ow: number, oh: number, flip: number) => {
+const orientModelMatrix = (ow: number, oh: number, flip: number) => {
     const theta = flipAngle(flip)
     const cos = Math.cos(theta)
     const sin = Math.sin(theta)
-    const hx = renderW / 2
-    const hy = renderH / 2
+    const swapped = flip === 5 || flip === 6
+    const hx = (swapped ? oh : ow) / 2
+    const hy = (swapped ? ow : oh) / 2
     const ox = 2 / ow
     const oy = 2 / oh
     return new Float32Array([cos * hx * ox, sin * hx * oy, 0, -sin * hy * ox, cos * hy * oy, 0, 0, 0, 1])
@@ -141,6 +148,7 @@ export const createExportEngine = () => {
     ])
     const tile = compile(VERT_TILE, FRAG_TILE, ['uModel', 'uTile', 'uSrcOrigin', 'uUvOffset', 'uUvScale'])
     const orient = compile(VERT_QUAD, FRAG_ORIENT, ['uTex', 'uModel'])
+    const drawerPass = compile(VERT_FULLSCREEN, FRAG_DRAWER, ['uTex', 'uDrawerTex', 'uSrgbToRec2020'])
 
     const quadBuffer = gl.createBuffer()
     const vao = gl.createVertexArray()
@@ -287,6 +295,13 @@ export const createExportEngine = () => {
                 gl.bindTexture(gl.TEXTURE_2D, input)
                 gl.uniform1i(pass2.u.uTex, 0)
                 gl.uniformMatrix3fv(pass2.u.uWarp, false, buildGeometryWarp(state.geometry))
+                const scan = state.scan
+                const scanOn = scan !== null && scan.enabled
+                gl.uniform1i(pass2.u.uScanOn, scanOn ? 1 : 0)
+                if (scanOn && scan) {
+                    gl.uniform2fv(pass2.u.uScanCorners, scanCornerArray(scan))
+                    gl.uniform2fv(pass2.u.uScanEdges, scanEdgeArray(scan))
+                }
                 applyLensUniforms(gl, pass2, lensPass, w, h)
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
             } else if (id === STAGE_TONE) {
@@ -383,7 +398,27 @@ export const createExportEngine = () => {
         return { finalTex: last, targets }
     }
 
-    const prepare = (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null) => {
+    const readTexturePhoto = (texture: WebGLTexture, width: number, height: number): DrawerPhoto | null => {
+        const fbo = gl.createFramebuffer()
+        if (!fbo) return null
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0)
+        const pixelCount = width * height
+        let data: Uint8ClampedArray<ArrayBuffer>
+        if (readType === gl.HALF_FLOAT) {
+            const raw = new Uint16Array(pixelCount * 4)
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.HALF_FLOAT, raw)
+            data = halfRgbaToSrgbBytes(raw, pixelCount)
+        } else {
+            const raw = new Float32Array(pixelCount * 4)
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, raw)
+            data = floatRgbaToSrgbBytes(raw, pixelCount)
+        }
+        gl.deleteFramebuffer(fbo)
+        return { data, width, height }
+    }
+
+    const prepare = (source: ExportSource, state: EditState, lensProfile: LensProfileMatch | null, drawer?: ExportDrawerInput) => {
         const longEdge = Math.max(source.width, source.height)
         const scale = longEdge > maxTexture ? maxTexture / longEdge : 1
         const renderW = Math.max(1, Math.round(source.width * scale))
@@ -401,7 +436,46 @@ export const createExportEngine = () => {
         const passes = runPasses(sourceTex, source, renderW, renderH, state, baseLut, toneLut, lensPass)
         owned.push(...passes.targets)
 
-        const dims = dispDims(renderW, renderH, source.flip)
+        let finalTex = passes.finalTex
+        let drawerCanvas: HTMLCanvasElement | null
+        if (typeof drawer === 'function') {
+            const photo = readTexturePhoto(passes.finalTex, renderW, renderH)
+            drawerCanvas = photo ? drawer(photo) : null
+        } else {
+            drawerCanvas = drawer ?? null
+        }
+        if (drawerCanvas) {
+            const drawerTexture = gl.createTexture()
+            if (drawerTexture) {
+                textures.push(drawerTexture)
+                gl.bindTexture(gl.TEXTURE_2D, drawerTexture)
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, drawerCanvas)
+                const composited = createTarget(renderW, renderH)
+                owned.push(composited)
+                gl.bindFramebuffer(gl.FRAMEBUFFER, composited.fbo)
+                gl.viewport(0, 0, renderW, renderH)
+                gl.disable(gl.BLEND)
+                gl.bindVertexArray(vao)
+                gl.useProgram(drawerPass.program)
+                gl.activeTexture(gl.TEXTURE0)
+                gl.bindTexture(gl.TEXTURE_2D, passes.finalTex)
+                gl.uniform1i(drawerPass.u.uTex, 0)
+                gl.activeTexture(gl.TEXTURE1)
+                gl.bindTexture(gl.TEXTURE_2D, drawerTexture)
+                gl.uniform1i(drawerPass.u.uDrawerTex, 1)
+                gl.uniformMatrix3fv(drawerPass.u.uSrgbToRec2020, false, toColumnMajor(SRGB_TO_REC2020))
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+                finalTex = composited.tex
+            }
+        }
+
+        const exportFlip = composeFlip(source.flip, state.geometry.rotate90)
+        const scanDims = scanOutputDims(renderW, renderH, state.scan)
+        const dims = dispDims(scanDims.w, scanDims.h, exportFlip)
         const orientedW = dims.dispW
         const orientedH = dims.dispH
         const oriented = createTarget(orientedW, orientedH)
@@ -412,9 +486,9 @@ export const createExportEngine = () => {
         gl.bindVertexArray(vao)
         gl.useProgram(orient.program)
         gl.activeTexture(gl.TEXTURE0)
-        gl.bindTexture(gl.TEXTURE_2D, passes.finalTex)
+        gl.bindTexture(gl.TEXTURE_2D, finalTex)
         gl.uniform1i(orient.u.uTex, 0)
-        gl.uniformMatrix3fv(orient.u.uModel, false, orientModelMatrix(renderW, renderH, orientedW, orientedH, source.flip))
+        gl.uniformMatrix3fv(orient.u.uModel, false, orientModelMatrix(orientedW, orientedH, exportFlip))
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
         const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER)
@@ -468,7 +542,7 @@ export const createExportEngine = () => {
     }
 
     const dispose = () => {
-        for (const info of [pass1, pass2, pass3, pass4, pass5, nr, sharpen, pass7, tile, orient]) gl.deleteProgram(info.program)
+        for (const info of [pass1, pass2, pass3, pass4, pass5, nr, sharpen, pass7, tile, orient, drawerPass]) gl.deleteProgram(info.program)
         gl.deleteBuffer(quadBuffer)
         gl.deleteVertexArray(vao)
         const lose = gl.getExtension('WEBGL_lose_context')

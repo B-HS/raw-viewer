@@ -1,5 +1,5 @@
 import { buildBaseCurveLut } from '../baseCurveLut'
-import { IDENTITY3, REC2020_TO_P3, REC2020_TO_SRGB, SRGB_TO_P3, toColumnMajor } from '../colorSpaces'
+import { IDENTITY3, REC2020_TO_P3, REC2020_TO_SRGB, SRGB_TO_P3, SRGB_TO_REC2020, toColumnMajor } from '../colorSpaces'
 import {
     earliestDirtyStage,
     STAGE_COLOR,
@@ -20,7 +20,9 @@ import type { LensPass } from '../lensUniforms'
 import { effectsUniforms, hslUniforms, nrUniforms, sharpenUniforms, toneUniforms } from '../passUniforms'
 import { NEUTRAL_EDIT_STATE } from '../stateDefaults'
 import { buildToneCurveLut, TONE_LUT_SIZE } from '../toneCurveLut'
-import { buildModelMatrix, computeFitScale, dispDims, viewScale } from '../viewTransform'
+import { floatRgbaToSrgbBytes } from '../photoConvert'
+import { scanCornerArray, scanEdgeArray, scanOutputDims } from '../scan'
+import { buildModelMatrix, composeFlip, computeFitScale, dispDims, viewScale } from '../viewTransform'
 import type { ViewState } from '../viewTransform'
 import { wbGainsFromState } from '../wbModel'
 import type { ClippingMode, CompareSplit } from '../viewTypes'
@@ -28,6 +30,7 @@ import {
     NR_COMPUTE_WORKGROUP,
     WGSL_HISTOGRAM,
     WGSL_NR_COMPUTE,
+    WGSL_DRAWER,
     WGSL_ORIENT,
     WGSL_PASS1,
     WGSL_PASS2,
@@ -140,6 +143,9 @@ export class WebGpuRenderer {
     private rec2020ToDisplayCol: Float32Array
     private srgbToDisplayCol: Float32Array
     private identityCol = toColumnMajor(IDENTITY3)
+    private srgbToRec2020Col = toColumnMajor(SRGB_TO_REC2020)
+    private drawerTexture: GPUTexture | null = null
+    private drawerPlaceholderTex: GPUTexture | null = null
 
     private fullscreenPipelines = new Map<string, GPURenderPipeline>()
     private pass8Pipeline!: GPURenderPipeline
@@ -170,6 +176,7 @@ export class WebGpuRenderer {
     private compareSplit: CompareSplit = null
     private sideBySide = false
     private cropEditMode = false
+    private scanEditMode = false
 
     private stages = new Map<number, GPUTexture>()
     private scratch: GPUTexture[] = []
@@ -345,10 +352,19 @@ export class WebGpuRenderer {
         if (!this.current) return null
         const image = this.images.get(this.current)
         if (!image) return null
-        const { dispW, dispH } = dispDims(image.width, image.height, image.flip)
+        const scanDims = this.displayDims(image)
+        const { dispW, dispH } = dispDims(scanDims.w, scanDims.h, this.orientedFlip(image.flip))
         const cw = this.canvas.width
         const ch = this.canvas.height
         return { cw, ch, dispW, dispH, dpr: window.devicePixelRatio || 1, fitScale: computeFitScale(cw, ch, dispW, dispH) }
+    }
+
+    private orientedFlip(flip: number) {
+        return composeFlip(flip, this.editState.geometry.rotate90)
+    }
+
+    private displayDims(image: { width: number; height: number }) {
+        return this.scanEditMode ? { w: image.width, h: image.height } : scanOutputDims(image.width, image.height, this.editState.scan)
     }
 
     hasImage(imageId: string) {
@@ -415,6 +431,33 @@ export class WebGpuRenderer {
 
     setSideBySide(on: boolean) {
         this.sideBySide = on
+    }
+
+    setScanEditMode(on: boolean) {
+        if (this.scanEditMode === on) return
+        this.scanEditMode = on
+        if (STAGE_GEOMETRY < this.rebuildFrom) this.rebuildFrom = STAGE_GEOMETRY
+    }
+
+    setDrawerCanvas(canvas: HTMLCanvasElement | null) {
+        this.drawerTexture?.destroy()
+        this.drawerTexture = null
+        if (!canvas) return
+        const texture = this.createTexture(
+            canvas.width,
+            canvas.height,
+            'rgba8unorm',
+            GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        )
+        this.device.queue.copyExternalImageToTexture({ source: canvas }, { texture }, { width: canvas.width, height: canvas.height })
+        this.drawerTexture = texture
+    }
+
+    private drawerPlaceholder() {
+        if (this.drawerPlaceholderTex) return this.drawerPlaceholderTex
+        this.drawerPlaceholderTex = this.createTexture(1, 1, 'rgba8unorm', GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST)
+        this.device.queue.writeTexture({ texture: this.drawerPlaceholderTex }, new Uint8Array(4), { bytesPerRow: 4 }, { width: 1, height: 1 })
+        return this.drawerPlaceholderTex
     }
 
     setCropEditMode(on: boolean) {
@@ -578,11 +621,17 @@ export class WebGpuRenderer {
         return data
     }
 
-    private pass2Uniform(width: number, height: number) {
-        const data = new Float32Array(40)
+    private pass2Uniform(width: number, height: number, applyScan: boolean) {
+        const data = new Float32Array(56)
         writeMat3(data, 0, buildGeometryWarp(this.editState.geometry))
         data[12] = width
         data[13] = height
+        const scan = this.editState.scan
+        if (applyScan && scan !== null && scan.enabled) {
+            data[39] = 1
+            data.set(scanCornerArray(scan), 40)
+            data.set(scanEdgeArray(scan), 48)
+        }
         const pass = this.lensPass
         if (!pass) return data
         const [normX, normY] = lensNormScale(width, height)
@@ -691,7 +740,15 @@ export class WebGpuRenderer {
         if (id === STAGE_GEOMETRY) {
             const target = this.stageTarget(id)
             const pipeline = this.fullscreenPipeline('pass2', WGSL_PASS2)
-            this.drawFullscreen(encoder, pipeline, target, this.pass2Uniform(this.procW, this.procH), [input], this.linearSampler, true)
+            this.drawFullscreen(
+                encoder,
+                pipeline,
+                target,
+                this.pass2Uniform(this.procW, this.procH, !this.scanEditMode),
+                [input],
+                this.linearSampler,
+                true,
+            )
             return target
         }
         if (id === STAGE_TONE) {
@@ -810,10 +867,11 @@ export class WebGpuRenderer {
         split: CompareSplit,
         canvasW: number,
         canvasH: number,
+        drawerOn: boolean,
     ) {
         const crop = this.editState.crop
         const cropMode = crop && crop.enabled ? (this.cropEditMode ? 2 : 1) : 0
-        const data = new Float32Array(52)
+        const data = new Float32Array(68)
         writeMat3(data, 0, model)
         writeMat3(data, 12, this.rec2020ToDisplayCol)
         writeMat3(data, 24, this.srgbToDisplayCol)
@@ -833,6 +891,8 @@ export class WebGpuRenderer {
         data[49] = useLut ? 1 : 0
         data[50] = Math.max(this.lutSize, 2)
         data[51] = cropMode
+        writeMat3(data, 52, this.srgbToRec2020Col)
+        data[64] = drawerOn ? 1 : 0
         return data
     }
 
@@ -854,6 +914,7 @@ export class WebGpuRenderer {
                 { binding: 2, resource: baseTex.createView() },
                 { binding: 3, resource: this.displayLut.createView() },
                 { binding: 4, resource: sampler },
+                { binding: 5, resource: (this.drawerTexture ?? this.drawerPlaceholder()).createView() },
             ],
         })
         const pass = encoder.beginRenderPass({
@@ -922,15 +983,17 @@ export class WebGpuRenderer {
             const ch = this.canvas.height
             const halfW = Math.floor(cw / 2)
             const paneMetrics = { ...metrics, cw: halfW, fitScale: computeFitScale(halfW, ch, metrics.dispW, metrics.dispH) }
-            const model = buildModelMatrix(view, paneMetrics, image.width, image.height, image.flip)
+            const paneDims = this.displayDims(image)
+            const model = buildModelMatrix(view, paneMetrics, paneDims.w, paneDims.h, this.orientedFlip(image.flip))
             this.lastModel = model
             this.lastMetrics = { cw: halfW, ch }
             const paneSampler = viewScale(view, paneMetrics) > paneMetrics.dpr + 0.001 ? this.nearestSampler : this.linearSampler
-            const uniform = this.pass8Uniform(model, 0, false, this.useMonitorProfile && this.lutSize > 0, null, cw, ch)
+            const uniform = this.pass8Uniform(model, 0, false, this.useMonitorProfile && this.lutSize > 0, null, cw, ch, this.drawerTexture !== null)
             this.drawPass8(encoder, canvasView, uniform, compareBase, compareBase, paneSampler, 'clear', { x: 0, w: halfW, h: ch })
             this.drawPass8(encoder, canvasView, uniform, this.processed, this.processed, paneSampler, 'load', { x: halfW, w: cw - halfW, h: ch })
         } else {
-            const model = buildModelMatrix(view, metrics, image.width, image.height, image.flip)
+            const dims = this.displayDims(image)
+            const model = buildModelMatrix(view, metrics, dims.w, dims.h, this.orientedFlip(image.flip))
             this.lastModel = model
             this.lastMetrics = { cw: metrics.cw, ch: metrics.ch }
             const uniform = this.pass8Uniform(
@@ -941,6 +1004,7 @@ export class WebGpuRenderer {
                 this.compareSplit,
                 this.canvas.width,
                 this.canvas.height,
+                this.drawerTexture !== null && image.kind !== 'l0',
             )
             this.drawPass8(encoder, canvasView, uniform, this.processed, compareBase ?? this.processed, sampler, 'clear', null)
         }
@@ -1059,6 +1123,12 @@ export class WebGpuRenderer {
             })
     }
 
+    readProcessedSrgb() {
+        const mirror = this.mirror
+        if (!mirror) return null
+        return { data: floatRgbaToSrgbBytes(mirror.data, mirror.width * mirror.height), width: mirror.width, height: mirror.height }
+    }
+
     samplePixel(canvasX: number, canvasY: number) {
         const mirror = this.mirror
         if (!mirror || this.procW === 0) return null
@@ -1119,6 +1189,7 @@ export class WebGpuRenderer {
         source: { width: number; height: number; data: Uint16Array; colorMatrix: number[] | null; flip: number },
         state: EditState,
         lensProfile: LensProfileMatch | null,
+        drawer?: HTMLCanvasElement | null,
     ): Promise<ExportFrame> {
         const previousState = this.editState
         const previousLens = { imageId: this.lensProfileImageId, profile: this.lensProfile, pass: this.lensPass, sig: this.lensSig }
@@ -1177,7 +1248,7 @@ export class WebGpuRenderer {
                     encoder,
                     this.fullscreenPipeline('pass2', WGSL_PASS2),
                     output,
-                    this.pass2Uniform(width, height),
+                    this.pass2Uniform(width, height, true),
                     [input],
                     this.linearSampler,
                     true,
@@ -1250,14 +1321,44 @@ export class WebGpuRenderer {
             output = output === primary ? secondary : primary
         }
 
-        const dims = dispDims(width, height, source.flip)
+        if (drawer) {
+            const drawerTexture = this.createTexture(
+                drawer.width,
+                drawer.height,
+                'rgba8unorm',
+                GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+            )
+            owned.push(drawerTexture)
+            this.device.queue.copyExternalImageToTexture(
+                { source: drawer },
+                { texture: drawerTexture },
+                { width: drawer.width, height: drawer.height },
+            )
+            const composited = makeTarget()
+            const drawerUniform = new Float32Array(12)
+            writeMat3(drawerUniform, 0, this.srgbToRec2020Col)
+            this.drawFullscreen(
+                encoder,
+                this.fullscreenPipeline('drawer', WGSL_DRAWER),
+                composited,
+                drawerUniform,
+                [last, drawerTexture],
+                this.linearSampler,
+                true,
+            )
+            last = composited
+        }
+
+        const exportFlip = composeFlip(source.flip, state.geometry.rotate90)
+        const scanDims = scanOutputDims(width, height, state.scan)
+        const dims = dispDims(scanDims.w, scanDims.h, exportFlip)
         const oriented = this.createColorTarget(dims.dispW, dims.dispH)
         owned.push(oriented)
         this.drawFullscreen(
             encoder,
             this.fullscreenPipeline('orient', WGSL_ORIENT),
             oriented,
-            new Float32Array([source.flip, 0, 0, 0]),
+            new Float32Array([exportFlip, 0, 0, 0]),
             [last],
             this.linearSampler,
             true,
@@ -1298,6 +1399,8 @@ export class WebGpuRenderer {
         this.toneLut.destroy()
         this.toneLutIdentity.destroy()
         this.displayLut.destroy()
+        this.drawerTexture?.destroy()
+        this.drawerPlaceholderTex?.destroy()
         this.quadBuffer.destroy()
         this.histogramCallbacks.clear()
         this.device.destroy()

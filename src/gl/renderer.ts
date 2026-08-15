@@ -1,5 +1,5 @@
 import { buildBaseCurveLut } from './baseCurveLut'
-import { IDENTITY3, REC2020_TO_P3, REC2020_TO_SRGB, SRGB_TO_P3, toColumnMajor } from './colorSpaces'
+import { IDENTITY3, REC2020_TO_P3, REC2020_TO_SRGB, SRGB_TO_P3, SRGB_TO_REC2020, toColumnMajor } from './colorSpaces'
 import {
     earliestDirtyStage,
     STAGE_COLOR,
@@ -17,6 +17,8 @@ import { applyLensUniforms, buildLensPass, PASS2_UNIFORMS } from './lensUniforms
 import { createHistogramService } from './histogram'
 import { createGlContext, createProgram, uniformLocations } from './glContext'
 import { effectsUniforms, hslUniforms, nrUniforms, sharpenUniforms, toneUniforms } from './passUniforms'
+import { floatRgbaToSrgbBytes } from './photoConvert'
+import { scanCornerArray, scanEdgeArray, scanOutputDims } from './scan'
 import { NEUTRAL_EDIT_STATE } from './stateDefaults'
 import {
     FRAG_HISTO,
@@ -36,7 +38,7 @@ import {
 } from './shaders'
 import { buildToneCurveLut, TONE_LUT_SIZE } from './toneCurveLut'
 import { effectiveMaxTexture, extractTile, needsTiling, planTiles, TILE_OVERLAP, TILE_SIZE } from './tiles'
-import { buildModelMatrix, computeFitScale, dispDims, viewScale } from './viewTransform'
+import { buildModelMatrix, composeFlip, computeFitScale, dispDims, viewScale } from './viewTransform'
 import { wbGainsFromState } from './wbModel'
 import type { ClippingMode, CompareSplit } from './viewTypes'
 import type { LensPass } from './lensUniforms'
@@ -111,6 +113,10 @@ export class Renderer {
     private compareSplit: CompareSplit = null
     private sideBySide = false
     private cropEditMode = false
+    private scanEditMode = false
+    private drawerSource: HTMLCanvasElement | null = null
+    private drawerTex: WebGLTexture | null = null
+    private srgbToRec2020Col = toColumnMajor(SRGB_TO_REC2020)
 
     private stages = new Map<number, Target>()
     private scratch: Target[] = []
@@ -207,6 +213,9 @@ export class Renderer {
             'uCropMode',
             'uCrop',
             'uCanvas',
+            'uDrawerTex',
+            'uDrawerOn',
+            'uSrgbToRec2020',
         ])
         this.tile = this.compile(VERT_TILE, FRAG_TILE, ['uModel', 'uTile', 'uSrcOrigin', 'uUvOffset', 'uUvScale'])
         this.histo = this.compile(VERT_FULLSCREEN, FRAG_HISTO, ['uTex', 'uRec2020ToDisplay'])
@@ -289,7 +298,8 @@ export class Renderer {
         if (!this.current) return null
         const image = this.images.get(this.current)
         if (!image) return null
-        const { dispW, dispH } = dispDims(image.width, image.height, image.flip)
+        const scanDims = this.displayDims(image)
+        const { dispW, dispH } = dispDims(scanDims.w, scanDims.h, this.orientedFlip(image.flip))
         const cw = this.canvas.width
         const ch = this.canvas.height
         return { cw, ch, dispW, dispH, dpr: window.devicePixelRatio || 1, fitScale: computeFitScale(cw, ch, dispW, dispH) }
@@ -297,6 +307,14 @@ export class Renderer {
 
     hasImage(imageId: string) {
         return this.images.has(imageId)
+    }
+
+    private orientedFlip(flip: number) {
+        return composeFlip(flip, this.editState.geometry.rotate90)
+    }
+
+    private displayDims(image: { width: number; height: number }) {
+        return this.scanEditMode ? { w: image.width, h: image.height } : scanOutputDims(image.width, image.height, this.editState.scan)
     }
 
     setCurrent(imageId: string | null) {
@@ -359,6 +377,40 @@ export class Renderer {
 
     setSideBySide(on: boolean) {
         this.sideBySide = on
+    }
+
+    setScanEditMode(on: boolean) {
+        if (this.scanEditMode === on) return
+        this.scanEditMode = on
+        if (STAGE_GEOMETRY < this.rebuildFrom) this.rebuildFrom = STAGE_GEOMETRY
+    }
+
+    setDrawerCanvas(canvas: HTMLCanvasElement | null) {
+        this.drawerSource = canvas
+        if (this.drawerTex) {
+            this.gl.deleteTexture(this.drawerTex)
+            this.drawerTex = null
+        }
+    }
+
+    private bindDrawerTexture(unit: number) {
+        const gl = this.gl
+        if (!this.drawerSource) return false
+        gl.activeTexture(gl.TEXTURE0 + unit)
+        if (this.drawerTex) {
+            gl.bindTexture(gl.TEXTURE_2D, this.drawerTex)
+            return true
+        }
+        const tex = gl.createTexture()
+        if (!tex) return false
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, this.drawerSource)
+        this.drawerTex = tex
+        return true
     }
 
     setCropEditMode(on: boolean) {
@@ -601,6 +653,13 @@ export class Renderer {
             gl.bindTexture(gl.TEXTURE_2D, input)
             gl.uniform1i(this.pass2.u.uTex, 0)
             gl.uniformMatrix3fv(this.pass2.u.uWarp, false, buildGeometryWarp(this.editState.geometry))
+            const scan = this.editState.scan
+            const scanOn = scan !== null && scan.enabled && !this.scanEditMode
+            gl.uniform1i(this.pass2.u.uScanOn, scanOn ? 1 : 0)
+            if (scanOn && scan) {
+                gl.uniform2fv(this.pass2.u.uScanCorners, scanCornerArray(scan))
+                gl.uniform2fv(this.pass2.u.uScanEdges, scanEdgeArray(scan))
+            }
             applyLensUniforms(gl, this.pass2, this.lensPass, this.procW, this.procH)
             this.drawFullscreen()
             return target.tex
@@ -889,7 +948,8 @@ export class Renderer {
     ) {
         if (!metrics) return
         const gl = this.gl
-        const model = buildModelMatrix(view, metrics, image.width, image.height, image.flip)
+        const dims = this.displayDims(image)
+        const model = buildModelMatrix(view, metrics, dims.w, dims.h, this.orientedFlip(image.flip))
         this.lastModel = model
         this.lastMetrics = { cw: metrics.cw, ch: metrics.ch }
         const nearest = viewScale(view, metrics) > metrics.dpr + 0.001
@@ -927,6 +987,10 @@ export class Renderer {
         gl.uniform1i(this.pass8.u.uCropMode, cropMode)
         gl.uniform4f(this.pass8.u.uCrop, crop?.left ?? 0, crop?.top ?? 0, crop?.right ?? 1, crop?.bottom ?? 1)
         gl.uniform2f(this.pass8.u.uCanvas, this.canvas.width, this.canvas.height)
+        const drawerOn = image.kind !== 'l0' && this.bindDrawerTexture(3)
+        gl.uniform1i(this.pass8.u.uDrawerTex, 3)
+        gl.uniform1i(this.pass8.u.uDrawerOn, drawerOn ? 1 : 0)
+        gl.uniformMatrix3fv(this.pass8.u.uSrgbToRec2020, false, this.srgbToRec2020Col)
         this.drawFullscreen()
     }
 
@@ -942,7 +1006,8 @@ export class Renderer {
         const ch = this.canvas.height
         const halfW = Math.floor(cw / 2)
         const paneMetrics = { ...metrics, cw: halfW, fitScale: computeFitScale(halfW, ch, metrics.dispW, metrics.dispH) }
-        const model = buildModelMatrix(view, paneMetrics, image.width, image.height, image.flip)
+        const dims = this.displayDims(image)
+        const model = buildModelMatrix(view, paneMetrics, dims.w, dims.h, this.orientedFlip(image.flip))
         this.lastModel = model
         this.lastMetrics = { cw: halfW, ch }
         const nearest = viewScale(view, paneMetrics) > paneMetrics.dpr + 0.001
@@ -970,6 +1035,10 @@ export class Renderer {
         gl.uniform1i(this.pass8.u.uLut, 2)
         gl.uniform1i(this.pass8.u.uUseLut, this.useMonitorProfile && this.lutSize > 0 ? 1 : 0)
         gl.uniform1f(this.pass8.u.uLutSize, Math.max(this.lutSize, 2))
+        const drawerOn = this.bindDrawerTexture(3)
+        gl.uniform1i(this.pass8.u.uDrawerTex, 3)
+        gl.uniform1i(this.pass8.u.uDrawerOn, drawerOn ? 1 : 0)
+        gl.uniformMatrix3fv(this.pass8.u.uSrgbToRec2020, false, this.srgbToRec2020Col)
         this.drawComparePane(baseTex, filter, 0, halfW, ch)
         this.drawComparePane(procTex, filter, halfW, cw - halfW, ch)
     }
@@ -982,6 +1051,23 @@ export class Renderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter)
         this.drawFullscreen()
+    }
+
+    readProcessedSrgb() {
+        if (!this.processed || !this.processedFbo || this.procW === 0) return null
+        const gl = this.gl
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.processedFbo)
+        const pixelCount = this.procW * this.procH
+        if (this.lowPrecision) {
+            const buffer = new Uint8Array(pixelCount * 4)
+            gl.readPixels(0, 0, this.procW, this.procH, gl.RGBA, gl.UNSIGNED_BYTE, buffer)
+            const floats = new Float32Array(buffer.length)
+            for (let index = 0; index < buffer.length; index++) floats[index] = buffer[index] / 255
+            return { data: floatRgbaToSrgbBytes(floats, pixelCount), width: this.procW, height: this.procH }
+        }
+        const buffer = new Float32Array(pixelCount * 4)
+        gl.readPixels(0, 0, this.procW, this.procH, gl.RGBA, gl.FLOAT, buffer)
+        return { data: floatRgbaToSrgbBytes(buffer, pixelCount), width: this.procW, height: this.procH }
     }
 
     samplePixel(canvasX: number, canvasY: number) {
@@ -1058,6 +1144,7 @@ export class Renderer {
         this.processedFbo = null
         this.processedFor = null
         this.baseFor = null
+        this.drawerTex = null
         this.stages.clear()
         this.scratch = []
         this.base = null
@@ -1079,6 +1166,7 @@ export class Renderer {
         gl.deleteTexture(this.toneLut)
         gl.deleteTexture(this.toneLutIdentity)
         gl.deleteTexture(this.displayLut)
+        if (this.drawerTex) gl.deleteTexture(this.drawerTex)
         gl.deleteBuffer(this.quadBuffer)
         gl.deleteVertexArray(this.vao)
         for (const info of [

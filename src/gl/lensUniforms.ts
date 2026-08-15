@@ -108,7 +108,7 @@ const LENS_PASS_UNIFORMS = [
     'uManualVig',
 ]
 
-export const PASS2_UNIFORMS = ['uTex', 'uWarp', ...LENS_PASS_UNIFORMS]
+export const PASS2_UNIFORMS = ['uTex', 'uWarp', 'uScanOn', 'uScanCorners', 'uScanEdges', ...LENS_PASS_UNIFORMS]
 
 type Pass2Program = { program: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 

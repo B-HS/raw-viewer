@@ -4,6 +4,7 @@ import { applyCropAspect, CROP_ASPECTS, swapCropAspect, toggleCropMode } from '.
 import { rotateBy, toggleFlipH, toggleFlipV } from '../../store/geometry'
 import { DEFAULT_EDIT_STATE } from '../../store/editDefaults'
 import { useEditStore } from '../../store/editStore'
+import { resetScan, setScanEnabled, toggleScanEditMode } from '../../store/scan'
 import { useUiStore } from '../../store/uiStore'
 import type { GeometryState } from '../../types/GeometryState'
 import { Section } from './Section'
@@ -17,7 +18,9 @@ export const CropGeometrySection: FC = () => {
     const { t } = useTranslation()
     const geometry = useEditStore((state) => state.state?.geometry)
     const crop = useEditStore((state) => state.state?.crop)
+    const scan = useEditStore((state) => state.state?.scan)
     const cropEditMode = useUiStore((state) => state.cropEditMode)
+    const scanEditMode = useUiStore((state) => state.scanEditMode)
     const cropOverlay = useUiStore((state) => state.cropOverlay)
     const edit = useEditStore((state) => state.edit)
 
@@ -101,6 +104,31 @@ export const CropGeometrySection: FC = () => {
                     <input type='checkbox' checked={geometry.flipV} onChange={toggleFlipV} />
                     {t('panel.crop.flipV')}
                 </label>
+            </div>
+            <p className='mt-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>{t('panel.crop.scanHeading')}</p>
+            <div className='flex items-center gap-2'>
+                <button
+                    type='button'
+                    onClick={toggleScanEditMode}
+                    className={`flex-1 rounded py-1.5 text-xs font-medium ${scanEditMode ? 'bg-neutral-200 text-neutral-900' : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'}`}>
+                    {scanEditMode ? t('panel.crop.scanDone') : t('panel.crop.scanEnter')}
+                </button>
+                <label className='flex items-center gap-1 text-xs text-neutral-300'>
+                    <input
+                        type='checkbox'
+                        checked={scan?.enabled ?? false}
+                        disabled={!scan}
+                        onChange={(event) => setScanEnabled(event.target.checked)}
+                    />
+                    {t('panel.crop.scanApply')}
+                </label>
+                <button
+                    type='button'
+                    onClick={resetScan}
+                    disabled={!scan}
+                    className='rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700 disabled:cursor-default disabled:opacity-40'>
+                    {t('panel.crop.scanReset')}
+                </button>
             </div>
             {geoSlider('straighten', t('panel.crop.straighten'), -45, 45, 0.1, (value) => `${signed(value)}°`)}
             <p className='mt-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>{t('panel.crop.transform')}</p>

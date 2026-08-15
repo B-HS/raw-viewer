@@ -101,7 +101,23 @@ uniform vec3 uVigCoeffs;
 uniform float uVigStrength;
 uniform float uManualDist;
 uniform float uManualVig;
+uniform int uScanOn;
+uniform vec2 uScanCorners[4];
+uniform vec2 uScanEdges[4];
 out vec4 o;
+vec2 qbez(vec2 a, vec2 m, vec2 b, float t) {
+    vec2 c = 2.0 * m - 0.5 * (a + b);
+    float s = 1.0 - t;
+    return s * s * a + 2.0 * s * t * c + t * t * b;
+}
+vec2 scanCoons(vec2 uv) {
+    vec2 top = qbez(uScanCorners[0], uScanEdges[0], uScanCorners[1], uv.x);
+    vec2 bottom = qbez(uScanCorners[3], uScanEdges[2], uScanCorners[2], uv.x);
+    vec2 left = qbez(uScanCorners[0], uScanEdges[3], uScanCorners[3], uv.y);
+    vec2 right = qbez(uScanCorners[1], uScanEdges[1], uScanCorners[2], uv.y);
+    vec2 corner = mix(mix(uScanCorners[0], uScanCorners[1], uv.x), mix(uScanCorners[3], uScanCorners[2], uv.x), uv.y);
+    return mix(top, bottom, uv.y) + mix(left, right, uv.x) - corner;
+}
 float cmrw(float x) {
     x = abs(x);
     float x2 = x * x;
@@ -150,6 +166,9 @@ void main() {
     if (any(lessThan(gUv, vec2(0.0))) || any(greaterThan(gUv, vec2(1.0)))) {
         o = vec4(0.0, 0.0, 0.0, 1.0);
         return;
+    }
+    if (uScanOn == 1) {
+        gUv = clamp(scanCoons(gUv), vec2(0.0), vec2(1.0));
     }
     if (uLensActive == 0) {
         o = vec4(texture(uTex, gUv).rgb, 1.0);
@@ -442,6 +461,21 @@ void main() {
 }
 `
 
+export const FRAG_DRAWER = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uTex;
+uniform sampler2D uDrawerTex;
+uniform mat3 uSrgbToRec2020;
+out vec4 o;
+${SRGB}
+void main() {
+    vec3 base = texture(uTex, vUv).rgb;
+    vec4 drawer = texture(uDrawerTex, vUv);
+    o = vec4(mix(base, uSrgbToRec2020 * eotf(drawer.rgb), drawer.a), 1.0);
+}
+`
+
 export const FRAG_PASS8 = `#version 300 es
 precision highp float;
 in vec2 vUv;
@@ -458,6 +492,9 @@ uniform vec3 uSplit;
 uniform int uCropMode;
 uniform vec4 uCrop;
 uniform vec2 uCanvas;
+uniform sampler2D uDrawerTex;
+uniform int uDrawerOn;
+uniform mat3 uSrgbToRec2020;
 out vec4 o;
 ${SRGB}
 ${LUT3D}
@@ -468,6 +505,12 @@ void main() {
     vec3 lin = beforeSide && uHasBase == 1 ? texture(uBaseTex, vUv).rgb : texture(uTex, vUv).rgb;
     bool clipHi = all(greaterThanEqual(lin, vec3(1.0)));
     bool clipLo = all(lessThanEqual(lin, vec3(0.0)));
+    if (uDrawerOn == 1) {
+        vec4 drawer = texture(uDrawerTex, vUv);
+        if (drawer.a > 0.0) {
+            lin = mix(lin, uSrgbToRec2020 * eotf(drawer.rgb), drawer.a);
+        }
+    }
     vec3 c = lin;
     if (uSourceKind == 0) {
         if (uUseLut == 1) {

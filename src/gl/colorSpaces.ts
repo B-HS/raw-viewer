@@ -8,5 +8,7 @@ export const REC2020_TO_P3 = [1.34357825, -0.28217967, -0.06139858, -0.06529745,
 
 export const SRGB_TO_P3 = [0.82246197, 0.17753803, 0.0, 0.0331942, 0.9668058, 0.0, 0.01708263, 0.07239744, 0.91051993]
 
+export const SRGB_TO_REC2020 = [0.6274039, 0.32928304, 0.04331306, 0.06909729, 0.91954039, 0.01136231, 0.01639144, 0.08801331, 0.89559525]
+
 export const toColumnMajor = (rowMajor: number[]) =>
     new Float32Array([rowMajor[0], rowMajor[3], rowMajor[6], rowMajor[1], rowMajor[4], rowMajor[7], rowMajor[2], rowMajor[5], rowMajor[8]])

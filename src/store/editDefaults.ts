@@ -27,6 +27,8 @@ export const DEFAULT_EDIT_STATE: EditState = {
         offsetY: 0,
     },
     crop: null,
+    scan: null,
+    drawer: null,
     tone: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, highlightRecovery: 0 },
     baseCurve: 'standard',
     curves: { rgb: identityCurve(), red: identityCurve(), green: identityCurve(), blue: identityCurve() },
@@ -99,6 +101,8 @@ const stateSignature = (state: EditState) =>
         state.geometry.offsetX,
         state.geometry.offsetY,
         state.crop ? [state.crop.enabled, state.crop.left, state.crop.top, state.crop.right, state.crop.bottom, state.crop.aspect] : null,
+        state.scan ? [state.scan.enabled, state.scan.corners, state.scan.edges] : null,
+        state.drawer ?? null,
         state.tone.exposure,
         state.tone.contrast,
         state.tone.highlights,
@@ -143,7 +147,7 @@ const DEFAULT_SIGNATURE = stateSignature(DEFAULT_EDIT_STATE)
 
 export const isDefault = (state: EditState) => stateSignature(state) === DEFAULT_SIGNATURE
 
-export type EditSection = 'basic' | 'tone-curve' | 'hsl' | 'lens' | 'detail' | 'effects' | 'crop'
+export type EditSection = 'basic' | 'tone-curve' | 'hsl' | 'lens' | 'detail' | 'effects' | 'crop' | 'drawer'
 
 export const cloneDefaultSection = (section: EditSection, state: EditState) => {
     const next: EditState = { ...state }
@@ -175,9 +179,12 @@ export const cloneDefaultSection = (section: EditSection, state: EditState) => {
         next.detail = { ...DEFAULT_EDIT_STATE.detail }
     } else if (section === 'effects') {
         next.effects = { ...DEFAULT_EDIT_STATE.effects }
+    } else if (section === 'drawer') {
+        next.drawer = null
     } else {
         next.geometry = { ...DEFAULT_EDIT_STATE.geometry }
         next.crop = null
+        next.scan = null
     }
     return next
 }

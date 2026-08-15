@@ -10,6 +10,7 @@ import { exportBegin, exportCancel, exportDng, exportFinish, exportSetWatermark,
 import { openWithEdited } from '../ipc/platform'
 import { onLevelReady } from '../ipc/events'
 import { fetchPixels } from '../ipc/pixels'
+import { buildExportDrawer } from '../gl/drawerRaster'
 import { createExportEngine } from '../gl/exportRenderer'
 import { loadWatermarkImage, renderWatermarkPng } from '../lib/watermark'
 import type { WatermarkSettings } from '../lib/watermark'
@@ -328,7 +329,12 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                     }
                     if (resolved.level !== 'l2') set({ warning: i18n.t('export.warnL1') })
                     const lensProfile = await useLens.getState().resolve(imageId)
-                    const job = engine.prepare(resolved.source, envelope.state, lensProfile)
+                    const job = engine.prepare(
+                        resolved.source,
+                        envelope.state,
+                        lensProfile,
+                        buildExportDrawer(envelope.state.drawer, resolved.source.width, resolved.source.height),
+                    )
                     if (job.downscaled) set({ warning: i18n.t('export.warnDownscaled') })
                     const outputDir = resolveOutputDir(get().settings, entry)
                     const request = buildRequest(
@@ -428,7 +434,12 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                 return
             }
             const lensProfile = await useLens.getState().resolve(imageId)
-            const job = engine.prepare(resolved.source, envelope.state, lensProfile)
+            const job = engine.prepare(
+                resolved.source,
+                envelope.state,
+                lensProfile,
+                buildExportDrawer(envelope.state.drawer, resolved.source.width, resolved.source.height),
+            )
             const settings: ExportSettings = {
                 format: 'tiff',
                 quality: 100,

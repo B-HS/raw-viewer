@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
-import { dispDims } from '../../gl/viewTransform'
+import { scanOutputDims } from '../../gl/scan'
+import { composeFlip, dispDims } from '../../gl/viewTransform'
 import { cropDisplayRatio, displayToSource, setCropRect, sourceToDisplay } from '../../store/crop'
 import { useEditStore } from '../../store/editStore'
 import { useHistoryStore } from '../../store/historyStore'
@@ -34,6 +35,8 @@ export const CropOverlay: FC = () => {
     const dragRef = useRef<{ handle: Handle; sx: number; sy: number; rect: RectPx } | null>(null)
     const [size, setSize] = useState({ w: 0, h: 0 })
     const crop = useEditStore((state) => state.state?.crop)
+    const scan = useEditStore((state) => state.state?.scan)
+    const rotate90 = useEditStore((state) => state.state?.geometry.rotate90 ?? 0)
     const currentIndex = usePlaylist((state) => state.currentIndex)
     const entries = usePlaylist((state) => state.entries)
     const best = usePlaylist((state) => state.best)
@@ -54,14 +57,16 @@ export const CropOverlay: FC = () => {
     if (!crop || !crop.enabled || !payload || size.w === 0 || size.h === 0)
         return <div ref={rootRef} className='pointer-events-none absolute inset-0' />
 
-    const { dispW, dispH } = dispDims(payload.width, payload.height, payload.flip)
+    const orientedFlip = composeFlip(payload.flip, rotate90)
+    const scanDims = scanOutputDims(payload.width, payload.height, scan)
+    const { dispW, dispH } = dispDims(scanDims.w, scanDims.h, orientedFlip)
     const fit = Math.min(size.w / dispW, size.h / dispH)
     const iw = dispW * fit
     const ih = dispH * fit
     const ix = (size.w - iw) / 2
     const iy = (size.h - ih) / 2
 
-    const display = sourceToDisplay({ left: crop.left, top: crop.top, right: crop.right, bottom: crop.bottom }, payload.flip)
+    const display = sourceToDisplay({ left: crop.left, top: crop.top, right: crop.right, bottom: crop.bottom }, orientedFlip)
     const rect: RectPx = {
         x: ix + display.left * iw,
         y: iy + display.top * ih,
@@ -75,7 +80,7 @@ export const CropOverlay: FC = () => {
         const dt = clamp((next.y - iy) / ih, 0, 1)
         const dr = clamp((next.x + next.w - ix) / iw, 0, 1)
         const db = clamp((next.y + next.h - iy) / ih, 0, 1)
-        setCropRect(displayToSource({ left: dl, top: dt, right: dr, bottom: db }, payload.flip), crop.aspect)
+        setCropRect(displayToSource({ left: dl, top: dt, right: dr, bottom: db }, orientedFlip), crop.aspect)
     }
 
     const resize = (handle: Exclude<Handle, 'move'>, px: number, py: number, start: RectPx) => {

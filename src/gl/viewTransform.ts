@@ -14,6 +14,12 @@ const clamp = (value: number, lo: number, hi: number) => (value < lo ? lo : valu
 export const dispDims = (width: number, height: number, flip: number) =>
     flip === 5 || flip === 6 ? { dispW: height, dispH: width } : { dispW: width, dispH: height }
 
+const FLIP_BY_CCW_TURNS = [0, 5, 3, 6]
+
+const flipCcwTurns = (flip: number) => (flip === 5 ? 1 : flip === 3 ? 2 : flip === 6 ? 3 : 0)
+
+export const composeFlip = (flip: number, rotate90: number) => FLIP_BY_CCW_TURNS[(((flipCcwTurns(flip) - rotate90) % 4) + 4) % 4]
+
 export const flipAngle = (flip: number) => (flip === 3 ? Math.PI : flip === 5 ? Math.PI / 2 : flip === 6 ? -Math.PI / 2 : 0)
 
 export const computeFitScale = (cw: number, ch: number, dispW: number, dispH: number) =>

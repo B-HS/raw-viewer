@@ -28,12 +28,15 @@ const curvesEqual = (a: CurvesState, b: CurvesState) =>
     JSON.stringify(a.green) === JSON.stringify(b.green) &&
     JSON.stringify(a.blue) === JSON.stringify(b.blue)
 
+const scanEqual = (a: EditState['scan'], b: EditState['scan']) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
 const stageParamsEqual = (stage: number, a: EditState, b: EditState) => {
     if (stage === STAGE_WB) return a.wb.temp === b.wb.temp && a.wb.tint === b.wb.tint && a.wb.tempShift === b.wb.tempShift
     if (stage === STAGE_GEOMETRY) {
         const x = a.geometry
         const y = b.geometry
         return (
+            scanEqual(a.scan, b.scan) &&
             x.flipH === y.flipH &&
             x.flipV === y.flipV &&
             x.straighten === y.straighten &&
