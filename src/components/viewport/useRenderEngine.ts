@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { createEngineApi } from '../../gl/engineApi'
 import { Renderer } from '../../gl/renderer'
-import { buildModelMatrix, clampPan, DEFAULT_VIEW, toggleFit, zoomAboutCursor, zoomTo } from '../../gl/viewTransform'
+import { scanOutputDims } from '../../gl/scan'
+import { buildModelMatrix, clampPan, composeFlip, DEFAULT_VIEW, toggleFit, zoomAboutCursor, zoomTo } from '../../gl/viewTransform'
 import type { ViewState } from '../../gl/viewTransform'
 import { WebGpuRenderer } from '../../gl/webgpu/webgpuRenderer'
 import { getDisplayLut } from '../../ipc/display'
 import { onDecodeFailed, onLevelReady } from '../../ipc/events'
 import { fetchPixels } from '../../ipc/pixels'
 import { isEditableTarget, KEYMAP } from '../../shortcuts/keymap'
+import { useEditStore } from '../../store/editStore'
 import { useHistogram } from '../../store/histogramStore'
 import { LEVEL_RANK, neighbors, usePlaylist, WINDOW_RADIUS } from '../../store/playlist'
 import { useSamplerPins } from '../../store/samplerPins'
@@ -67,7 +69,12 @@ export const useRenderEngine = () => {
                 const current = state.entries[state.currentIndex]
                 const level = current ? state.best[current.imageId] : undefined
                 if (!metrics || !current || !level) return null
-                const model = buildModelMatrix(view, metrics, level.width, level.height, level.flip)
+                const editState = useEditStore.getState().state
+                const rotate90 = editState?.geometry.rotate90 ?? 0
+                const dims = useUiStore.getState().scanEditMode
+                    ? { w: level.width, h: level.height }
+                    : scanOutputDims(level.width, level.height, editState?.scan)
+                const model = buildModelMatrix(view, metrics, dims.w, dims.h, composeFlip(level.flip, rotate90))
                 return { model, clientW: canvas.clientWidth, clientH: canvas.clientHeight, imageId: current.imageId }
             }
 

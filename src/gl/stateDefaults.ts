@@ -34,6 +34,8 @@ export const NEUTRAL_EDIT_STATE: EditState = {
         offsetY: 0,
     },
     crop: null,
+    scan: null,
+    drawer: null,
     tone: { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, highlightRecovery: 0 },
     baseCurve: 'standard',
     curves: { rgb: identityCurve(), red: identityCurve(), green: identityCurve(), blue: identityCurve() },
@@ -103,4 +105,4 @@ export const isEffectsNeutral = (effects: EffectsState) =>
 
 export const isCurvePassActive = (state: EditState) => state.baseCurve !== 'linear' || !isCurvesNeutral(state.curves)
 
-export const isGeometryPassActive = (state: EditState) => !isGeometryNeutral(state.geometry)
+export const isGeometryPassActive = (state: EditState) => !isGeometryNeutral(state.geometry) || state.scan?.enabled === true

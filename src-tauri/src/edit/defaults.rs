@@ -60,6 +60,8 @@ fn build_default() -> EditState {
             offset_y: 0.0,
         },
         crop: None,
+        scan: None,
+        drawer: None,
         tone: ToneState {
             exposure: 0.0,
             contrast: 0.0,
@@ -123,6 +125,8 @@ pub fn is_default(state: &EditState) -> bool {
         && state.lens == base.lens
         && state.geometry == base.geometry
         && state.crop == base.crop
+        && state.scan == base.scan
+        && state.drawer == base.drawer
         && state.tone == base.tone
         && state.base_curve == base.base_curve
         && state.curves == base.curves
@@ -189,6 +193,126 @@ mod tests {
         assert!(is_default(&state));
         state.tone.exposure = 0.5;
         assert!(!is_default(&state));
+    }
+
+    #[test]
+    fn is_default_false_when_scan_present() {
+        let mut state = default_edit_state();
+        state.scan = Some(crate::types::ScanState {
+            enabled: true,
+            corners: [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]],
+            edges: [[0.5, 0.1], [0.9, 0.5], [0.5, 0.9], [0.1, 0.5]],
+        });
+        assert!(!is_default(&state));
+    }
+
+    #[test]
+    fn edit_state_without_scan_field_deserializes_to_none() -> Result<(), Box<dyn std::error::Error>> {
+        let mut value = serde_json::to_value(default_edit_state())?;
+        value.as_object_mut().and_then(|map| map.remove("scan"));
+        let state: EditState = serde_json::from_value(value)?;
+        assert!(state.scan.is_none());
+        assert!(is_default(&state));
+        Ok(())
+    }
+
+    #[test]
+    fn edit_state_without_drawer_field_deserializes_to_none() -> Result<(), Box<dyn std::error::Error>> {
+        let mut value = serde_json::to_value(default_edit_state())?;
+        value.as_object_mut().and_then(|map| map.remove("drawer"));
+        let state: EditState = serde_json::from_value(value)?;
+        assert!(state.drawer.is_none());
+        assert!(is_default(&state));
+        Ok(())
+    }
+
+    #[test]
+    fn drawer_objects_round_trip_through_json() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::{DrawerAdjust, DrawerBlendMode, DrawerLayer, DrawerObject, DrawerShapeKind, DrawerState, DrawerTool, DrawerTransform};
+        let mut state = default_edit_state();
+        state.drawer = Some(DrawerState {
+            layers: vec![DrawerLayer {
+                id: "layer-1".to_owned(),
+                name: "Layer 1".to_owned(),
+                visible: true,
+                opacity: 80.0,
+                objects: vec![
+                    DrawerObject::Stroke {
+                        tool: DrawerTool::Brush,
+                        color: "#ff0000".to_owned(),
+                        size: 2.5,
+                        opacity: 100.0,
+                        points: vec![[0.1, 0.1], [0.2, 0.15]],
+                        clip: Some(vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]),
+                    },
+                    DrawerObject::Shape {
+                        shape: DrawerShapeKind::Arrow,
+                        color: "#00ff00".to_owned(),
+                        size: 1.0,
+                        fill: false,
+                        from: [0.3, 0.3],
+                        to: [0.6, 0.5],
+                        clip: None,
+                    },
+                    DrawerObject::Text {
+                        text: "메모".to_owned(),
+                        color: "#ffffff".to_owned(),
+                        size: 4.0,
+                        position: [0.5, 0.5],
+                    },
+                    DrawerObject::Fill {
+                        color: "#0000ff".to_owned(),
+                        seed: [0.4, 0.4],
+                        clip: None,
+                    },
+                    DrawerObject::Clone {
+                        points: vec![[0.5, 0.5], [0.55, 0.5]],
+                        offset: [0.1, -0.05],
+                        size: 3.0,
+                        clip: None,
+                    },
+                    DrawerObject::Blur {
+                        points: vec![[0.7, 0.7]],
+                        size: 5.0,
+                        clip: None,
+                    },
+                ],
+                blend: DrawerBlendMode::Multiply,
+                transform: Some(DrawerTransform {
+                    offset_x: 0.05,
+                    offset_y: -0.02,
+                    scale: 120.0,
+                    rotate: 15.0,
+                }),
+                adjust: Some(DrawerAdjust {
+                    brightness: 10.0,
+                    contrast: -5.0,
+                    saturation: 20.0,
+                    hue: 30.0,
+                }),
+            }],
+        });
+        assert!(!is_default(&state));
+        let json = serde_json::to_string(&state)?;
+        assert!(json.contains("\"kind\":\"stroke\""));
+        assert!(json.contains("\"kind\":\"clone\""));
+        let parsed: EditState = serde_json::from_str(&json)?;
+        assert_eq!(parsed.drawer, state.drawer);
+        Ok(())
+    }
+
+    #[test]
+    fn drawer_layer_without_d2_fields_gets_defaults() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::types::{DrawerBlendMode, DrawerLayer};
+        let json = r##"{"id":"layer-1","name":"Layer 1","visible":true,"opacity":100.0,"objects":[
+            {"kind":"stroke","tool":"brush","color":"#ff0000","size":2.0,"opacity":100.0,"points":[[0.1,0.1]]}
+        ]}"##;
+        let layer: DrawerLayer = serde_json::from_str(json)?;
+        assert_eq!(layer.blend, DrawerBlendMode::Normal);
+        assert!(layer.transform.is_none());
+        assert!(layer.adjust.is_none());
+        assert!(matches!(&layer.objects[0], crate::types::DrawerObject::Stroke { clip: None, .. }));
+        Ok(())
     }
 
     #[test]

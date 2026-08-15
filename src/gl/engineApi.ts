@@ -13,9 +13,12 @@ export type EngineBackend = Pick<
     | 'setCompare'
     | 'setSideBySide'
     | 'setCropEditMode'
+    | 'setScanEditMode'
+    | 'setDrawerCanvas'
     | 'setUseMonitorProfile'
     | 'onHistogram'
     | 'samplePixel'
+    | 'readProcessedSrgb'
 >
 
 export type EngineApi = {
@@ -25,9 +28,12 @@ export type EngineApi = {
     setCompare: (split: CompareSplit) => void
     setSideBySide: (on: boolean) => void
     setCropEditMode: (on: boolean) => void
+    setScanEditMode: (on: boolean) => void
+    setDrawerCanvas: (canvas: HTMLCanvasElement | null) => void
     setUseMonitorProfile: (on: boolean) => void
     onHistogram: (cb: (hist: { r: Uint32Array; g: Uint32Array; b: Uint32Array; luma: Uint32Array }) => void) => () => void
     samplePixel: (canvasX: number, canvasY: number) => { r: number; g: number; b: number } | null
+    readProcessedSrgb: () => { data: Uint8ClampedArray<ArrayBuffer>; width: number; height: number } | null
     wbGainsFromState: (wb: WbState) => [number, number, number]
     tempTintFromGains: (gains: [number, number, number]) => { temp: number; tint: number }
 }
@@ -57,12 +63,21 @@ export const createEngineApi = (renderer: EngineBackend, requestRender: () => vo
         renderer.setCropEditMode(on)
         requestRender()
     },
+    setScanEditMode: (on) => {
+        renderer.setScanEditMode(on)
+        requestRender()
+    },
+    setDrawerCanvas: (canvas) => {
+        renderer.setDrawerCanvas(canvas)
+        requestRender()
+    },
     setUseMonitorProfile: (on) => {
         renderer.setUseMonitorProfile(on)
         requestRender()
     },
     onHistogram: (cb) => renderer.onHistogram(cb),
     samplePixel: (canvasX, canvasY) => renderer.samplePixel(canvasX, canvasY),
+    readProcessedSrgb: () => renderer.readProcessedSrgb(),
     wbGainsFromState: (wb) => wbGainsFromState(wb),
     tempTintFromGains: (gains) => tempTintFromGains(gains),
 })

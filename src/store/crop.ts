@@ -1,4 +1,5 @@
-import { dispDims } from '../gl/viewTransform'
+import { scanOutputDims } from '../gl/scan'
+import { composeFlip, dispDims } from '../gl/viewTransform'
 import { i18n } from '../i18n/i18n'
 import { useEditStore } from './editStore'
 import { usePlaylist } from './playlist'
@@ -13,19 +14,14 @@ const clamp01 = (value: number) => (value < 0 ? 0 : value > 1 ? 1 : value)
 
 export const isFullFrame = (crop: CropState) => crop.left <= 0.001 && crop.top <= 0.001 && crop.right >= 0.999 && crop.bottom >= 0.999
 
-export const currentImageFlip = () => {
-    const playlist = usePlaylist.getState()
-    const current = playlist.entries[playlist.currentIndex]
-    const best = current ? playlist.best[current.imageId] : undefined
-    return best ? best.flip : 0
-}
-
 const currentDisplayDims = () => {
     const playlist = usePlaylist.getState()
     const current = playlist.entries[playlist.currentIndex]
     const best = current ? playlist.best[current.imageId] : undefined
     if (!best) return { dispW: 1, dispH: 1 }
-    return dispDims(best.width, best.height, best.flip)
+    const editState = useEditStore.getState().state
+    const scanDims = scanOutputDims(best.width, best.height, editState?.scan)
+    return dispDims(scanDims.w, scanDims.h, composeFlip(best.flip, editState?.geometry.rotate90 ?? 0))
 }
 
 export const cropDisplayRatio = (aspect: string) => {

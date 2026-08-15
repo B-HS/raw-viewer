@@ -1,20 +1,12 @@
 import { REC2020_TO_SRGB } from './colorSpaces'
+import { buildExportDrawer } from './drawerRaster'
 import { createExportEngine } from './exportRenderer'
-import { floatToHalf } from './half'
+import { floatToHalf, halfToFloat } from './half'
 import type { ExportSource } from './exportRenderer'
 import type { EditState } from '../types/EditState'
 import type { LensProfileMatch } from '../types/LensProfileMatch'
 
 const CLIPBOARD_MAX_EDGE = 4096
-
-const halfToFloat = (bits: number) => {
-    const sign = (bits & 0x8000) >> 15 ? -1 : 1
-    const exponent = (bits & 0x7c00) >> 10
-    const fraction = bits & 0x03ff
-    if (exponent === 0) return sign * Math.pow(2, -14) * (fraction / 1024)
-    if (exponent === 0x1f) return fraction ? NaN : sign * Infinity
-    return sign * Math.pow(2, exponent - 15) * (1 + fraction / 1024)
-}
 
 const encodeOetf = (value: number) => {
     const x = value < 0 ? 0 : value > 1 ? 1 : value
@@ -72,7 +64,7 @@ export const renderClipboardPng = async (
     const scaled = downscaleSource(source, maxEdge)
     const engine = createExportEngine()
     try {
-        const job = engine.prepare(scaled, state, lensProfile)
+        const job = engine.prepare(scaled, state, lensProfile, buildExportDrawer(state.drawer, scaled.width, scaled.height))
         const canvas = document.createElement('canvas')
         canvas.width = job.width
         canvas.height = job.height

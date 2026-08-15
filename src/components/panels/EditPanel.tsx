@@ -6,6 +6,7 @@ import { useEditStore } from '../../store/editStore'
 import { BasicSection } from './BasicSection'
 import { CropGeometrySection } from './CropGeometrySection'
 import { DetailSection } from './DetailSection'
+import { DrawerSection } from './DrawerSection'
 import { EffectsSection } from './EffectsSection'
 import { HslSection } from './HslSection'
 import { LensSection } from './LensSection'
@@ -98,6 +99,18 @@ const SECTION_LABEL_KEYS: readonly (readonly [string, readonly string[]])[] = [
             'panel.crop.flipV',
         ],
     ],
+    [
+        'drawer',
+        [
+            'panel.drawer.title',
+            'panel.drawer.enter',
+            'panel.drawer.tool.brush',
+            'panel.drawer.tool.pencil',
+            'panel.drawer.tool.eraser',
+            'panel.drawer.tool.text',
+            'panel.drawer.layers',
+        ],
+    ],
 ]
 
 const SECTION_COMPONENTS: Record<string, FC> = {
@@ -108,6 +121,7 @@ const SECTION_COMPONENTS: Record<string, FC> = {
     lens: LensSection,
     effects: EffectsSection,
     crop: CropGeometrySection,
+    drawer: DrawerSection,
 }
 
 export const EditPanel: FC = () => {

@@ -196,6 +196,23 @@ const buildVectors = (): Vector[] => {
     push('flip3', () => undefined, { flip: 3 })
     push('flip5', () => undefined, { flip: 5 })
     push('flip6', () => undefined, { flip: 6 })
+    push('scan', (state) => {
+        state.scan = {
+            enabled: true,
+            corners: [
+                [0.12, 0.08],
+                [0.9, 0.15],
+                [0.85, 0.9],
+                [0.08, 0.82],
+            ],
+            edges: [
+                [0.51, 0.09],
+                [0.89, 0.5],
+                [0.47, 0.88],
+                [0.09, 0.47],
+            ],
+        }
+    })
     push('combined', (state) => {
         state.wb = { mode: 'custom', temp: 5200, tint: 20, tempShift: null }
         state.tone.exposure = 0.4

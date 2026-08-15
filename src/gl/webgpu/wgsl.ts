@@ -67,11 +67,32 @@ struct U {
     vigStrength: f32,
     manualDist: f32,
     manualVig: f32,
-    pad: f32,
+    scanOn: f32,
+    scanCornersA: vec4f,
+    scanCornersB: vec4f,
+    scanEdgesA: vec4f,
+    scanEdgesB: vec4f,
 }
 @group(0) @binding(0) var<uniform> u: U;
 @group(0) @binding(1) var tex: texture_2d<f32>;
 @group(0) @binding(2) var samp: sampler;
+fn qbez(a: vec2f, m: vec2f, b: vec2f, t: f32) -> vec2f {
+    let c = 2.0 * m - 0.5 * (a + b);
+    let s = 1.0 - t;
+    return s * s * a + 2.0 * s * t * c + t * t * b;
+}
+fn scanCoons(uv: vec2f) -> vec2f {
+    let tl = u.scanCornersA.xy;
+    let tr = u.scanCornersA.zw;
+    let br = u.scanCornersB.xy;
+    let bl = u.scanCornersB.zw;
+    let top = qbez(tl, u.scanEdgesA.xy, tr, uv.x);
+    let bottom = qbez(bl, u.scanEdgesB.xy, br, uv.x);
+    let left = qbez(tl, u.scanEdgesB.zw, bl, uv.y);
+    let right = qbez(tr, u.scanEdgesA.zw, br, uv.y);
+    let corner = mix(mix(tl, tr, uv.x), mix(bl, br, uv.x), uv.y);
+    return mix(top, bottom, uv.y) + mix(left, right, uv.x) - corner;
+}
 fn cmrw(v: f32) -> f32 {
     let x = abs(v);
     let x2 = x * x;
@@ -116,8 +137,9 @@ fn tcaScale(t: vec3f, ru: f32) -> f32 {
 }
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
     let p = u.warp * vec3f(in.uv - 0.5, 1.0);
-    let gUv = p.xy / p.z + 0.5;
+    var gUv = p.xy / p.z + 0.5;
     if (any(gUv < vec2f(0.0)) || any(gUv > vec2f(1.0))) { return vec4f(0.0, 0.0, 0.0, 1.0); }
+    if (u.scanOn == 1.0) { gUv = clamp(scanCoons(gUv), vec2f(0.0), vec2f(1.0)); }
     if (u.lensActive == 0.0) { return vec4f(textureSampleLevel(tex, samp, gUv, 0.0).rgb, 1.0); }
     let d = gUv - 0.5;
     let n = d * u.lensNorm;
@@ -463,12 +485,15 @@ struct U {
     useLut: f32,
     lutSize: f32,
     cropMode: f32,
+    srgbToRec2020: mat3x3f,
+    drawerOn: f32,
 }
 @group(0) @binding(0) var<uniform> u: U;
 @group(0) @binding(1) var tex: texture_2d<f32>;
 @group(0) @binding(2) var baseTex: texture_2d<f32>;
 @group(0) @binding(3) var lut: texture_2d<f32>;
 @group(0) @binding(4) var samp: sampler;
+@group(0) @binding(5) var drawerTex: texture_2d<f32>;
 ${COMMON}
 fn sampleDisplayLut(rgb: vec3f) -> vec3f {
     let n = u.lutSize;
@@ -501,6 +526,12 @@ fn sampleDisplayLut(rgb: vec3f) -> vec3f {
     else { lin = textureSampleLevel(tex, samp, in.uv, 0.0).rgb; }
     let clipHi = all(lin >= vec3f(1.0));
     let clipLo = all(lin <= vec3f(0.0));
+    if (u.drawerOn == 1.0) {
+        let drawer = textureSampleLevel(drawerTex, samp, in.uv, 0.0);
+        if (drawer.a > 0.0) {
+            lin = mix(lin, u.srgbToRec2020 * eotf(drawer.rgb), drawer.a);
+        }
+    }
     var c = lin;
     if (u.sourceKind == 0.0) {
         if (u.useLut == 1.0) {
@@ -522,6 +553,21 @@ fn sampleDisplayLut(rgb: vec3f) -> vec3f {
     if ((u.clipMode == 1.0 || u.clipMode == 3.0) && clipLo) { c = vec3f(0.0, 0.0, 1.0); }
     if (u.split.x > 0.5 && abs(axisCoord - u.split.z) < 0.0015) { c = vec3f(1.0); }
     return vec4f(c, 1.0);
+}
+`
+
+export const WGSL_DRAWER = /* wgsl */ `
+${FULLSCREEN_VERT}
+${COMMON}
+struct U { srgbToRec2020: mat3x3f }
+@group(0) @binding(0) var<uniform> u: U;
+@group(0) @binding(1) var tex: texture_2d<f32>;
+@group(0) @binding(2) var drawerTex: texture_2d<f32>;
+@group(0) @binding(3) var samp: sampler;
+@fragment fn fs(in: VsOut) -> @location(0) vec4f {
+    let base = textureSampleLevel(tex, samp, in.uv, 0.0).rgb;
+    let drawer = textureSampleLevel(drawerTex, samp, in.uv, 0.0);
+    return vec4f(mix(base, u.srgbToRec2020 * eotf(drawer.rgb), drawer.a), 1.0);
 }
 `
 

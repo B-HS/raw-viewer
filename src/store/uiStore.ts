@@ -11,6 +11,9 @@ const CROP_OVERLAY_ORDER: CropOverlayStyle[] = ['thirds', 'golden', 'diag', 'non
 
 export type ZoomPreset = 'fit' | 'actual'
 
+export type DrawerToolId =
+    'brush' | 'pencil' | 'eraser' | 'line' | 'arrow' | 'rect' | 'ellipse' | 'text' | 'fill' | 'move' | 'lasso' | 'clone' | 'blur'
+
 export type RenderCaps = { lowPrecision: boolean; displaySpace: string }
 
 export const shouldForceCpuRender = () => {
@@ -35,6 +38,15 @@ type UiState = {
     compare: CompareSplit
     sideBySide: boolean
     cropEditMode: boolean
+    scanEditMode: boolean
+    drawerEditMode: boolean
+    drawerTool: DrawerToolId
+    drawerColor: string
+    drawerSize: number
+    drawerFill: boolean
+    drawerActiveLayerId: string | null
+    drawerSelection: [number, number][] | null
+    drawerCloneSource: [number, number] | null
     cropOverlay: CropOverlayStyle
     eyedropper: boolean
     tatActive: boolean
@@ -57,6 +69,15 @@ type UiState = {
     resetComparePosition: () => void
     exitCompare: () => void
     setCropEditMode: (on: boolean) => void
+    setScanEditMode: (on: boolean) => void
+    setDrawerEditMode: (on: boolean) => void
+    setDrawerTool: (tool: DrawerToolId) => void
+    setDrawerColor: (color: string) => void
+    setDrawerSize: (size: number) => void
+    setDrawerFill: (on: boolean) => void
+    setDrawerActiveLayer: (id: string | null) => void
+    setDrawerSelection: (points: [number, number][] | null) => void
+    setDrawerCloneSource: (point: [number, number] | null) => void
     cycleCropOverlay: () => void
     setEyedropper: (on: boolean) => void
     toggleTat: () => void
@@ -78,6 +99,15 @@ export const useUiStore = create<UiState>((set, get) => ({
     compare: null,
     sideBySide: false,
     cropEditMode: false,
+    scanEditMode: false,
+    drawerEditMode: false,
+    drawerTool: 'brush',
+    drawerColor: '#ff3b30',
+    drawerSize: 2,
+    drawerFill: false,
+    drawerActiveLayerId: null,
+    drawerSelection: null,
+    drawerCloneSource: null,
     cropOverlay: 'thirds',
     eyedropper: false,
     tatActive: false,
@@ -91,6 +121,7 @@ export const useUiStore = create<UiState>((set, get) => ({
         engine.setCompare(state.compare)
         engine.setSideBySide(state.sideBySide)
         engine.setCropEditMode(state.cropEditMode)
+        engine.setScanEditMode(state.scanEditMode)
     },
     setRenderCaps: (caps) => set({ renderCaps: caps }),
     setGpuError: (on) => set({ gpuError: on }),
@@ -149,8 +180,29 @@ export const useUiStore = create<UiState>((set, get) => ({
     setCropEditMode: (on) =>
         set((state) => {
             state.engine?.setCropEditMode(on)
-            return { cropEditMode: on }
+            if (on && state.scanEditMode) state.engine?.setScanEditMode(false)
+            return { cropEditMode: on, scanEditMode: on ? false : state.scanEditMode, drawerEditMode: on ? false : state.drawerEditMode }
         }),
+    setScanEditMode: (on) =>
+        set((state) => {
+            state.engine?.setScanEditMode(on)
+            if (on && state.cropEditMode) state.engine?.setCropEditMode(false)
+            return { scanEditMode: on, cropEditMode: on ? false : state.cropEditMode, drawerEditMode: on ? false : state.drawerEditMode }
+        }),
+    setDrawerEditMode: (on) =>
+        set((state) => {
+            if (!on) return { drawerEditMode: false, drawerSelection: null, drawerCloneSource: null }
+            if (state.cropEditMode) state.engine?.setCropEditMode(false)
+            if (state.scanEditMode) state.engine?.setScanEditMode(false)
+            return { drawerEditMode: true, cropEditMode: false, scanEditMode: false }
+        }),
+    setDrawerTool: (tool) => set({ drawerTool: tool, drawerCloneSource: null }),
+    setDrawerColor: (color) => set({ drawerColor: color }),
+    setDrawerSize: (size) => set({ drawerSize: size }),
+    setDrawerFill: (on) => set({ drawerFill: on }),
+    setDrawerActiveLayer: (id) => set({ drawerActiveLayerId: id }),
+    setDrawerSelection: (points) => set({ drawerSelection: points }),
+    setDrawerCloneSource: (point) => set({ drawerCloneSource: point }),
     cycleCropOverlay: () =>
         set((state) => {
             const index = CROP_OVERLAY_ORDER.indexOf(state.cropOverlay)

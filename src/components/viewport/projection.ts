@@ -12,7 +12,7 @@ export const uvToCanvas = (model: Float32Array, clientW: number, clientH: number
     return { x: ((ndcX + 1) / 2) * clientW, y: ((1 - ndcY) / 2) * clientH }
 }
 
-export const canvasToUv = (model: Float32Array, clientW: number, clientH: number, x: number, y: number) => {
+export const canvasToUvUnclamped = (model: Float32Array, clientW: number, clientH: number, x: number, y: number) => {
     const ndcX = (2 * x) / clientW - 1
     const ndcY = 1 - (2 * y) / clientH
     const a = model[0]
@@ -25,8 +25,11 @@ export const canvasToUv = (model: Float32Array, clientW: number, clientH: number
     const ry = ndcY - model[7]
     const posX = (d * rx - c * ry) / det
     const posY = (-b * rx + a * ry) / det
-    const u = posX * 0.5 + 0.5
-    const v = (1 - posY) * 0.5
-    if (u < 0 || u > 1 || v < 0 || v > 1) return null
-    return { u, v }
+    return { u: posX * 0.5 + 0.5, v: (1 - posY) * 0.5 }
+}
+
+export const canvasToUv = (model: Float32Array, clientW: number, clientH: number, x: number, y: number) => {
+    const uv = canvasToUvUnclamped(model, clientW, clientH, x, y)
+    if (!uv || uv.u < 0 || uv.u > 1 || uv.v < 0 || uv.v > 1) return null
+    return uv
 }
