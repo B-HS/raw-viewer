@@ -3770,7 +3770,7 @@ dependencies = [
 
 [[package]]
 name = "raw-viewer"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "base64 0.22.1",
  "bindgen",
