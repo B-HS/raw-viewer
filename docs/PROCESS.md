@@ -51,7 +51,7 @@
 ## 현재 상태 스냅샷 (2026-07-18 심야 기준)
 
 - **저장소**: 공개(public), MIT. dev=prod 동기화.
-- **최신 릴리스**: **v0.5.3 = 첫 공개(published) 릴리스** (2026-07-18, "Raw Viewer 0.5.3" — 영문 릴리스 노트+스크린샷). 자산명은 점 표기(`Raw.Viewer_0.5.3_aarch64.dmg`·`Raw.Viewer.app.tar.gz`)이며 latest.json·자산 URL 200 확인 — **자동 업데이트 활성**(v0.5.2→0.5.3 왕복 감지·설치 실검증 pass). v0.1.1~v0.5.2 draft는 의도적 유지.
+- **최신 릴리스**: **v0.5.5 draft**(2026-08-17 생성, "Raw Viewer 0.5.5" — 스캔·드로잉·회전 수정, 영문 노트 작성 완료, **사용자 publish 대기**. 0.5.4는 사용자 지시로 건너뜀). 최신 published는 **v0.5.3**(2026-07-18, 첫 공개 릴리스 — 자동 업데이트 활성, v0.5.2→0.5.3 왕복 실검증 pass). 자산명은 점 표기(`Raw.Viewer_*`). v0.1.1~v0.5.2 draft는 의도적 유지.
 - **README.md 작성 완료**(영문·히어로 스크린샷 docs/assets/screenshot.jpg·기능 요약·설치·단축키) — prod 반영.
 - **시크릿**: Apple 서명·공증 5종 + `TAURI_SIGNING_PRIVATE_KEY` 등록 완료. updater 개인키 = `~/environment/raw-viewer-updater.key`(재생성 금지·머신 외부 백업 권장).
 - **테스트**: Rust 324건 + 프론트 bun test 17건 + E2E 디코드 스모크 12건 + WebGPU 패리티 하니스 18벡터(parity.html, headless Chrome). eslint 에러 0·경고 0.
@@ -61,6 +61,18 @@
 - **직전 이력**: 2026-07-18 하루 동안 v0.5.0(WebGPU 6a~6i+NR compute) → 실사용 검증(A/B 체크리스트) → v0.5.1(이슈 6건) → v0.5.2(파이프라인 재설계+마무리 9건). 상세는 [history/2026-07-18-quality-waves.md](./history/2026-07-18-quality-waves.md).
 
 ## 남은 작업
+
+### 완료(publish 대기) — v0.5.5 릴리스 (2026-08-17, 0.5.4는 사용자 지시로 건너뜀)
+
+release.md 확립 흐름. publish는 사용자가 직접.
+
+- [x] a. 웹페이지 갱신 — features 6→8카드(Document scan·Drawing layers 추가, 데스크톱 4열 2행), headless Chrome 렌더 확인. 기존 prettier 비적합(web/index.html·tauri.conf.json)은 수정 전부터 존재 — 베이스라인 유지, 신규 라인은 150폭 준수
+- [x] b. 버전 상향 0.5.5 — 세 파일 + cargo check로 Cargo.lock 갱신
+- [x] c. 검증 사다리 — tsc 0 · eslint 0 · bun test 42 · cargo test 338 pass · i18n en/ko/ja 801키 일치
+- [x] d. 커밋 `58c42f5`(web)·`6a44693`(버전) → dev push → prod 병합 `e0fc3ec`·push(diff 0) → Deploy web 성공·https://b-hs.github.io/raw-viewer/ 200·신규 카드 반영 확인
+- [x] e. Warm release cache 완료(3m14s) → 태그 v0.5.5(`6a44693`, 버전 커밋 — v0.5.3 정례) push → Release 워크플로 success(약 8분 40초, 워밍 적중)
+- [x] f. draft 자산 5종·latest.json 정합(version 0.5.5·URL=Raw.Viewer.app.tar.gz 일치·서명 포함) 확인 + 영문 릴리스 노트("Raw Viewer 0.5.5") 작성
+- [ ] g. **사용자 publish** → 자동 업데이트 왕복(0.5.3→0.5.5 감지·설치)·신기능 실기동 시각 검증(스캔·드로잉·회전)
 
 ### 진행 중 — 회전 버그 + 스캔/Drawer/보정 3기능 (2026-08-15)
 
