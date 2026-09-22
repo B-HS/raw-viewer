@@ -21,6 +21,7 @@ type HistoryState = {
     beginCoalesce: (key: string) => void
     endCoalesce: () => void
     record: (imageId: string, entry: HistoryEntry) => void
+    clear: (imageId: string) => void
     undo: () => void
     redo: () => void
     jumpTo: (imageId: string, target: number) => void
@@ -61,17 +62,25 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
                 top.coalesceKey === entry.coalesceKey &&
                 entry.timestamp - top.timestamp < COALESCE_MS)
         if (mergeTop && top) {
-            undo[undo.length - 1] = { ...top, patches: entry.patches, timestamp: entry.timestamp, label: entry.label }
+            undo[undo.length - 1] = {
+                ...top,
+                patches: [...top.patches, ...entry.patches],
+                inversePatches: [...entry.inversePatches, ...top.inversePatches],
+                timestamp: entry.timestamp,
+                label: entry.label,
+            }
         } else {
             undo.push(entry)
             if (undo.length > MAX_HISTORY_ENTRIES) undo.shift()
         }
         set({
             stacks: { ...state.stacks, [imageId]: { undo, redo: [] } },
-            dragStarted: state.dragKey !== null ? true : state.dragStarted,
+            dragStarted: dragging ? true : state.dragStarted,
         })
     },
+    clear: (imageId) => set((state) => ({ stacks: { ...state.stacks, [imageId]: emptyStack() }, dragKey: null, dragStarted: false })),
     undo: () => {
+        get().endCoalesce()
         const imageId = target?.imageId()
         if (!imageId || !target) return
         const stack = get().stacks[imageId]
@@ -81,6 +90,7 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
         set({ stacks: { ...get().stacks, [imageId]: { undo: stack.undo.slice(0, -1), redo: [...stack.redo, entry] } } })
     },
     redo: () => {
+        get().endCoalesce()
         const imageId = target?.imageId()
         if (!imageId || !target) return
         const stack = get().stacks[imageId]
@@ -90,6 +100,7 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
         set({ stacks: { ...get().stacks, [imageId]: { undo: [...stack.undo, entry], redo: stack.redo.slice(0, -1) } } })
     },
     jumpTo: (imageId, targetIndex) => {
+        get().endCoalesce()
         if (!target || target.imageId() !== imageId) return
         const stack = get().stacks[imageId]
         if (!stack) return

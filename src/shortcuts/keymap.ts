@@ -22,7 +22,11 @@ export const DIGIT_CODES = ['Digit0', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'D
 export const digitValue = (code: string) => (DIGIT_CODES as readonly string[]).indexOf(code)
 
 export const isEditableTarget = (element: Element | null) =>
-    element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || (element instanceof HTMLElement && element.isContentEditable)
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement ||
+    (element instanceof HTMLElement &&
+        (element.isContentEditable || element.getAttribute('role') === 'slider' || element.getAttribute('role') === 'tab'))
 
 export type Binding = { code: string; meta?: boolean; shift?: boolean; alt?: boolean; ctrl?: boolean }
 

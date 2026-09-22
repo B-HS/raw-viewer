@@ -47,7 +47,7 @@ export const useMeta = create<MetaState>((set, get) => {
         loadForImage: async (imageId) => {
             if (get().imageId === imageId && get().metadata) return
             const current = ++token
-            set({ imageId, loading: true, error: null })
+            set({ imageId, metadata: null, loading: true, error: null })
             try {
                 const metadata = await getMetadata(imageId)
                 if (token !== current) return

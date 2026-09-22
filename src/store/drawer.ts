@@ -1,5 +1,7 @@
 import { i18n } from '../i18n/i18n'
+import { EDITOR_LAYER_NAME_MAX } from '../shared/constants/editor'
 import { useEditStore } from './editStore'
+import { useHistoryStore } from './historyStore'
 import { useUiStore } from './uiStore'
 import type { DrawerAdjust } from '../types/DrawerAdjust'
 import type { DrawerBlendMode } from '../types/DrawerBlendMode'
@@ -63,6 +65,33 @@ export const removeDrawerLayer = (id: string) => {
         { label: i18n.t('history.drawerLayerRemove') },
     )
     if (useUiStore.getState().drawerActiveLayerId === id) useUiStore.getState().setDrawerActiveLayer(null)
+}
+
+export const renameDrawerLayer = (id: string, name: string) => {
+    const trimmed = name.trim().slice(0, EDITOR_LAYER_NAME_MAX)
+    if (!trimmed) return
+    useEditStore.getState().edit(
+        (draft) => {
+            const layer = draft.drawer?.layers.find((item) => item.id === id)
+            if (layer) layer.name = trimmed
+        },
+        { label: i18n.t('editor.renameLayer') },
+    )
+}
+
+export const duplicateDrawerLayer = (id: string) => {
+    const source = useEditStore.getState().state?.drawer?.layers.find((item) => item.id === id)
+    if (!source) return
+    const copy = { ...structuredClone(source), id: crypto.randomUUID(), name: i18n.t('editor.layerCopy', { name: source.name }) }
+    useEditStore.getState().edit(
+        (draft) => {
+            if (!draft.drawer) return
+            const index = draft.drawer.layers.findIndex((item) => item.id === id)
+            draft.drawer.layers = [...draft.drawer.layers.slice(0, index + 1), copy, ...draft.drawer.layers.slice(index + 1)]
+        },
+        { label: i18n.t('editor.duplicateLayer') },
+    )
+    useUiStore.getState().setDrawerActiveLayer(copy.id)
 }
 
 export const moveDrawerLayer = (id: string, delta: number) =>
@@ -139,7 +168,7 @@ export const appendDrawerObject = (layerId: string, object: DrawerObject) =>
             const layer = draft.drawer?.layers.find((item) => item.id === layerId)
             if (layer) layer.objects.push(object)
         },
-        { coalesceKey: 'drawer.draw', label: i18n.t(OBJECT_HISTORY_KEY[object.kind]) },
+        { coalesceKey: useHistoryStore.getState().dragKey ?? undefined, label: i18n.t(OBJECT_HISTORY_KEY[object.kind]) },
     )
 
 export const mutateLastDrawerObject = (layerId: string, mutate: (object: DrawerObject) => void) =>

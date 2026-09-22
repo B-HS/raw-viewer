@@ -13,6 +13,8 @@ import { useEditStore } from '../../store/editStore'
 import { useHistoryStore } from '../../store/historyStore'
 import { useUiStore } from '../../store/uiStore'
 import { useViewportProjection } from '../../store/viewportProjection'
+import { drawerPointToLocal } from '../../gl/drawer-coordinates'
+import { usePlaylist } from '../../store/playlist'
 import type { DrawerTransform } from '../../types/DrawerTransform'
 import { canvasToUvUnclamped, uvToCanvas } from './projection'
 
@@ -27,9 +29,9 @@ type ActiveDrag =
     | { kind: 'shape'; layerId: string }
     | { kind: 'move'; layerId: string; startU: number; startV: number; base: DrawerTransform }
 
-type TextDraft = { x: number; y: number; u: number; v: number; value: string }
+type TextDraft = { x: number; y: number; u: number; v: number; value: string; layerId: string; size: number; color: string }
 
-const clamp01 = (value: number) => (value < 0 ? 0 : value > 1 ? 1 : value)
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
 
 export const DrawerOverlay: FC = () => {
     const rootRef = useRef<HTMLDivElement>(null)
@@ -39,6 +41,8 @@ export const DrawerOverlay: FC = () => {
     const tool = useUiStore((state) => state.drawerTool)
     const color = useUiStore((state) => state.drawerColor)
     const size = useUiStore((state) => state.drawerSize)
+    const opacity = useUiStore((state) => state.drawerOpacity)
+    const panHeld = useUiStore((state) => state.drawerPanHeld)
     const fill = useUiStore((state) => state.drawerFill)
     const selection = useUiStore((state) => state.drawerSelection)
     const cloneSource = useUiStore((state) => state.drawerCloneSource)
@@ -47,6 +51,8 @@ export const DrawerOverlay: FC = () => {
     const clientH = useViewportProjection((state) => state.clientH)
 
     const { t } = useTranslation()
+
+    useEffect(() => () => useHistoryStore.getState().endCoalesce(), [])
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -60,22 +66,37 @@ export const DrawerOverlay: FC = () => {
 
     if (!model) return null
 
-    const toUv = (event: { clientX: number; clientY: number }) => {
+    const toUv = (event: { clientX: number; clientY: number }, clamp: boolean) => {
         const rect = rootRef.current?.getBoundingClientRect()
         if (!rect) return null
         const uv = canvasToUvUnclamped(model, clientW, clientH, event.clientX - rect.left, event.clientY - rect.top)
-        return uv ? ([clamp01(uv.u), clamp01(uv.v)] as [number, number]) : null
+        if (!uv) return null
+        if (!clamp && (uv.u < 0 || uv.u > 1 || uv.v < 0 || uv.v > 1)) return null
+        return [clamp01(uv.u), clamp01(uv.v)] satisfies [number, number]
     }
     const toCanvasPoint = (point: readonly [number, number]) => uvToCanvas(model, clientW, clientH, point[0], point[1])
+
+    const toLocal = (point: [number, number], layerId: string) => {
+        const layer = useEditStore.getState().state?.drawer?.layers.find((item) => item.id === layerId)
+        const playlist = usePlaylist.getState()
+        const entry = playlist.entries[playlist.currentIndex]
+        const level = entry ? playlist.best[entry.imageId] : undefined
+        if (!level) return point
+        return drawerPointToLocal(point, layer?.transform ?? null, level.width, level.height)
+    }
 
     const commitText = () => {
         if (!textDraft) return
         const trimmed = textDraft.value.trim()
         setTextDraft(null)
         if (trimmed.length === 0) return
-        const layerId = ensureDrawerLayer()
-        if (layerId === null) return
-        appendDrawerObject(layerId, { kind: 'text', text: trimmed, color, size, position: [textDraft.u, textDraft.v] })
+        appendDrawerObject(textDraft.layerId, {
+            kind: 'text',
+            text: trimmed,
+            color: textDraft.color,
+            size: textDraft.size,
+            position: [textDraft.u, textDraft.v],
+        })
     }
 
     const beginCapturedDrag = (drag: ActiveDrag, pointerId: number, coalesceKey: string) => {
@@ -85,14 +106,27 @@ export const DrawerOverlay: FC = () => {
     }
 
     const onPointerDown = (event: React.PointerEvent) => {
-        if (event.button !== 0) return
-        const point = toUv(event)
+        if (event.button !== 0 || dragRef.current || panHeld || tool === 'hand') return
+        const point = toUv(event, false)
         if (!point) return
         if (tool === 'text') {
             if (textDraft) commitText()
             const rect = rootRef.current?.getBoundingClientRect()
             if (!rect) return
-            setTextDraft({ x: event.clientX - rect.left, y: event.clientY - rect.top, u: point[0], v: point[1], value: '' })
+            const layerId = ensureDrawerLayer()
+            if (!layerId) return
+            const local = toLocal(point, layerId)
+            const scale = useEditStore.getState().state?.drawer?.layers.find((layer) => layer.id === layerId)?.transform?.scale ?? PERCENT
+            setTextDraft({
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top,
+                u: local[0],
+                v: local[1],
+                value: '',
+                layerId,
+                size: (size * PERCENT) / scale,
+                color,
+            })
             return
         }
         if (tool === 'lasso') {
@@ -110,7 +144,13 @@ export const DrawerOverlay: FC = () => {
         }
         if (tool === 'fill') {
             const layerId = ensureDrawerLayer()
-            if (layerId !== null) appendDrawerObject(layerId, { kind: 'fill', color, seed: point, clip: selection })
+            if (layerId !== null)
+                appendDrawerObject(layerId, {
+                    kind: 'fill',
+                    color,
+                    seed: toLocal(point, layerId),
+                    clip: selection?.map((item) => toLocal(item, layerId)) ?? null,
+                })
             return
         }
         if (tool === 'move') {
@@ -127,32 +167,42 @@ export const DrawerOverlay: FC = () => {
         }
         const layerId = ensureDrawerLayer()
         if (layerId === null) return
+        const localPoint = toLocal(point, layerId)
+        const clip = selection?.map((item) => toLocal(item, layerId)) ?? null
+        const scale = useEditStore.getState().state?.drawer?.layers.find((layer) => layer.id === layerId)?.transform?.scale ?? PERCENT
+        const localSize = (size * PERCENT) / scale
         if (tool === 'brush' || tool === 'pencil' || tool === 'eraser') {
-            appendDrawerObject(layerId, { kind: 'stroke', tool, color, size, opacity: 100, points: [point], clip: selection })
-            beginCapturedDrag({ kind: 'draw', layerId, last: point }, event.pointerId, 'drawer.draw')
+            beginCapturedDrag({ kind: 'draw', layerId, last: localPoint }, event.pointerId, 'drawer.draw')
+            appendDrawerObject(layerId, { kind: 'stroke', tool, color, size: localSize, opacity, points: [localPoint], clip })
             return
         }
         if (tool === 'clone') {
             if (!cloneSource) return
-            const offset: [number, number] = [cloneSource[0] - point[0], cloneSource[1] - point[1]]
-            appendDrawerObject(layerId, { kind: 'clone', points: [point], offset, size, clip: selection })
-            beginCapturedDrag({ kind: 'draw', layerId, last: point }, event.pointerId, 'drawer.draw')
+            const localSource = toLocal(cloneSource, layerId)
+            const offset: [number, number] = [localSource[0] - localPoint[0], localSource[1] - localPoint[1]]
+            beginCapturedDrag({ kind: 'draw', layerId, last: localPoint }, event.pointerId, 'drawer.draw')
+            appendDrawerObject(layerId, { kind: 'clone', points: [localPoint], offset, size: localSize, clip })
             return
         }
         if (tool === 'blur') {
-            appendDrawerObject(layerId, { kind: 'blur', points: [point], size, clip: selection })
-            beginCapturedDrag({ kind: 'draw', layerId, last: point }, event.pointerId, 'drawer.draw')
+            beginCapturedDrag({ kind: 'draw', layerId, last: localPoint }, event.pointerId, 'drawer.draw')
+            appendDrawerObject(layerId, { kind: 'blur', points: [localPoint], size: localSize, clip })
             return
         }
-        appendDrawerObject(layerId, { kind: 'shape', shape: tool, color, size, fill, from: point, to: point, clip: selection })
         beginCapturedDrag({ kind: 'shape', layerId }, event.pointerId, 'drawer.draw')
+        appendDrawerObject(layerId, { kind: 'shape', shape: tool, color, size: localSize, fill, from: localPoint, to: localPoint, clip })
     }
 
     const onPointerMove = (event: React.PointerEvent) => {
         const drag = dragRef.current
         if (!drag) return
-        const point = toUv(event)
-        if (!point) return
+        if (useHistoryStore.getState().dragKey === null) {
+            dragRef.current = null
+            return
+        }
+        const uv = toUv(event, true)
+        if (!uv) return
+        const point = drag.kind === 'move' ? uv : toLocal(uv, drag.layerId)
         if (drag.kind === 'draw') {
             if (Math.hypot(point[0] - drag.last[0], point[1] - drag.last[1]) < MIN_POINT_DISTANCE_UV) return
             drag.last = point
@@ -175,6 +225,7 @@ export const DrawerOverlay: FC = () => {
 
     const onPointerUp = (event: React.PointerEvent) => {
         if (!dragRef.current) return
+        if (event.type === 'pointerup') onPointerMove(event)
         dragRef.current = null
         if (rootRef.current?.hasPointerCapture(event.pointerId)) rootRef.current.releasePointerCapture(event.pointerId)
         useHistoryStore.getState().endCoalesce()
@@ -194,11 +245,12 @@ export const DrawerOverlay: FC = () => {
         <div
             ref={rootRef}
             className='absolute inset-0 touch-none'
-            style={{ cursor: tool === 'move' ? 'move' : 'crosshair' }}
+            style={{ cursor: tool === 'move' ? 'move' : 'crosshair', pointerEvents: panHeld || tool === 'hand' ? 'none' : 'auto' }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}>
+            onPointerCancel={onPointerUp}
+            onLostPointerCapture={onPointerUp}>
             <svg className='pointer-events-none absolute inset-0 h-full w-full'>
                 {selection && selection.length >= 3 && (
                     <path

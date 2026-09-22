@@ -3,10 +3,10 @@ import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Histogram } from '../Histogram'
 import { useEditStore } from '../../store/editStore'
+import { usePlaylist } from '../../store/playlist'
 import { BasicSection } from './BasicSection'
 import { CropGeometrySection } from './CropGeometrySection'
 import { DetailSection } from './DetailSection'
-import { DrawerSection } from './DrawerSection'
 import { EffectsSection } from './EffectsSection'
 import { HslSection } from './HslSection'
 import { LensSection } from './LensSection'
@@ -99,18 +99,6 @@ const SECTION_LABEL_KEYS: readonly (readonly [string, readonly string[]])[] = [
             'panel.crop.flipV',
         ],
     ],
-    [
-        'drawer',
-        [
-            'panel.drawer.title',
-            'panel.drawer.enter',
-            'panel.drawer.tool.brush',
-            'panel.drawer.tool.pencil',
-            'panel.drawer.tool.eraser',
-            'panel.drawer.tool.text',
-            'panel.drawer.layers',
-        ],
-    ],
 ]
 
 const SECTION_COMPONENTS: Record<string, FC> = {
@@ -121,13 +109,15 @@ const SECTION_COMPONENTS: Record<string, FC> = {
     lens: LensSection,
     effects: EffectsSection,
     crop: CropGeometrySection,
-    drawer: DrawerSection,
 }
 
 export const EditPanel: FC = () => {
     const [query, setQuery] = useState('')
     const { t } = useTranslation()
     const hasState = useEditStore((state) => state.state !== null)
+    const editImageId = useEditStore((state) => state.imageId)
+    const currentImageId = usePlaylist((state) => state.entries[state.currentIndex]?.imageId)
+    const ready = hasState && editImageId === currentImageId
     const edited = useEditStore((state) => state.dirtyFromDefault)
 
     const trimmed = query.trim().toLowerCase()
@@ -145,12 +135,13 @@ export const EditPanel: FC = () => {
                 </span>
                 <button
                     type='button'
+                    disabled={!ready}
                     onClick={() => useEditStore.getState().resetAll()}
                     className='rounded px-2 py-0.5 text-[10px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100'>
                     {t('panel.resetAll')}
                 </button>
             </div>
-            {hasState ? (
+            {ready ? (
                 <>
                     <div className='border-b border-neutral-800 px-3 py-1.5'>
                         <input

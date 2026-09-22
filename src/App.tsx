@@ -5,6 +5,11 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useEffect, useRef, useState } from 'react'
 import type { FC, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { WorkspaceTabs } from './widgets/editor/workspace-tabs'
+import { EditorToolbar } from './widgets/editor/editor-toolbar'
+import { EditorOptions } from './widgets/editor/editor-options'
+import { EditorPanel } from './widgets/editor/editor-panel'
+import { handleEditorShortcut } from './actions/editor-shortcuts'
 import { AboutDialog } from './components/AboutDialog'
 import { CommandPalette } from './components/CommandPalette'
 import { SettingsDialog } from './components/settings/SettingsDialog'
@@ -135,7 +140,10 @@ const advanceToNextFiltered = () => {
     if (target != null) usePlaylist.getState().focusIndex(target)
 }
 
+let pairRequest = 0
+
 const togglePairJpeg = async () => {
+    const request = ++pairRequest
     const state = usePlaylist.getState()
     const current = state.entries[state.currentIndex]
     if (!current) return
@@ -150,8 +158,10 @@ const togglePairJpeg = async () => {
     if (!jpegPath) return
     try {
         const jpegEntry = await registerImage(jpegPath)
+        const latest = usePlaylist.getState()
+        if (request !== pairRequest || latest.entries[latest.currentIndex]?.imageId !== current.imageId) return
         useUiStore.getState().setPairSwap(jpegEntry.imageId, current)
-        usePlaylist.getState().replaceEntryAt(usePlaylist.getState().currentIndex, jpegEntry)
+        latest.replaceEntryAt(latest.currentIndex, jpegEntry)
     } catch {
         useToast.getState().show(i18n.t('toast.pairJpegFailed'))
     }
@@ -172,21 +182,30 @@ const selectAllFiltered = () => {
     usePlaylist.getState().selectAll(activeFilteredList().map((index) => state.entries[index].imageId))
 }
 
+let openRequest = 0
+
 const openImagePath = async (path: string, setOpenError: (message: string) => void) => {
+    const request = ++openRequest
     setOpenError('')
     try {
+        await useEditStore.getState().flushPending()
         const result = await openPath(path)
+        if (request !== openRequest) return
         usePlaylist.getState().openWith(result.entry, result.dir)
         useOrganize.getState().loadMany([result.entry.imageId])
         noteRecent(path).catch(() => undefined)
         watchDirectory(result.dir).catch(() => undefined)
         const summary = await scanDirectory(result.dir, (batch) => {
+            if (request !== openRequest) return
             usePlaylist.getState().addEntries(batch.entries, batch.done)
             useOrganize.getState().loadMany(batch.entries.map((entry) => entry.imageId))
         })
+        if (request !== openRequest) return
         usePlaylist.getState().setScanTotal(summary.total)
         usePairs.getState().load(result.dir)
     } catch (error) {
+        if (request !== openRequest) return
+        usePlaylist.setState({ scanning: false })
         setOpenError(error instanceof Error ? error.message : i18n.t('app.openFailed'))
     }
 }
@@ -239,7 +258,18 @@ export const App: FC = () => {
     const sortOrder = useSettings((state) => state.sortOrder)
     const { t } = useTranslation()
 
-    const quickBarMounted = quickBarVisible && !gridActive && !isFullscreen
+    const workspace = useUiStore((state) => state.workspace)
+    const editImageId = useEditStore((state) => state.imageId)
+    const hasEditState = useEditStore((state) => state.state !== null)
+    const gpuError = useUiStore((state) => state.gpuError)
+    const animated = usePlaylist((state) => state.entries[state.currentIndex]?.isAnimated === true)
+    const editLevel = usePlaylist((state) => {
+        const current = state.entries[state.currentIndex]
+        return current ? state.best[current.imageId]?.level : undefined
+    })
+    const editorActive = workspace === 'editor'
+    const editorDisabled = !hasEditState || editImageId !== currentImageId || gpuError || animated || !editLevel || editLevel === 'l0'
+    const quickBarMounted = quickBarVisible && !gridActive && !isFullscreen && !editorActive
 
     const handleOpen = (path: string) => openImagePath(path, setOpenError)
 
@@ -293,7 +323,10 @@ export const App: FC = () => {
                 try {
                     await useEditStore.getState().flushPending()
                     await flushOrganize()
-                } catch {}
+                } catch {
+                    closingRef.current = false
+                    return
+                }
                 try {
                     await getCurrentWindow().destroy()
                 } catch {
@@ -310,11 +343,19 @@ export const App: FC = () => {
     useEffect(() => {
         let disposed = false
         let unlisten: (() => void) | null = null
+        let scanRequest = 0
         const reconcile = async (dir: string) => {
+            const request = ++scanRequest
+            const opened = openRequest
             const collected: ImageEntry[] = []
-            await scanDirectory(dir, (batch) => collected.push(...batch.entries)).catch(() => undefined)
-            usePlaylist.getState().syncEntries(collected)
-            useOrganize.getState().loadMany(collected.map((entry) => entry.imageId))
+            try {
+                await scanDirectory(dir, (batch) => collected.push(...batch.entries))
+                if (disposed || request !== scanRequest || opened !== openRequest || usePlaylist.getState().dir !== dir) return
+                usePlaylist.getState().syncEntries(collected)
+                await useOrganize.getState().loadMany(collected.map((entry) => entry.imageId))
+            } catch {
+                return
+            }
         }
         onFsChanged((payload) => {
             const state = usePlaylist.getState()
@@ -390,7 +431,8 @@ export const App: FC = () => {
             pendingIndexRef.current = null
         }
         const onKeyDown = (event: KeyboardEvent) => {
-            if (isEditableTarget(document.activeElement) || event.metaKey) return
+            if (event.defaultPrevented || isEditableTarget(document.activeElement) || event.metaKey || useUiStore.getState().workspace === 'editor')
+                return
             if (isOverlayBlocking() || useGridView.getState().active) return
             if (usePlaylist.getState().entries.length === 0) return
             const base = pendingIndexRef.current ?? usePlaylist.getState().currentIndex
@@ -424,6 +466,11 @@ export const App: FC = () => {
         const onKeyDown = (event: KeyboardEvent) => {
             if (isEditableTarget(document.activeElement)) return
             if (isOverlayBlocking()) return
+            if (handleEditorShortcut(event)) {
+                event.preventDefault()
+                event.stopImmediatePropagation()
+                return
+            }
             const ui = useUiStore.getState()
             if (matchAction(event, 'view.history')) {
                 event.preventDefault()
@@ -561,6 +608,7 @@ export const App: FC = () => {
                 ui.toggleClipping(event.shiftKey ? 'highlight' : event.altKey ? 'shadow' : 'both')
             } else if (matchAction(event, 'compare.split')) {
                 event.preventDefault()
+                if (ui.workspace === 'editor') ui.setWorkspace('photo')
                 if (event.shiftKey || event.altKey) ui.toggleCompare(event.altKey ? 'y' : 'x')
                 else ui.toggleSideBySide()
             } else if (matchAction(event, 'inspect.before') && !event.repeat) {
@@ -568,10 +616,14 @@ export const App: FC = () => {
                 ui.engine?.setEditState(null)
             } else if (matchAction(event, 'tool.crop')) {
                 event.preventDefault()
+                if (ui.workspace === 'editor') ui.setWorkspace('photo')
                 toggleCropMode()
             } else if (matchAction(event, 'tool.eyedropper')) {
                 event.preventDefault()
-                if (useEditStore.getState().isRaw) useUiStore.getState().setEyedropper(!useUiStore.getState().eyedropper)
+                if (useEditStore.getState().isRaw) {
+                    if (ui.workspace === 'editor') ui.setWorkspace('photo')
+                    ui.setEyedropper(!ui.eyedropper)
+                }
             } else if (ui.cropEditMode) {
                 if (event.code === KEYMAP.tool.aspect && event.shiftKey) {
                     event.preventDefault()
@@ -638,17 +690,30 @@ export const App: FC = () => {
     }, [currentImageId])
 
     useEffect(() => {
+        let disposed = false
         const run = async () => {
             const state = usePlaylist.getState()
             const current = state.entries[state.currentIndex]
-            if (!current) return
             const edit = useEditStore.getState()
-            if (edit.imageId && edit.imageId !== current.imageId) await edit.flushPending()
-            const nav = neighbors(state.entries, state.currentIndex, useSettings.getState().preloadRadius)
-            await navigate(current.imageId, nav.prevIds, nav.nextIds).catch(() => undefined)
-            if (useEditStore.getState().imageId !== current.imageId) await useEditStore.getState().loadForImage(current.imageId, current.isRaw)
+            try {
+                if (edit.imageId && edit.imageId !== current?.imageId) await edit.flushPending()
+                if (disposed) return
+                if (!current) {
+                    edit.clear()
+                    return
+                }
+                const nav = neighbors(state.entries, state.currentIndex, useSettings.getState().preloadRadius)
+                await navigate(current.imageId, nav.prevIds, nav.nextIds)
+                if (disposed) return
+                if (useEditStore.getState().imageId !== current.imageId) await edit.loadForImage(current.imageId, current.isRaw)
+            } catch {
+                return
+            }
         }
-        run().catch(() => undefined)
+        run()
+        return () => {
+            disposed = true
+        }
     }, [currentImageId, scanning])
 
     useEffect(() => {
@@ -816,14 +881,20 @@ export const App: FC = () => {
                     </form>
                     {openError && <p className='px-6 text-xs text-red-400'>{openError}</p>}
                 </div>
+                <SettingsDialog />
+                <AboutDialog />
+                <CommandPalette onOpenFile={pickAndOpen} onOpenPath={handleOpen} />
             </main>
         )
 
     return (
         <main className='relative flex h-screen w-screen select-none flex-col bg-viewport'>
             {!isFullscreen && <TitleBar onOpenFile={pickAndOpen} />}
-            <div className='flex min-h-0 flex-1'>
-                <div className='relative min-w-0 flex-1' onContextMenu={openContextMenu}>
+            {!isFullscreen && <WorkspaceTabs />}
+            {editorActive && !isFullscreen && <EditorOptions disabled={editorDisabled} />}
+            <div id='workspace-content' role='tabpanel' aria-labelledby={`workspace-${workspace}`} className='flex min-h-0 flex-1'>
+                {editorActive && !isFullscreen && <EditorToolbar disabled={editorDisabled} />}
+                <div className='relative min-w-0 flex-1' onContextMenu={editorActive ? (event) => event.preventDefault() : openContextMenu}>
                     <Viewport />
                     {quickBarMounted && <QuickBar />}
                     {scanning && (
@@ -832,7 +903,7 @@ export const App: FC = () => {
                             {total > 0 ? t('app.scanningTotal', { count: entryCount, total }) : t('app.scanning', { count: entryCount })}
                         </div>
                     )}
-                    {selectionCount > 1 && (
+                    {selectionCount > 1 && !editorActive && (
                         <button
                             type='button'
                             onClick={() => useEditClipboard.getState().syncSelection(usePlaylist.getState().selection)}
@@ -841,8 +912,8 @@ export const App: FC = () => {
                         </button>
                     )}
                     <PerfOverlay visible={perfVisible} />
-                    {gridActive && <GridView />}
-                    {rightPanel === 'none' && !isFullscreen && (
+                    {gridActive && !editorActive && <GridView />}
+                    {rightPanel === 'none' && !isFullscreen && !editorActive && (
                         <button
                             type='button'
                             onClick={() => useLayout.getState().reopenRightPanel()}
@@ -855,7 +926,8 @@ export const App: FC = () => {
                         </button>
                     )}
                 </div>
-                {rightPanel !== 'none' && !isFullscreen && (
+                {editorActive && !isFullscreen && <EditorPanel disabled={editorDisabled} />}
+                {rightPanel !== 'none' && !isFullscreen && !editorActive && (
                     <div className='flex h-full w-80 shrink-0 flex-col'>
                         <div className='flex shrink-0 border-b border-l border-neutral-800 bg-neutral-900 text-[11px]'>
                             {PANEL_TABS.map((id) => (
@@ -877,7 +949,7 @@ export const App: FC = () => {
                     </div>
                 )}
             </div>
-            {filmstripVisible && !isFullscreen && (
+            {filmstripVisible && !isFullscreen && !editorActive && (
                 <div className='flex shrink-0 flex-col'>
                     <FilmstripResizer />
                     <FilterBar />

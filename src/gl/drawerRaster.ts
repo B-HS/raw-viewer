@@ -2,6 +2,7 @@ import type { DrawerAdjust } from '../types/DrawerAdjust'
 import type { DrawerBlendMode } from '../types/DrawerBlendMode'
 import type { DrawerLayer } from '../types/DrawerLayer'
 import type { DrawerObject } from '../types/DrawerObject'
+import type { DrawerTransform } from '../types/DrawerTransform'
 import type { DrawerState } from '../types/DrawerState'
 
 const DRAWER_RASTER_MAX_EDGE = 4096
@@ -17,6 +18,9 @@ const STAMP_SPACING_FACTOR = 0.35
 const BLUR_DOWNSCALE = 8
 
 const RGBA_CHANNELS = 4
+const PERCENT = 100
+const HALF_TURN_DEGREES = 180
+const CENTER_DIVISOR = 2
 
 const HUE_LUMA: [number, number, number] = [0.213, 0.715, 0.072]
 
@@ -218,7 +222,7 @@ const stampAlongPath = (points: Vec2[], radiusPx: number, width: number, height:
 
 type PhotoCanvases = { photo: HTMLCanvasElement; blurred: HTMLCanvasElement }
 
-const buildPhotoCanvases = (photo: DrawerPhoto, width: number, height: number): PhotoCanvases | null => {
+const buildPhotoCanvases = (photo: DrawerPhoto, width: number, height: number, transform: DrawerTransform | null = null): PhotoCanvases | null => {
     const source = createCanvas(photo.width, photo.height)
     const sourceCtx = source.getContext('2d')
     if (!sourceCtx) return null
@@ -226,6 +230,15 @@ const buildPhotoCanvases = (photo: DrawerPhoto, width: number, height: number): 
     const scaled = createCanvas(width, height)
     const scaledCtx = scaled.getContext('2d')
     if (!scaledCtx) return null
+    if (transform) {
+        scaledCtx.translate(width / CENTER_DIVISOR, height / CENTER_DIVISOR)
+        scaledCtx.scale(PERCENT / transform.scale, PERCENT / transform.scale)
+        scaledCtx.rotate((-transform.rotate * Math.PI) / HALF_TURN_DEGREES)
+        scaledCtx.translate(
+            -width / CENTER_DIVISOR - (transform.offsetX * width) / PERCENT,
+            -height / CENTER_DIVISOR - (transform.offsetY * height) / PERCENT,
+        )
+    }
     scaledCtx.drawImage(source, 0, 0, width, height)
     const small = createCanvas(Math.max(1, Math.round(width / BLUR_DOWNSCALE)), Math.max(1, Math.round(height / BLUR_DOWNSCALE)))
     const smallCtx = small.getContext('2d')
@@ -242,7 +255,7 @@ const buildPhotoCanvases = (photo: DrawerPhoto, width: number, height: number): 
 const drawStroke = (ctx: CanvasRenderingContext2D, object: Extract<DrawerObject, { kind: 'stroke' }>, width: number, height: number) => {
     if (object.points.length === 0) return
     ctx.globalCompositeOperation = object.tool === 'eraser' ? 'destination-out' : 'source-over'
-    ctx.globalAlpha = object.tool === 'eraser' ? 1 : object.opacity / 100
+    ctx.globalAlpha = object.opacity / 100
     const lineWidth = drawerSizePx(object.size, width, height)
     const startX = object.points[0][0] * width
     const startY = object.points[0][1] * height
@@ -372,36 +385,32 @@ const drawObject = (ctx: CanvasRenderingContext2D, object: DrawerObject, width: 
     if (clipped && object.kind !== 'fill') ctx.restore()
 }
 
-type LayerCacheEntry = { width: number; height: number; photo: DrawerPhoto | null; canvas: HTMLCanvasElement }
+type LayerCacheEntry = { width: number; height: number; photo: DrawerPhoto | null; canvas: HTMLCanvasElement; transform: DrawerTransform | null }
 
 const layerContentCache = new WeakMap<DrawerLayer['objects'], LayerCacheEntry>()
 
 const layerAdjustedCache = new WeakMap<DrawerLayer, LayerCacheEntry>()
 
-const rasterizeLayerContent = (
-    layer: DrawerLayer,
-    width: number,
-    height: number,
-    photo: DrawerPhoto | null,
-    photoCanvases: () => PhotoCanvases | null,
-) => {
+const rasterizeLayerContent = (layer: DrawerLayer, width: number, height: number, photo: DrawerPhoto | null) => {
     const cached = layerContentCache.get(layer.objects)
-    if (cached && cached.width === width && cached.height === height && cached.photo === photo) return cached.canvas
+    if (cached && cached.width === width && cached.height === height && cached.photo === photo && cached.transform === layer.transform)
+        return cached.canvas
     const canvas = createCanvas(width, height)
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
     const needsPhoto = layer.objects.some((object) => object.kind === 'clone' || object.kind === 'blur')
-    const resolvedPhoto = needsPhoto ? photoCanvases() : null
+    const resolvedPhoto = needsPhoto && photo ? buildPhotoCanvases(photo, width, height, layer.transform) : null
     for (const object of layer.objects) drawObject(ctx, object, width, height, resolvedPhoto)
-    layerContentCache.set(layer.objects, { width, height, photo, canvas })
+    layerContentCache.set(layer.objects, { width, height, photo, canvas, transform: layer.transform })
     return canvas
 }
 
-const rasterizeLayer = (layer: DrawerLayer, width: number, height: number, photo: DrawerPhoto | null, photoCanvases: () => PhotoCanvases | null) => {
-    const content = rasterizeLayerContent(layer, width, height, photo, photoCanvases)
+const rasterizeLayer = (layer: DrawerLayer, width: number, height: number, photo: DrawerPhoto | null) => {
+    const content = rasterizeLayerContent(layer, width, height, photo)
     if (!content || isAdjustNeutral(layer.adjust)) return content
     const cached = layerAdjustedCache.get(layer)
-    if (cached && cached.width === width && cached.height === height && cached.photo === photo) return cached.canvas
+    if (cached && cached.width === width && cached.height === height && cached.photo === photo && cached.transform === layer.transform)
+        return cached.canvas
     const canvas = createCanvas(width, height)
     const ctx = canvas.getContext('2d')
     if (!ctx) return content
@@ -409,7 +418,7 @@ const rasterizeLayer = (layer: DrawerLayer, width: number, height: number, photo
     const image = ctx.getImageData(0, 0, width, height)
     if (layer.adjust) adjustPixels(image.data, layer.adjust)
     ctx.putImageData(image, 0, 0)
-    layerAdjustedCache.set(layer, { width, height, photo, canvas })
+    layerAdjustedCache.set(layer, { width, height, photo, canvas, transform: layer.transform })
     return canvas
 }
 
@@ -433,15 +442,9 @@ export const rasterizeDrawer = (drawer: DrawerState, width: number, height: numb
     const canvas = createCanvas(width, height)
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    let photoCache: PhotoCanvases | null = null
-    const photoCanvases = () => {
-        if (!photo) return null
-        photoCache = photoCache ?? buildPhotoCanvases(photo, width, height)
-        return photoCache
-    }
     for (const layer of drawer.layers) {
         if (!layer.visible || layer.objects.length === 0) continue
-        const layerCanvas = rasterizeLayer(layer, width, height, photo, photoCanvases)
+        const layerCanvas = rasterizeLayer(layer, width, height, photo)
         if (!layerCanvas) continue
         ctx.save()
         ctx.globalAlpha = layer.opacity / 100
