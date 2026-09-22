@@ -11,6 +11,8 @@
 | `PATH="$HOME/.cargo/bin:$PATH" LIBOMP_PREFIX=/opt/homebrew/opt/libomp cargo test` (`src-tauri`) | 338건 통과, 실패 0. library ignore 3건과 binary별 ignore 각 1건은 기존 설정대로 미실행 |
 | en/ko/ja 키를 재귀적으로 추출·정렬하여 비교 | 언어별 768키, 구조 차이 0; 소스의 정적 `t('…')` 참조 누락 0 |
 | `git diff --check` | 공백 오류 없음 |
+| v0.6.0 Release 실행 `35701935692` | 태그 버전 검사·프론트 54건·Rust release 338건·제품 빌드·번들 자기완결성 검사 성공 |
+| 다운로드한 draft 자산 검증 | 자산 5종 SHA-256과 GitHub digest 일치, DMG checksum 일치, latest.json 버전·URL·sig 일치, 앱 버전 0.6.0·codesign·stapler 검증 성공 |
 
 수정 전 실패를 직접 확인한 회귀: coalesced 배열 patch redo, 서로 다른 필드의 undo, 저장 응답 대기 중 추가 변경 flush. 수정 후 관련 테스트가 성공했습니다. 동일 코드·환경에서 성공한 전체 검사는 변경이 없는 범위에 재사용했습니다.
 

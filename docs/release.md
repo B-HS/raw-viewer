@@ -2,12 +2,12 @@
 
 > 2026-07-16 도입, 2026-07-18 현행화. GitHub Actions 기반, macOS Apple Silicon 단일 타깃. 저장소는 **공개**(2026-07-17 전환, MIT).
 
-## 현재 상태 스냅샷 (2026-07-18)
+## 현재 상태 스냅샷 (2026-09-22)
 
-- 최신 태그: **v0.5.5** (문서 스캔·드로잉 레이어·회전 수정, 0.5.4는 사용자 지시로 건너뜀) — **draft 생성·영문 노트 작성 완료(2026-08-17), 사용자 publish 대기**. 워밍 적중 실측: 워밍 3m14s, 릴리스 전체 약 8분 40초. 최신 published: **v0.5.3**(2026-07-18, 첫 published 릴리스). 이후 릴리스도 draft 생성 → 사용자가 직접 publish. v0.1.1~v0.5.2 draft는 의도적 유지.
+- 최신 태그: **v0.6.0** (`e2b9522`, 독립 레이어 편집·안정성 개선) — **draft 생성·자산 5종·서명·공증·영문 노트 검증 완료, 사용자 publish 대기**. 워밍 7m20s 성공 후 태그를 푸시했습니다. [진행·검증·브랜치 영향도 기록](history/2026-09-22-v0.6.0-release.md). 최신 published: **v0.5.5**(2026-08-16, GitHub API 확인). 이후 릴리스도 draft 생성 → 사용자가 직접 publish. 이전 draft는 유지합니다.
 - **파일명 전환(v0.5.3부터)**: productName="Raw Viewer" — 번들은 `Raw Viewer.app`, DMG 로컬명은 `Raw Viewer_<ver>_aarch64.dmg`. GitHub 자산명은 공백을 점으로 치환하므로 워크플로가 **업로드 전에 선제 리네임**(`Raw.Viewer_*`)해 latest.json URL·SHA256SUMS와 서빙 자산명을 일치시킨다(v0.5.3 draft에서 URL 일치 실검증 완료). 자기완결성 가드는 `.app` 글롭(+부재 시 실패)으로 교정. 기설치본의 구 `raw-viewer.app`은 새 DMG 설치 시 수동 삭제 필요.
 - v0.3.1부터 updater 자산(`latest.json`·`.app.tar.gz`·`.sig`) 포함 — 서명 시크릿 등록 완료 상태.
-- 자동 업데이트는 **published 릴리스 중 최신**(`releases/latest`)을 본다 — draft만 있으면 업데이트 확인이 실패(무해)하므로, 배포하려면 최신 릴리스를 publish해야 한다. **현재 v0.5.3 publish로 latest.json이 정상 서빙 중(자동 업데이트 활성).**
+- 자동 업데이트는 **published 릴리스 중 최신**(`releases/latest`)을 봅니다. v0.6.0은 draft이므로 사용자 Publish 전에는 자동 업데이트로 제공되지 않습니다. 현재 최신 published는 v0.5.5입니다.
 - 등록된 시크릿 (총 6): `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `TAURI_SIGNING_PRIVATE_KEY`.
 
 ## 구조

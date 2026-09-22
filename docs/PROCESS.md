@@ -51,7 +51,7 @@
 ## 현재 상태 스냅샷 (2026-07-18 심야 기준)
 
 - **저장소**: 공개(public), MIT. dev=prod 동기화.
-- **최신 릴리스**: **v0.5.5 draft**(2026-08-17 생성, "Raw Viewer 0.5.5" — 스캔·드로잉·회전 수정, 영문 노트 작성 완료, **사용자 publish 대기**. 0.5.4는 사용자 지시로 건너뜀). 최신 published는 **v0.5.3**(2026-07-18, 첫 공개 릴리스 — 자동 업데이트 활성, v0.5.2→0.5.3 왕복 실검증 pass). 자산명은 점 표기(`Raw.Viewer_*`). v0.1.1~v0.5.2 draft는 의도적 유지.
+- **최신 릴리스**: **v0.6.0 draft**(2026-09-22, "Raw Viewer 0.6.0" — 독립 레이어 편집·안정성 개선, 자산 5종·서명·공증·영문 노트 검증 완료, **사용자 publish 대기**). 최신 published는 **v0.5.5**(2026-08-16T16:01:39Z, GitHub API 확인). 자산명은 점 표기(`Raw.Viewer_*`). 이전 draft는 유지합니다.
 - **README.md 작성 완료**(영문·히어로 스크린샷 docs/assets/screenshot.jpg·기능 요약·설치·단축키) — prod 반영.
 - **시크릿**: Apple 서명·공증 5종 + `TAURI_SIGNING_PRIVATE_KEY` 등록 완료. updater 개인키 = `~/environment/raw-viewer-updater.key`(재생성 금지·머신 외부 백업 권장).
 - **테스트**: Rust 324건 + 프론트 bun test 17건 + E2E 디코드 스모크 12건 + WebGPU 패리티 하니스 18벡터(parity.html, headless Chrome). eslint 에러 0·경고 0.
@@ -62,15 +62,15 @@
 
 ## 남은 작업
 
-### 진행 중 — 레이어 편집 변경 릴리스 마무리 (2026-09-22)
+### 완료 — 레이어 편집 변경 릴리스 마무리 (2026-09-22)
 
 사용자 목표: 수정 후 commit·push·merge·draft 생성까지 완료합니다. 기존 요청대로 서브에이전트 없이 직접 수행합니다.
 
 - [x] a. 원격 dev/prod 및 태그 대조. GitHub API에서 v0.5.5는 이미 published로 확인했습니다. 독립 편집 기능의 minor 릴리스 v0.6.0을 선택했습니다. 기존 타입·린트·빌드·프론트/Rust 검증 근거를 재사용합니다.
 - [x] b. 버전 3파일과 Cargo.lock 0.6.0 일치, `cargo check --offline` 성공. 버전 커밋 `5e26a13`을 origin/dev에 푸시했습니다.
-- [ ] c. dev를 prod에 병합·푸시하고 해당 커밋의 캐시 워밍 성공을 확인합니다. 자동 승인 검토가 production 브랜치 변경을 거부하여 명시 승인 대기 중입니다. 명령 실행 전 거부되어 prod 변경 없음.
-- [ ] d. 새 버전 태그를 푸시하고 릴리스 작업 완료·draft 자산·서명·업데이터 메타데이터를 검증합니다.
-- [ ] e. 결과를 문서에 기록하고 dev/prod 원격 상태와 draft를 대조하여 완료합니다.
+- [x] c. 사용자가 병합·태그·draft 진행을 명시 승인했습니다. dev를 prod에 병합·푸시 완료(`e2b9522`), 파일 diff 0 확인. 캐시 워밍 [35701172363](https://github.com/B-HS/raw-viewer/actions/runs/35701172363) 성공(7m20s).
+- [x] d. `v0.6.0` 태그를 병합 커밋 `e2b9522`에 푸시했습니다. [Release 35701935692](https://github.com/B-HS/raw-viewer/actions/runs/35701935692) 성공. 프론트 54건·Rust release 338건 성공, draft 자산 5종·체크섬·앱 서명·공증·업데이터 버전/URL/서명 정합 확인.
+- [x] e. [draft](https://github.com/B-HS/raw-viewer/releases/tag/untagged-6b84babf7cd55e7ed7aa) 노트 반영 및 `draft=true`, `published_at=null` 확인. dev가 뒤처진 32개는 모두 병합 커밋이며 파일 차이·누락 일반 커밋 0. fast-forward로 dev 이력 동기화 후 원격 ahead/behind 0/0 확인했습니다. 결과와 영향도를 아래 이력에 기록했습니다.
 
 절차: [release.md](release.md). draft 상태 유지, Publish는 사용자 수행입니다.
 
