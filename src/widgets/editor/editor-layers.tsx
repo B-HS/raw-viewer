@@ -2,6 +2,8 @@ import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
     addDrawerLayer,
+    duplicateDrawerLayer,
+    renameDrawerLayer,
     DEFAULT_DRAWER_ADJUST,
     DEFAULT_DRAWER_TRANSFORM,
     moveDrawerLayer,
@@ -14,32 +16,20 @@ import {
 } from '../../store/drawer'
 import { useEditStore } from '../../store/editStore'
 import { useUiStore } from '../../store/uiStore'
-import type { DrawerToolId } from '../../store/uiStore'
 import type { DrawerAdjust } from '../../types/DrawerAdjust'
 import type { DrawerBlendMode } from '../../types/DrawerBlendMode'
 import type { DrawerTransform } from '../../types/DrawerTransform'
-import { Section } from './Section'
-import { Slider } from './Slider'
-
-const TOOLS: DrawerToolId[] = ['brush', 'pencil', 'eraser', 'fill', 'line', 'arrow', 'rect', 'ellipse', 'text', 'move', 'lasso', 'clone', 'blur']
+import { EDITOR_LAYER_NAME_MAX } from '../../shared/constants/editor'
+import { Slider } from '../../components/panels/Slider'
+import { LayerPreview } from './layer-preview'
 
 const BLEND_MODES: DrawerBlendMode[] = ['normal', 'multiply', 'screen', 'overlay']
 
-const SIZE_MIN = 0.2
-
-const SIZE_MAX = 20
-
-export const DrawerSection: FC = () => {
+export const EditorLayers: FC = () => {
     const { t } = useTranslation()
     const drawer = useEditStore((state) => state.state?.drawer)
     const hasState = useEditStore((state) => state.state !== null)
-    const drawerEditMode = useUiStore((state) => state.drawerEditMode)
-    const tool = useUiStore((state) => state.drawerTool)
-    const color = useUiStore((state) => state.drawerColor)
-    const size = useUiStore((state) => state.drawerSize)
-    const fill = useUiStore((state) => state.drawerFill)
     const activeLayerId = useUiStore((state) => state.drawerActiveLayerId)
-    const selection = useUiStore((state) => state.drawerSelection)
 
     if (!hasState) return null
 
@@ -80,57 +70,7 @@ export const DrawerSection: FC = () => {
         )
 
     return (
-        <Section id='drawer' title={t('panel.drawer.title')}>
-            <button
-                type='button'
-                onClick={() => useUiStore.getState().setDrawerEditMode(!drawerEditMode)}
-                className={`rounded py-1.5 text-xs font-medium ${drawerEditMode ? 'bg-neutral-200 text-neutral-900' : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'}`}>
-                {drawerEditMode ? t('panel.drawer.done') : t('panel.drawer.enter')}
-            </button>
-            <div className='grid grid-cols-4 gap-1'>
-                {TOOLS.map((id) => (
-                    <button
-                        key={id}
-                        type='button'
-                        onClick={() => useUiStore.getState().setDrawerTool(id)}
-                        className={`rounded px-1 py-1 text-[11px] ${tool === id ? 'bg-sky-500/30 text-sky-200' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}`}>
-                        {t(`panel.drawer.tool.${id}`)}
-                    </button>
-                ))}
-            </div>
-            {tool === 'clone' && <p className='text-[10px] text-neutral-500'>{t('panel.drawer.cloneHint')}</p>}
-            {selection && (
-                <button
-                    type='button'
-                    onClick={() => useUiStore.getState().setDrawerSelection(null)}
-                    className='rounded bg-neutral-800 py-1 text-[11px] text-sky-300 hover:bg-neutral-700'>
-                    {t('panel.drawer.clearSelection')}
-                </button>
-            )}
-            <div className='flex items-center gap-2'>
-                <input
-                    type='color'
-                    value={color}
-                    onChange={(event) => useUiStore.getState().setDrawerColor(event.target.value)}
-                    aria-label={t('panel.drawer.color')}
-                    className='h-6 w-8 cursor-pointer rounded bg-neutral-800'
-                />
-                <input
-                    type='range'
-                    min={SIZE_MIN}
-                    max={SIZE_MAX}
-                    step={0.1}
-                    value={size}
-                    onChange={(event) => useUiStore.getState().setDrawerSize(Number(event.target.value))}
-                    aria-label={t('panel.drawer.size')}
-                    className='flex-1'
-                />
-                <span className='w-9 text-right text-[10px] tabular-nums text-neutral-400'>{size.toFixed(1)}%</span>
-                <label className='flex items-center gap-1 text-xs text-neutral-300'>
-                    <input type='checkbox' checked={fill} onChange={(event) => useUiStore.getState().setDrawerFill(event.target.checked)} />
-                    {t('panel.drawer.fill')}
-                </label>
-            </div>
+        <div className='flex flex-col gap-3 p-3'>
             <div className='flex items-center justify-between'>
                 <span className='text-[10px] font-semibold uppercase tracking-wide text-neutral-500'>{t('panel.drawer.layers')}</span>
                 <button
@@ -140,6 +80,11 @@ export const DrawerSection: FC = () => {
                     {t('panel.drawer.addLayer')}
                 </button>
             </div>
+            {layers.length === 0 && (
+                <p className='rounded border border-dashed border-neutral-700 px-4 py-6 text-center text-xs leading-relaxed text-neutral-500'>
+                    {t('editor.emptyLayers')}
+                </p>
+            )}
             {topFirstLayers.map((layer) => (
                 <div
                     key={layer.id}
@@ -152,9 +97,11 @@ export const DrawerSection: FC = () => {
                     />
                     <button
                         type='button'
+                        aria-pressed={activeLayer?.id === layer.id}
                         onClick={() => useUiStore.getState().setDrawerActiveLayer(layer.id)}
-                        className='flex-1 truncate text-left text-xs text-neutral-200'>
-                        {layer.name}
+                        className='flex min-w-0 flex-1 items-center gap-2 text-left text-xs text-neutral-200'>
+                        <LayerPreview layer={layer} />
+                        <span className='truncate'>{layer.name}</span>
                     </button>
                     <input
                         type='range'
@@ -164,23 +111,29 @@ export const DrawerSection: FC = () => {
                         value={layer.opacity}
                         onChange={(event) => setDrawerLayerOpacity(layer.id, Number(event.target.value))}
                         aria-label={t('panel.drawer.opacityAria', { name: layer.name })}
-                        className='w-14'
+                        className='w-10 accent-sky-400'
                     />
                     <button
                         type='button'
+                        disabled={layer.id === layers.at(-1)?.id}
                         onClick={() => moveDrawerLayer(layer.id, 1)}
                         title={t('panel.drawer.layerUpAria')}
                         aria-label={t('panel.drawer.layerUpAria')}
                         className='rounded px-1 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100'>
-                        ↑
+                        <svg width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='currentColor' aria-hidden='true'>
+                            <path d='m2 8 4-4 4 4' />
+                        </svg>
                     </button>
                     <button
                         type='button'
+                        disabled={layer.id === layers[0]?.id}
                         onClick={() => moveDrawerLayer(layer.id, -1)}
                         title={t('panel.drawer.layerDownAria')}
                         aria-label={t('panel.drawer.layerDownAria')}
                         className='rounded px-1 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100'>
-                        ↓
+                        <svg width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='currentColor' aria-hidden='true'>
+                            <path d='m2 4 4 4 4-4' />
+                        </svg>
                     </button>
                     <button
                         type='button'
@@ -188,12 +141,40 @@ export const DrawerSection: FC = () => {
                         title={t('panel.drawer.layerDeleteAria')}
                         aria-label={t('panel.drawer.layerDeleteAria')}
                         className='rounded px-1 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-red-300'>
-                        ✕
+                        <svg width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='currentColor' aria-hidden='true'>
+                            <path d='m3 3 6 6M9 3 3 9' />
+                        </svg>
                     </button>
                 </div>
             ))}
+            <div className='flex items-center gap-2 rounded border border-neutral-800 bg-neutral-950/50 px-3 py-3 text-xs text-neutral-500'>
+                <svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' aria-hidden='true'>
+                    <rect x='3' y='7' width='10' height='7' rx='1' />
+                    <path d='M5 7V4a3 3 0 0 1 6 0v3' />
+                </svg>
+                {t('editor.original')}
+            </div>
             {activeLayer && (
                 <>
+                    <label className='flex flex-col gap-1 text-[11px] text-neutral-500'>
+                        {t('editor.layerName')}
+                        <input
+                            key={activeLayer.id + activeLayer.name}
+                            defaultValue={activeLayer.name}
+                            maxLength={EDITOR_LAYER_NAME_MAX}
+                            onBlur={(event) => renameDrawerLayer(activeLayer.id, event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') event.currentTarget.blur()
+                            }}
+                            className='rounded border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs text-neutral-100 outline-none focus:border-sky-400'
+                        />
+                    </label>
+                    <button
+                        type='button'
+                        onClick={() => duplicateDrawerLayer(activeLayer.id)}
+                        className='rounded border border-neutral-700 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800'>
+                        {t('editor.duplicateLayer')}
+                    </button>
                     <div className='flex items-center gap-2'>
                         <span className='text-xs text-neutral-400'>{t('panel.drawer.blend')}</span>
                         <select
@@ -223,6 +204,6 @@ export const DrawerSection: FC = () => {
                     {adjustSlider('hue', t('panel.drawer.adjustHue'), -180, 180)}
                 </>
             )}
-        </Section>
+        </div>
     )
 }

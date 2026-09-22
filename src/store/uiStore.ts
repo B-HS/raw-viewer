@@ -12,7 +12,7 @@ const CROP_OVERLAY_ORDER: CropOverlayStyle[] = ['thirds', 'golden', 'diag', 'non
 export type ZoomPreset = 'fit' | 'actual'
 
 export type DrawerToolId =
-    'brush' | 'pencil' | 'eraser' | 'line' | 'arrow' | 'rect' | 'ellipse' | 'text' | 'fill' | 'move' | 'lasso' | 'clone' | 'blur'
+    'hand' | 'brush' | 'pencil' | 'eraser' | 'line' | 'arrow' | 'rect' | 'ellipse' | 'text' | 'fill' | 'move' | 'lasso' | 'clone' | 'blur'
 
 export type RenderCaps = { lowPrecision: boolean; displaySpace: string }
 
@@ -39,6 +39,9 @@ type UiState = {
     sideBySide: boolean
     cropEditMode: boolean
     scanEditMode: boolean
+    workspace: 'photo' | 'editor'
+    drawerPanHeld: boolean
+    drawerOpacity: number
     drawerEditMode: boolean
     drawerTool: DrawerToolId
     drawerColor: string
@@ -70,6 +73,10 @@ type UiState = {
     exitCompare: () => void
     setCropEditMode: (on: boolean) => void
     setScanEditMode: (on: boolean) => void
+    setWorkspace: (workspace: 'photo' | 'editor') => void
+    setDrawerPanHeld: (on: boolean) => void
+    setDrawerOpacity: (opacity: number) => void
+    resetDrawerSession: () => void
     setDrawerEditMode: (on: boolean) => void
     setDrawerTool: (tool: DrawerToolId) => void
     setDrawerColor: (color: string) => void
@@ -100,6 +107,9 @@ export const useUiStore = create<UiState>((set, get) => ({
     sideBySide: false,
     cropEditMode: false,
     scanEditMode: false,
+    workspace: 'photo',
+    drawerPanHeld: false,
+    drawerOpacity: 100,
     drawerEditMode: false,
     drawerTool: 'brush',
     drawerColor: '#ff3b30',
@@ -189,12 +199,29 @@ export const useUiStore = create<UiState>((set, get) => ({
             if (on && state.cropEditMode) state.engine?.setCropEditMode(false)
             return { scanEditMode: on, cropEditMode: on ? false : state.cropEditMode, drawerEditMode: on ? false : state.drawerEditMode }
         }),
+    setWorkspace: (workspace) => {
+        get().setDrawerEditMode(workspace === 'editor')
+        set({ workspace, drawerPanHeld: false, activeSection: workspace === 'editor' ? 'drawer' : 'basic', slideshowActive: false })
+    },
+    setDrawerPanHeld: (on) => set({ drawerPanHeld: on }),
+    setDrawerOpacity: (opacity) => set({ drawerOpacity: opacity }),
+    resetDrawerSession: () => set({ drawerActiveLayerId: null, drawerSelection: null, drawerCloneSource: null, drawerPanHeld: false }),
     setDrawerEditMode: (on) =>
         set((state) => {
             if (!on) return { drawerEditMode: false, drawerSelection: null, drawerCloneSource: null }
             if (state.cropEditMode) state.engine?.setCropEditMode(false)
             if (state.scanEditMode) state.engine?.setScanEditMode(false)
-            return { drawerEditMode: true, cropEditMode: false, scanEditMode: false }
+            state.engine?.setCompare(null)
+            state.engine?.setSideBySide(false)
+            return {
+                drawerEditMode: true,
+                cropEditMode: false,
+                scanEditMode: false,
+                compare: null,
+                sideBySide: false,
+                eyedropper: false,
+                tatActive: false,
+            }
         }),
     setDrawerTool: (tool) => set({ drawerTool: tool, drawerCloneSource: null }),
     setDrawerColor: (color) => set({ drawerColor: color }),

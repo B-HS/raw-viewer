@@ -4,6 +4,7 @@ import { i18n } from '../i18n/i18n'
 import { cloneDefaultSection, DEFAULT_EDIT_STATE, isDefault } from './editDefaults'
 import { connectHistoryTarget, useHistoryStore } from './historyStore'
 import { useToast } from './toast'
+import { usePlaylist } from './playlist'
 import { useUiStore } from './uiStore'
 import { getEditState, isConflictError, resetEditState, setEditStateCommand } from '../ipc/commands'
 import type { EditSection } from './editDefaults'
@@ -25,6 +26,7 @@ type EditStoreState = {
     state: EditState | null
     version: number
     dirtyFromDefault: boolean
+    clear: () => void
     loadForImage: (imageId: string, isRaw: boolean) => Promise<void>
     edit: (recipe: (draft: EditState) => void, meta: { label: string; coalesceKey?: string }) => void
     applyPatches: (patches: Patch[]) => void
@@ -62,25 +64,41 @@ export const useEditStore = create<EditStoreState>((set, get) => {
                 try {
                     const envelope = await getEditState(imageId)
                     if (get().imageId === imageId) {
+                        queued = false
+                        useHistoryStore.getState().clear(imageId)
                         set({ state: envelope.state, version: envelope.editVersion, dirtyFromDefault: !envelope.isDefault })
                         pushEngine(envelope.state)
+                        useToast.getState().show(i18n.t('editor.saveFailed'))
+                        return
                     }
                 } catch {}
             }
+            if (get().imageId === imageId) queued = true
+            useToast.getState().show(i18n.t('editor.saveFailed'))
+            throw error
         }
     }
 
     const enqueueSave = () => {
-        chain = chain.then(doSave)
+        const previous = chain
+        const next = async () => {
+            try {
+                await previous
+            } catch {}
+            await doSave()
+        }
+        chain = next()
         return chain
     }
 
     const scheduleSave = () => {
         queued = true
         if (saveTimer) clearTimeout(saveTimer)
-        saveTimer = setTimeout(() => {
+        saveTimer = setTimeout(async () => {
             saveTimer = null
-            enqueueSave()
+            try {
+                await enqueueSave()
+            } catch {}
         }, SAVE_DEBOUNCE_MS)
     }
 
@@ -104,17 +122,28 @@ export const useEditStore = create<EditStoreState>((set, get) => {
         state: null,
         version: 0,
         dirtyFromDefault: false,
+        clear: () => {
+            loadToken++
+            set({ imageId: null, state: null, version: 0, dirtyFromDefault: false })
+            pushEngine(null)
+            useUiStore.getState().resetDrawerSession()
+        },
         loadForImage: async (imageId, isRaw) => {
             const token = ++loadToken
+            set({ imageId: null, state: null, dirtyFromDefault: false })
+            pushEngine(null)
+            useUiStore.getState().resetDrawerSession()
             try {
                 const envelope = await getEditState(imageId)
-                if (token !== loadToken) return
+                const playlist = usePlaylist.getState()
+                if (token !== loadToken || playlist.entries[playlist.currentIndex]?.imageId !== imageId) return
                 set({ imageId, isRaw, state: envelope.state, version: envelope.editVersion, dirtyFromDefault: !envelope.isDefault })
                 pushEngine(envelope.state)
             } catch {
-                if (token !== loadToken) return
-                set({ imageId, isRaw, state: DEFAULT_EDIT_STATE, version: 0, dirtyFromDefault: false })
-                pushEngine(DEFAULT_EDIT_STATE)
+                const playlist = usePlaylist.getState()
+                if (token !== loadToken || playlist.entries[playlist.currentIndex]?.imageId !== imageId) return
+                set({ imageId, isRaw, state: null, version: 0, dirtyFromDefault: false })
+                useToast.getState().show(i18n.t('editor.loadFailed'))
             }
         },
         edit: (recipe, meta) => {
@@ -147,6 +176,7 @@ export const useEditStore = create<EditStoreState>((set, get) => {
                 saveTimer = null
             }
             try {
+                await chain
                 const envelope = await resetEditState(imageId)
                 if (get().imageId !== imageId) return
                 commitReplacement(imageId, get().state ?? state, envelope.state, i18n.t('history.resetAll'), {
@@ -182,11 +212,10 @@ export const useEditStore = create<EditStoreState>((set, get) => {
                 clearTimeout(saveTimer)
                 saveTimer = null
             }
-            if (queued) {
-                await enqueueSave()
-                return
-            }
-            await chain
+            do {
+                if (queued) await enqueueSave()
+                else await chain
+            } while (queued)
         },
     }
 })

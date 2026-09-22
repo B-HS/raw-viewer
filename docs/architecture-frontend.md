@@ -6,6 +6,14 @@
 
 진입: `src/main.tsx` — `useSettings.getState().hydrate()`를 await 없이 호출한 뒤 `I18nextProvider`로 `App`을 렌더 (main.tsx:9-20). FSD가 아니라 역할별 평면 디렉토리 구조다.
 
+## 2026-09-22 추가: 독립 레이어 편집 작업공간
+
+`App`이 `uiStore.workspace`에 따라 사진 보정/레이어 편집 탭을 전환합니다. 새 UI는 `src/widgets/editor/`의 workspace-tabs, editor-toolbar, editor-options, editor-panel, editor-layers, layer-preview이며 `shared/constants/editor.ts`를 공유합니다. 기존 오른쪽 DrawerSection은 editor-layers로 이동했습니다. Viewport는 두 탭에서 동일하게 유지하며, 편집 탭에서만 왼쪽 도구와 오른쪽 레이어/히스토리·속성을 표시합니다.
+
+도구와 레이어 변경은 기존 `store/drawer.ts` → `editStore` → 히스토리·자동 저장·렌더 계약을 재사용합니다. 새 `actions/editor-shortcuts.ts`가 편집 탭의 키를 우선 처리하고, `gl/drawer-coordinates.ts`가 레이어 변형의 역변환을 제공합니다. 이미지별 로드 토큰과 현재 imageId를 검증하며 저장 flush는 대기 중 추가 변경도 배출합니다. 새 UI는 기존 평면 디렉토리와 상대 경로로 연결하는 점진적 구조입니다.
+
+구현 범위·검증·21개 버그 근거는 [작업 이력](history/2026-09-22-editor-workspace.md)을 참조합니다. 아래 기존 장들의 과거 라인 번호와 드로잉 패널 설명은 이 추가 사항을 우선 적용합니다.
+
 ---
 
 ## 1. 디렉토리 맵

@@ -26,13 +26,13 @@ const cursorPoint = (event: { clientX: number; clientY: number }, canvas: HTMLCa
     return { x: (event.clientX - rect.left) * dpr - canvas.width / 2, y: canvas.height / 2 - (event.clientY - rect.top) * dpr }
 }
 
-export const useRenderEngine = () => {
+export const useRenderEngine = (enabled: boolean) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const renderBackend = useSettings((state) => state.renderBackend)
 
     useEffect(() => {
         const canvas = canvasRef.current
-        if (!canvas) return
+        if (!canvas || !enabled) return
         let initDisposed = false
         let cleanup: (() => void) | null = null
 
@@ -196,9 +196,11 @@ export const useRenderEngine = () => {
 
             const onPointerDown = (event: PointerEvent) => {
                 if (event.button !== 0) return
-                const pin = event.shiftKey && !spacePressed
-                drag = { x: event.clientX, y: event.clientY, panning: spacePressed, moved: false, pin }
-                if (spacePressed || pin) canvas.setPointerCapture(event.pointerId)
+                const ui = useUiStore.getState()
+                const panning = spacePressed || (ui.workspace === 'editor' && ui.drawerTool === 'hand')
+                const pin = event.shiftKey && !panning
+                drag = { x: event.clientX, y: event.clientY, panning, moved: false, pin }
+                if (panning || pin) canvas.setPointerCapture(event.pointerId)
             }
 
             const onPointerMove = (event: PointerEvent) => {
@@ -255,6 +257,7 @@ export const useRenderEngine = () => {
                 if (isEditableTarget(document.activeElement)) return
                 if (event.code === KEYMAP.pan.modifier) {
                     spacePressed = true
+                    useUiStore.getState().setDrawerPanHeld(true)
                     event.preventDefault()
                     return
                 }
@@ -287,7 +290,16 @@ export const useRenderEngine = () => {
             }
 
             const onKeyUp = (event: KeyboardEvent) => {
-                if (event.code === KEYMAP.pan.modifier) spacePressed = false
+                if (event.code === KEYMAP.pan.modifier) {
+                    spacePressed = false
+                    useUiStore.getState().setDrawerPanHeld(false)
+                }
+            }
+
+            const onWindowBlur = () => {
+                spacePressed = false
+                drag = null
+                useUiStore.getState().setDrawerPanHeld(false)
             }
 
             const onContextLost = (event: Event) => event.preventDefault()
@@ -305,7 +317,8 @@ export const useRenderEngine = () => {
                 scheduleRender()
             }
 
-            canvas.addEventListener('wheel', onWheel, { passive: false })
+            const wheelTarget = canvas.parentElement ?? canvas
+            wheelTarget.addEventListener('wheel', onWheel, { passive: false })
             canvas.addEventListener('pointerdown', onPointerDown)
             canvas.addEventListener('pointermove', onPointerMove)
             canvas.addEventListener('pointerup', onPointerUp)
@@ -314,6 +327,7 @@ export const useRenderEngine = () => {
             canvas.addEventListener('webglcontextrestored', onContextRestored)
             window.addEventListener('keydown', onKeyDown)
             window.addEventListener('keyup', onKeyUp)
+            window.addEventListener('blur', onWindowBlur)
 
             const unsubZoom = onZoomCommand((command) => {
                 const metrics = renderer.getMetrics()
@@ -375,7 +389,7 @@ export const useRenderEngine = () => {
                 unsubHistogram()
                 unsubMonitor()
                 for (const unlisten of eventUnlisteners) unlisten()
-                canvas.removeEventListener('wheel', onWheel)
+                wheelTarget.removeEventListener('wheel', onWheel)
                 canvas.removeEventListener('pointerdown', onPointerDown)
                 canvas.removeEventListener('pointermove', onPointerMove)
                 canvas.removeEventListener('pointerup', onPointerUp)
@@ -384,11 +398,13 @@ export const useRenderEngine = () => {
                 canvas.removeEventListener('webglcontextrestored', onContextRestored)
                 window.removeEventListener('keydown', onKeyDown)
                 window.removeEventListener('keyup', onKeyUp)
+                window.removeEventListener('blur', onWindowBlur)
                 if (raf != null) cancelAnimationFrame(raf)
                 raf = null
                 for (const controller of fetches.values()) controller.abort()
                 fetches.clear()
                 renderer.dispose()
+                useViewportProjection.getState().clear()
                 useUiStore.getState().setRenderCaps(null)
                 useUiStore.getState().attachEngine(null)
             }
@@ -399,7 +415,7 @@ export const useRenderEngine = () => {
             initDisposed = true
             cleanup?.()
         }
-    }, [renderBackend])
+    }, [renderBackend, enabled])
 
     return { canvasRef }
 }

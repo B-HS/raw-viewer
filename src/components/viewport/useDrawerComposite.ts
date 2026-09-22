@@ -2,14 +2,15 @@ import { useEffect } from 'react'
 import { drawerNeedsPhoto, renderDrawerCanvas } from '../../gl/drawerRaster'
 import { useEditStore } from '../../store/editStore'
 import { usePlaylist } from '../../store/playlist'
+import type { EditState } from '../../types/EditState'
 import type { EngineApi } from '../../gl/engineApi'
 
 export const useDrawerComposite = (engine: EngineApi | null) => {
     useEffect(() => {
         if (!engine) return
         let raf: number | null = null
-        let lastDrawer: unknown = null
-        let lastState: unknown = null
+        let lastDrawer: EditState['drawer'] = null
+        let lastState: EditState | null = null
         let lastLevelKey = ''
 
         const rasterize = () => {
@@ -17,7 +18,8 @@ export const useDrawerComposite = (engine: EngineApi | null) => {
             const playlist = usePlaylist.getState()
             const current = playlist.entries[playlist.currentIndex]
             const level = current ? playlist.best[current.imageId] : undefined
-            const drawer = useEditStore.getState().state?.drawer
+            const edit = useEditStore.getState()
+            const drawer = edit.imageId === current?.imageId ? edit.state?.drawer : null
             const photo = drawer && drawerNeedsPhoto(drawer) ? engine.readProcessedSrgb() : null
             engine.setDrawerCanvas(level && drawer ? renderDrawerCanvas(drawer, level.width, level.height, photo) : null)
         }
@@ -28,7 +30,7 @@ export const useDrawerComposite = (engine: EngineApi | null) => {
             const level = current ? playlist.best[current.imageId] : undefined
             const editState = useEditStore.getState().state
             const drawer = editState?.drawer ?? null
-            const levelKey = current && level ? `${current.imageId}:${level.width}x${level.height}` : ''
+            const levelKey = current && level ? `${current.imageId}:${level.level}:${level.rev}:${level.width}x${level.height}` : ''
             const photoDirty = drawerNeedsPhoto(drawer) && editState !== lastState
             if (drawer === lastDrawer && levelKey === lastLevelKey && !photoDirty) return
             lastDrawer = drawer

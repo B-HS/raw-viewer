@@ -24,7 +24,6 @@ const LEVEL_STEPS = ['l0', 'l1', 'l2'] as const
 
 export const Viewport: FC = () => {
     const { t } = useTranslation()
-    const { canvasRef } = useRenderEngine()
     const engine = useUiStore((state) => state.engine)
     const caps = useUiStore((state) => state.renderCaps)
     const gpuError = useUiStore((state) => state.gpuError)
@@ -34,6 +33,9 @@ export const Viewport: FC = () => {
     const errors = usePlaylist((state) => state.errors)
     const cropEditMode = useUiStore((state) => state.cropEditMode)
     const scanEditMode = useUiStore((state) => state.scanEditMode)
+    const editImageId = useEditStore((state) => state.imageId)
+    const hasEditState = useEditStore((state) => state.state !== null)
+    const drawerTool = useUiStore((state) => state.drawerTool)
     const drawerEditMode = useUiStore((state) => state.drawerEditMode)
     const compare = useUiStore((state) => state.compare)
     const sideBySide = useUiStore((state) => state.sideBySide)
@@ -45,6 +47,7 @@ export const Viewport: FC = () => {
     const level = current ? best[current.imageId] : undefined
     const error = current ? errors[current.imageId] : undefined
     const noProfile = level?.hasColorProfile === false
+    const { canvasRef } = useRenderEngine(!gpuError && !current?.isAnimated)
 
     const sampleWhiteBalance = (event: React.MouseEvent) => {
         if (!engine || !useEditStore.getState().isRaw) {
@@ -154,7 +157,9 @@ export const Viewport: FC = () => {
 
             {cropEditMode && <CropOverlay />}
             {scanEditMode && <ScanOverlay />}
-            {drawerEditMode && <DrawerOverlay />}
+            {drawerEditMode && hasEditState && editImageId === current?.imageId && level && level.level !== 'l0' && (
+                <DrawerOverlay key={`${current.imageId}:${drawerTool}`} />
+            )}
 
             <div className='pointer-events-none absolute left-3 top-3 flex flex-col gap-2'>
                 {caps?.lowPrecision && (

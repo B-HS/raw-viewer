@@ -32,8 +32,8 @@ export const ZoomControl: FC = () => {
                 step={1}
                 value={sliderValue}
                 onChange={(event) => requestZoom({ ratio: Number(event.target.value) / 100 })}
-                aria-label={t('viewport.zoomSlider')}
-                title={t('viewport.zoomSlider')}
+                aria-label={t('panel.detail.zoomSlider')}
+                title={t('panel.detail.zoomSlider')}
                 className='w-24 accent-neutral-300'
             />
             <span className='w-10 text-right tabular-nums'>{percent}%</span>

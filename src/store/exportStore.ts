@@ -317,6 +317,8 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                 const entry = usePlaylist.getState().entries.find((item) => item.imageId === imageId)
                 const name = entry?.fileName ?? imageId
                 set({ currentName: name })
+                let pendingJobId: string | null = null
+                let releaseJob: (() => void) | null = null
                 try {
                     const envelope = await getEditState(imageId)
                     const resolved = await ensureAethSource(imageId)
@@ -335,6 +337,7 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                         lensProfile,
                         buildExportDrawer(envelope.state.drawer, resolved.source.width, resolved.source.height),
                     )
+                    releaseJob = job.release
                     if (job.downscaled) set({ warning: i18n.t('export.warnDownscaled') })
                     const outputDir = resolveOutputDir(get().settings, entry)
                     const request = buildRequest(
@@ -347,15 +350,12 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                         envelope.state.meta.appliedPreset,
                     )
                     const jobId = await exportBegin(request)
+                    pendingJobId = jobId
                     const completed = await job.stream(
                         (tile) => exportTile(jobId, tile),
                         () => get().cancelRequested,
                     )
-                    job.release()
-                    if (!completed) {
-                        await exportCancel(jobId).catch(() => undefined)
-                        break
-                    }
+                    if (!completed) break
                     const watermark = get().settings.watermark
                     if (watermark.enabled) {
                         const [outputWidth, outputHeight] = outputDims(get().settings, job.width, job.height)
@@ -364,12 +364,22 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                         if (overlay) await exportSetWatermark(jobId, overlay)
                     }
                     const path = await exportFinish(jobId)
+                    pendingJobId = null
                     set((state) => ({ done: state.done + 1, lastOutputPath: path }))
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error)
                     set((state) => ({ failures: [...state.failures, { imageId, name, message }], done: state.done + 1 }))
+                } finally {
+                    releaseJob?.()
+                    if (pendingJobId) {
+                        try {
+                            await exportCancel(pendingJobId)
+                        } catch {}
+                    }
                 }
             }
+        } catch (error) {
+            set({ warning: error instanceof Error ? error.message : i18n.t('editor.saveFailed') })
         } finally {
             engine.dispose()
             const cancelled = get().cancelRequested
@@ -388,6 +398,7 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
     runDng: async (imageId, name, entry) => {
         const outDir = resolveOutputDir(get().settings, entry)
         try {
+            await useEditStore.getState().flushPending()
             const result = await exportDng(imageId, outDir)
             useToast.getState().show(result.xmpInjected ? i18n.t('toast.dngDone') : i18n.t('toast.dngNoXmp'))
             revealItemInDir(result.path).catch(() => undefined)
@@ -402,6 +413,7 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
         for (const item of items) {
             const outDir = resolveOutputDir(get().settings, item.entry)
             try {
+                await useEditStore.getState().flushPending()
                 const result = await exportDng(item.imageId, outDir)
                 lastPath = result.path
             } catch {
@@ -425,6 +437,8 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
             return
         }
         useToast.getState().show(i18n.t('toast.editedRendering', { name }))
+        let pendingJobId: string | null = null
+        let releaseJob: (() => void) | null = null
         try {
             await useEditStore.getState().flushPending()
             const envelope = await getEditState(imageId)
@@ -440,6 +454,7 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
                 lensProfile,
                 buildExportDrawer(envelope.state.drawer, resolved.source.width, resolved.source.height),
             )
+            releaseJob = job.release
             const settings: ExportSettings = {
                 format: 'tiff',
                 quality: 100,
@@ -456,21 +471,25 @@ export const useExportStore = create<ExportStoreState>((set, get) => ({
             }
             const request = buildRequest(settings, imageId, job.width, job.height, 1, dirname(entry.path), envelope.state.meta.appliedPreset)
             const jobId = await exportBegin(request)
+            pendingJobId = jobId
             const completed = await job.stream(
                 (tile) => exportTile(jobId, tile),
                 () => false,
             )
-            job.release()
-            if (!completed) {
-                await exportCancel(jobId).catch(() => undefined)
-                return
-            }
+            if (!completed) return
             const path = await exportFinish(jobId)
+            pendingJobId = null
             await openWithEdited(path, appPath)
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             useToast.getState().show(i18n.t('toast.editedFailed', { message }))
         } finally {
+            releaseJob?.()
+            if (pendingJobId) {
+                try {
+                    await exportCancel(pendingJobId)
+                } catch {}
+            }
             engine.dispose()
         }
     },
